@@ -8,7 +8,6 @@
         </div>
       </template>
       <el-table :data="regions" size="small">
-        <el-table-column prop="id" label="地区 ID" width="120" />
         <el-table-column prop="name" label="显示名称" min-width="140" />
         <el-table-column prop="sort" label="排序" width="80" />
         <el-table-column label="是否显示" width="100">
@@ -111,13 +110,6 @@
 
     <el-dialog v-model="regionVisible" :title="regionEditing ? '编辑地区' : '新增地区'" width="440px">
       <el-form label-width="110px">
-        <el-form-item label="地区 ID" required>
-          <el-input
-            v-model="regionForm.id"
-            :disabled="regionEditing"
-            placeholder="英文标识，如 shanghai"
-          />
-        </el-form-item>
         <el-form-item label="显示名称" required>
           <el-input v-model="regionForm.name" placeholder="例如：上海市" />
         </el-form-item>
@@ -305,13 +297,12 @@ function openRegion(row) {
 }
 
 async function saveRegion() {
-  if (!regionForm.id?.trim()) {
-    ElMessage.warning('请填写地区 ID')
-    return
-  }
   if (!regionForm.name?.trim()) {
     ElMessage.warning('请填写显示名称')
     return
+  }
+  if (!regionEditing.value) {
+    regionForm.id = 'r' + Date.now()
   }
   const payload = {
     id: regionForm.id.trim(),
