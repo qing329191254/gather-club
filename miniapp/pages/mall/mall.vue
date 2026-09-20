@@ -53,6 +53,8 @@
 
 <script>
 	import { mallGoods, mallPoints } from '../../common/mall-goods.js'
+	import { api } from '../../common/api.js'
+	import { getUser, refreshProfile, silentLogin, isLoggedIn } from '../../common/auth.js'
 
 	export default {
 		data() {
@@ -64,7 +66,22 @@
 		onLoad() {
 			this.goods = mallGoods
 		},
+		onShow() {
+			this.loadData()
+		},
 		methods: {
+			async loadData() {
+				if (!isLoggedIn()) {
+					await silentLogin()
+				} else {
+					await refreshProfile()
+				}
+				this.points = getUser().points || 0
+				try {
+					const res = await api.mallGoods()
+					if (res.list && res.list.length) this.goods = res.list
+				} catch (e) {}
+			},
 			onRules() {
 				uni.navigateTo({ url: '/pages/mall/rules' })
 			},

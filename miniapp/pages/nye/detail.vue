@@ -98,6 +98,7 @@
 
 <script>
 	import { findNyeDetail } from '../../common/nye-data.js'
+	import { api } from '../../common/api.js'
 
 	export default {
 		data() {
@@ -107,7 +108,8 @@
 				navSolid: false,
 				bannerIndex: 0,
 				stewardVisible: false,
-				detail: null
+				detail: null,
+				nyeId: ''
 			}
 		},
 		computed: {
@@ -126,7 +128,29 @@
 			const sys = uni.getSystemInfoSync()
 			this.statusBarHeight = sys.statusBarHeight || 20
 			this.heroHeight = Math.round((sys.windowWidth || 375) * (500 / 750))
-			this.detail = findNyeDetail(query.id)
+			this.nyeId = (query && query.id) || 'gongkang'
+			this.detail = findNyeDetail(this.nyeId)
+			api
+				.nyeDetail(this.nyeId)
+				.then((res) => {
+					if (!res) return
+					this.detail = {
+						id: res.id,
+						name: res.name,
+						cover: res.cover,
+						price: res.price,
+						originPrice: res.originPrice,
+						tag: res.tag,
+						address: res.address,
+						route: res.route,
+						lat: res.lat,
+						lng: res.lng,
+						banners: res.banners || [],
+						detailImages: res.detailImages || [],
+						recentBuy: res.recentBuy || {}
+					}
+				})
+				.catch(() => {})
 		},
 		onPageScroll(e) {
 			this.navSolid = e.scrollTop > 120

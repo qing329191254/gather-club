@@ -69,6 +69,7 @@
 <script>
 	import { gatherRegions } from '../../common/regions.js'
 	import { gatherTabs, gatherProducts } from '../../common/gather-data.js'
+	import { api } from '../../common/api.js'
 
 	export default {
 		data() {
@@ -106,6 +107,7 @@
 			this.statusBarHeight = sys.statusBarHeight || 20
 			const rpx = (sys.windowWidth || 375) / 750
 			this.headHeight = this.statusBarHeight + Math.round(176 * rpx)
+			this.loadGather()
 		},
 		onShow() {
 			uni.hideTabBar({ fail() {} })
@@ -117,6 +119,26 @@
 			}
 		},
 		methods: {
+			loadGather() {
+				api
+					.gather()
+					.then((res) => {
+						if (res.tabs && res.tabs.length) {
+							this.tabs = res.tabs.map((t) => ({
+								key: t.key,
+								name: t.name,
+								showSold: t.showSold
+							}))
+							if (!this.tabs.some((t) => t.key === this.currentTab)) {
+								this.currentTab = this.tabs[0].key
+							}
+						}
+						if (res.products && res.products.length) {
+							this.products = res.products
+						}
+					})
+					.catch(() => {})
+			},
 			switchTab(key) {
 				if (this.currentTab === key) return
 				this.currentTab = key

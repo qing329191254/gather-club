@@ -63,7 +63,8 @@
 		getUser,
 		isLoggedIn,
 		needPhoneLoginPrompt,
-		silentLogin
+		silentLogin,
+		refreshProfile
 	} from '../../common/auth.js'
 	import { resolveVip } from '../../common/vip-levels.js'
 
@@ -107,6 +108,11 @@
 		methods: {
 			refreshUser() {
 				this.user = getUser()
+				if (isLoggedIn()) {
+					refreshProfile().then((user) => {
+						this.user = user
+					})
+				}
 			},
 			checkPhoneLogin() {
 				if (needPhoneLoginPrompt()) {

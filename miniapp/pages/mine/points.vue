@@ -26,7 +26,8 @@
 </template>
 
 <script>
-	import { getUser } from '../../common/auth.js'
+	import { getUser, refreshProfile, isLoggedIn, silentLogin } from '../../common/auth.js'
+	import { api } from '../../common/api.js'
 
 	export default {
 		data() {
@@ -36,30 +37,20 @@
 			}
 		},
 		onShow() {
-			const user = getUser()
-			this.balance = user.points != null ? user.points : 14
-			this.list = [
-				{
-					id: 'p1',
-					title: '每日签到',
-					time: '2026-09-19 13:35:28',
-					value: 2
-				},
-				{
-					id: 'p2',
-					title: '每日签到',
-					time: '2026-09-19 00:21:07',
-					value: 2
-				},
-				{
-					id: 'p3',
-					title: '预约直播',
-					time: '2026-08-17 19:33:07',
-					value: 10
+			this.loadPoints()
+		},
+		methods: {
+			async loadPoints() {
+				if (!isLoggedIn()) await silentLogin()
+				else await refreshProfile()
+				this.balance = getUser().points || 0
+				try {
+					const res = await api.points()
+					this.balance = res.balance != null ? res.balance : this.balance
+					this.list = res.list || []
+				} catch (e) {
+					this.list = []
 				}
-			]
-			if (!this.balance) {
-				this.balance = this.list.reduce((sum, row) => sum + (row.value || 0), 0)
 			}
 		}
 	}

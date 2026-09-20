@@ -150,6 +150,8 @@
 	import { findNyeDetail, isNyeOpenDate, nyePackages } from '../../common/nye-data.js'
 	import { getAvailability, lockRooms } from '../../common/room-inventory.js'
 	import { prependOrder } from '../../common/orders-store.js'
+	import { api } from '../../common/api.js'
+	import { isLoggedIn, silentLogin } from '../../common/auth.js'
 
 	export default {
 		data() {
@@ -257,6 +259,30 @@
 				this.specId = first.id
 				this.people = first.people
 			}
+			api
+				.nyeDetail(query.id || 'gongkang')
+				.then((res) => {
+					if (!res) return
+					this.detail = {
+						id: res.id,
+						name: res.name,
+						cover: res.cover,
+						price: res.price,
+						address: res.address,
+						route: res.route,
+						lat: res.lat,
+						lng: res.lng,
+						banners: res.banners || [],
+						detailImages: res.detailImages || []
+					}
+					this.packages = res.packages && res.packages.length ? res.packages : nyePackages(this.detail)
+					const ok = this.packages.find((item) => !item.disabled)
+					if (ok) {
+						this.specId = ok.id
+						this.people = ok.people
+					}
+				})
+				.catch(() => {})
 		},
 		methods: {
 			pickSpec(item) {
@@ -314,7 +340,6 @@
 				const cur = this.current
 				if (!cur) return
 
-				// 已选日期时校验并锁定包房；稍后选日期则仅生成订单不锁库存
 				if (this.date) {
 					const avail = getAvailability(storeId, this.date, this.roomSlot)
 					if (avail.full) {
@@ -329,49 +354,40 @@
 					content: `需支付 ¥${amount}`,
 					confirmText: '立即支付',
 					confirmColor: '#e54148',
-					success: (res) => {
+					success: async (res) => {
 						if (!res.confirm) return
 						uni.showLoading({ title: '支付中', mask: true })
-						setTimeout(() => {
-							uni.hideLoading()
-							const orderId = 'nye_' + Date.now()
-							if (this.date) {
-								const locked = lockRooms({
-									storeId,
-									date: this.date,
-									slot: this.roomSlot,
-									qty: this.quantity,
-									orderId
-								})
-								if (!locked.ok) {
-									uni.showToast({ title: locked.message || '包房已满', icon: 'none' })
-									return
-								}
-							}
-							prependOrder({
-								id: orderId,
+						try {
+							if (!isLoggedIn()) await silentLogin()
+							const created = await api.createOrder({
 								type: 'nye',
-								storeId,
-								storeName,
-								status: 'paid',
-								statusText: '待核销',
-								cover: cur.cover || (this.detail && this.detail.cover) || '/static/orders/nye-xinzhuang.png',
+								store_id: storeId,
+								store_name: storeName,
 								title: storeName + '-年夜饭',
 								spec: cur.name + (this.date ? ' · ' + this.date : ''),
+								cover: cur.cover || (this.detail && this.detail.cover) || '/static/orders/nye-xinzhuang.png',
 								quantity: this.quantity,
 								price: amount,
 								amount,
-								roomDate: this.date || '',
-								roomSlot: this.roomSlot,
-								contactName: this.name,
-								contactPhone: this.phone,
-								remark: this.remark
+								contact_name: this.name,
+								contact_phone: this.phone,
+								people: this.people,
+								remark: this.remark,
+								room_date: this.date || '',
+								room_slot: this.date ? this.roomSlot : ''
 							})
+							if (created && created.id) {
+								await api.payOrder(created.id)
+							}
+							uni.hideLoading()
 							uni.showToast({ title: '支付成功', icon: 'success' })
 							setTimeout(() => {
 								uni.navigateTo({ url: '/pages/orders/orders' })
 							}, 600)
-						}, 700)
+						} catch (e) {
+							uni.hideLoading()
+							uni.showToast({ title: (e && e.message) || '支付失败', icon: 'none' })
+						}
 					}
 				})
 			},

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -472,6 +472,52 @@ def cancel_order(order_id: str, db: Session = Depends(get_db)):
     order.status_text = STATUS_TEXT["cancelled"]
     db.commit()
     return _order_out(order)
+
+
+@router.post("/mall/redeem")
+def mall_redeem(
+    payload: dict = Body(default={}),
+    x_openid: str = Header(default="", alias="X-Openid"),
+    openid: str = Query(default=""),
+    db: Session = Depends(get_db),
+):
+    oid = x_openid or openid or "anonymous"
+    user = _ensure_user(db, oid)
+    goods_id = int(payload.get("goodsId") or payload.get("goods_id") or 0)
+    row = db.query(MallGoods).filter(MallGoods.id == goods_id, MallGoods.enabled.is_(True)).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="商品不存在")
+    if row.stock <= 0:
+        raise HTTPException(status_code=400, detail="库存不足")
+    if user.points < row.cost:
+        raise HTTPException(status_code=400, detail="积分不足")
+    user.points -= row.cost
+    row.stock -= 1
+    db.add(PointLedger(user_id=user.id, title=f"兑换-{row.name}", value=-row.cost))
+    order = Order(
+        id=f"mall{int(datetime.utcnow().timestamp() * 1000)}",
+        user_id=user.id,
+        openid=oid,
+        type="mall",
+        store_name="积分商城",
+        title=row.title or row.name,
+        spec=f"{row.cost}积分",
+        cover=row.cover,
+        quantity=1,
+        price=0,
+        amount=0,
+        status="paid",
+        status_text="待核销",
+    )
+    db.add(order)
+    db.commit()
+    db.refresh(user)
+    return {
+        "ok": True,
+        "balance": user.points,
+        "orderId": order.id,
+        "message": "兑换成功",
+    }
 
 
 @router.get("/user/profile")

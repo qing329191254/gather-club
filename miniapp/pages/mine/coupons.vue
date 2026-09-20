@@ -36,6 +36,9 @@
 </template>
 
 <script>
+	import { api } from '../../common/api.js'
+	import { isLoggedIn, silentLogin } from '../../common/auth.js'
+
 	export default {
 		data() {
 			return {
@@ -55,6 +58,22 @@
 		computed: {
 			currentList() {
 				return this.coupons[this.current] || []
+			}
+		},
+		onShow() {
+			this.loadCoupons()
+		},
+		methods: {
+			async loadCoupons() {
+				if (!isLoggedIn()) await silentLogin()
+				try {
+					const res = await api.coupons()
+					this.coupons = {
+						unused: res.unused || [],
+						used: res.used || [],
+						expired: res.expired || []
+					}
+				} catch (e) {}
 			}
 		}
 	}

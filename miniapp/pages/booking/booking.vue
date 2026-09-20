@@ -133,6 +133,8 @@
 		ensureInventory
 	} from '../../common/room-inventory.js'
 	import { prependOrder } from '../../common/orders-store.js'
+	import { api } from '../../common/api.js'
+	import { isLoggedIn, silentLogin } from '../../common/auth.js'
 
 	const STORE_MAP = {
 		shibo: {
@@ -259,9 +261,11 @@
 			this.viewMonth = tomorrow.getMonth() + 1
 			this.refreshMonth()
 			this.tick++
+			this.loadRemoteMonth()
 		},
 		onShow() {
 			this.refreshMonth()
+			this.loadRemoteMonth()
 			this.tick++
 		},
 		methods: {
@@ -271,11 +275,22 @@
 			refreshMonth() {
 				this.monthMap = getMonthAvailability(this.storeId, this.viewYear, this.viewMonth)
 			},
+			async loadRemoteMonth() {
+				try {
+					const res = await api.roomMonth(this.storeId, this.viewYear, this.viewMonth)
+					if (res && typeof res === 'object') {
+						this.monthMap = res
+						this.tick++
+					}
+				} catch (e) {}
+			},
 			slotInfo(key) {
 				this.tick
 				if (!this.date) {
 					return { remain: 0, full: false, statusText: '请先选日期' }
 				}
+				const fromMonth = this.monthMap && this.monthMap[this.date] && this.monthMap[this.date][key]
+				if (fromMonth) return fromMonth
 				return getAvailability(this.storeId, this.date, key)
 			},
 			pickSlot(item) {
@@ -296,6 +311,7 @@
 					this.draftDate = ''
 				}
 				this.refreshMonth()
+				this.loadRemoteMonth()
 				this.calendarVisible = true
 			},
 			closeCalendar() {
@@ -314,6 +330,7 @@
 				this.viewYear = y
 				this.viewMonth = m
 				this.refreshMonth()
+				this.loadRemoteMonth()
 			},
 			pickDate(cell) {
 				if (!cell.open || cell.muted) return
@@ -327,17 +344,17 @@
 				this.date = this.draftDate
 				this.calendarVisible = false
 				this.tick++
-				const lunch = getAvailability(this.storeId, this.date, 'lunch')
-				const dinner = getAvailability(this.storeId, this.date, 'dinner')
+				const lunch = this.slotInfo('lunch')
+				const dinner = this.slotInfo('dinner')
 				if (this.slot === 'lunch' && lunch.full && !dinner.full) this.slot = 'dinner'
 				if (this.slot === 'dinner' && dinner.full && !lunch.full) this.slot = 'lunch'
 			},
-			onSubmit() {
+			async onSubmit() {
 				if (!this.date) {
 					uni.showToast({ title: '请选择日期', icon: 'none' })
 					return
 				}
-				const avail = getAvailability(this.storeId, this.date, this.slot)
+				const avail = this.slotInfo(this.slot)
 				if (avail.full) {
 					uni.showToast({ title: '该时段包房已满', icon: 'none' })
 					return
@@ -352,46 +369,44 @@
 					return
 				}
 
-				const orderId = 'rb_' + Date.now()
+				if (!isLoggedIn()) await silentLogin()
+
 				const slotMeta = SLOTS.find((s) => s.key === this.slot) || SLOTS[1]
-				const result = lockRooms({
-					storeId: this.storeId,
-					date: this.date,
-					slot: this.slot,
-					qty: 1,
-					orderId
-				})
-				if (!result.ok) {
-					uni.showToast({ title: result.message || '预约失败', icon: 'none' })
+				uni.showLoading({ title: '提交中', mask: true })
+				try {
+					const created = await api.createOrder({
+						type: 'room',
+						store_id: this.storeId,
+						store_name: this.store.name,
+						title: `${this.store.name.replace('天天俱乐部', '')}-包房预约`,
+						spec: `${this.date} ${slotMeta.name}（${slotMeta.time}）·${this.people}人`,
+						cover: this.store.cover,
+						quantity: 1,
+						price: 0,
+						amount: 0,
+						contact_name: this.name,
+						contact_phone: phone,
+						people: this.people,
+						remark: this.remark,
+						room_date: this.date,
+						room_slot: this.slot
+					})
+					if (created && created.id) {
+						await api.payOrder(created.id)
+					}
+					uni.hideLoading()
 					this.tick++
-					return
+					this.loadRemoteMonth()
+					uni.showToast({ title: '预约成功', icon: 'success' })
+					setTimeout(() => {
+						uni.navigateTo({ url: '/pages/orders/orders' })
+					}, 600)
+				} catch (e) {
+					uni.hideLoading()
+					uni.showToast({ title: (e && e.message) || '预约失败', icon: 'none' })
+					this.tick++
+					this.loadRemoteMonth()
 				}
-
-				prependOrder({
-					id: orderId,
-					type: 'room',
-					storeId: this.storeId,
-					storeName: this.store.name,
-					status: 'paid',
-					statusText: '待核销',
-					cover: this.store.cover,
-					title: `${this.store.name.replace('天天俱乐部', '')}-包房预约`,
-					spec: `${this.date} ${slotMeta.name}（${slotMeta.time}）·${this.people}人`,
-					quantity: 1,
-					price: 0,
-					amount: 0,
-					roomDate: this.date,
-					roomSlot: this.slot,
-					contactName: this.name,
-					contactPhone: phone,
-					remark: this.remark
-				})
-
-				this.tick++
-				uni.showToast({ title: '预约成功', icon: 'success' })
-				setTimeout(() => {
-					uni.navigateTo({ url: '/pages/orders/orders' })
-				}, 600)
 			}
 		}
 	}

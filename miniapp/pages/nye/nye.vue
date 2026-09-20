@@ -66,6 +66,7 @@
 
 <script>
 	import { nyeList } from '../../common/nye-data.js'
+	import { api } from '../../common/api.js'
 
 	export default {
 		data() {
@@ -87,6 +88,12 @@
 			const width = sys.windowWidth || 375
 			this.heroHeight = Math.round(width * (500 / 750))
 			this.list = nyeList
+			api
+				.nyeList()
+				.then((res) => {
+					if (res.list && res.list.length) this.list = res.list
+				})
+				.catch(() => {})
 		},
 		onPageScroll(e) {
 			this.navSolid = e.scrollTop > 160

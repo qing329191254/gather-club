@@ -41,6 +41,8 @@
 			</view>
 		</view>
 
+		<view v-if="!orders.length" class="empty">暂无订单</view>
+
 		<view class="end-line">
 			<view class="end-rule" />
 			<text class="end-text">没有更多了</text>
@@ -50,61 +52,8 @@
 </template>
 
 <script>
-	import { releaseRooms } from '../../common/room-inventory.js'
-
-	const ORDERS_KEY = 'gather_orders_v3'
-	const COVER = '/static/orders/nye-xinzhuang.png'
-
-	const defaultOrders = [
-		{
-			id: 'o-pending-1',
-			storeName: '天天俱乐部上海莘庄店',
-			status: 'pending',
-			statusText: '待支付',
-			cover: COVER,
-			title: '上海莘庄店-天天俱乐部-2027年夜饭',
-			spec: '三羊开泰宴 (10-12人)',
-			quantity: 1,
-			price: 2688,
-			amount: 2688
-		},
-		{
-			id: 'o-cancel-1',
-			storeName: '天天俱乐部上海共康店',
-			status: 'cancelled',
-			statusText: '已取消',
-			cover: COVER,
-			title: '上海共康店-天天俱乐部-2027年夜饭',
-			spec: '喜气羊羊宴 (10-12人)',
-			quantity: 1,
-			price: 0,
-			amount: 1988
-		},
-		{
-			id: 'o-cancel-2',
-			storeName: '天天俱乐部上海共康店',
-			status: 'cancelled',
-			statusText: '已取消',
-			cover: COVER,
-			title: '上海共康店-天天俱乐部-2027年夜饭',
-			spec: '喜气羊羊宴 (10-12人)',
-			quantity: 1,
-			price: 0,
-			amount: 1988
-		},
-		{
-			id: 'o-cancel-3',
-			storeName: '天天俱乐部上海共康店',
-			status: 'cancelled',
-			statusText: '已取消',
-			cover: COVER,
-			title: '上海共康店-天天俱乐部-2027年夜饭',
-			spec: '喜气羊羊宴 (10-12人)',
-			quantity: 1,
-			price: 0,
-			amount: 1988
-		}
-	]
+	import { api } from '../../common/api.js'
+	import { isLoggedIn, silentLogin } from '../../common/auth.js'
 
 	export default {
 		data() {
@@ -116,19 +65,34 @@
 			this.loadOrders()
 		},
 		methods: {
-			loadOrders() {
-				try {
-					const raw = uni.getStorageSync(ORDERS_KEY)
-					if (Array.isArray(raw) && raw.length) {
-						this.orders = raw
-						return
-					}
-				} catch (e) {}
-				this.orders = defaultOrders.map((item) => Object.assign({}, item))
-				this.persist()
+			mapOrder(row) {
+				return {
+					id: row.id,
+					type: row.type,
+					storeId: row.storeId,
+					storeName: row.storeName,
+					status: row.status,
+					statusText: row.statusText,
+					cover: row.cover || '/static/orders/nye-xinzhuang.png',
+					title: row.title,
+					spec: row.spec,
+					quantity: row.quantity || 1,
+					price: row.price,
+					amount: row.amount,
+					roomDate: row.roomDate,
+					roomSlot: row.roomSlot
+				}
 			},
-			persist() {
-				uni.setStorageSync(ORDERS_KEY, this.orders)
+			async loadOrders() {
+				if (!isLoggedIn()) {
+					await silentLogin()
+				}
+				try {
+					const res = await api.orders()
+					this.orders = (res.list || []).map((row) => this.mapOrder(row))
+				} catch (e) {
+					uni.showToast({ title: '订单加载失败', icon: 'none' })
+				}
 			},
 			onOrder(order) {
 				if (order.status === 'pending') {
@@ -142,21 +106,15 @@
 					title: '取消订单',
 					content: '确定取消该订单吗？取消后不可恢复',
 					confirmColor: '#e54148',
-					success: (res) => {
+					success: async (res) => {
 						if (!res.confirm) return
-						if (order.roomDate && order.roomSlot && order.storeId) {
-							releaseRooms({
-								storeId: order.storeId,
-								date: order.roomDate,
-								slot: order.roomSlot,
-								qty: order.quantity || 1
-							})
+						try {
+							await api.cancelOrder(order.id)
+							uni.showToast({ title: '订单已取消', icon: 'none' })
+							this.loadOrders()
+						} catch (e) {
+							uni.showToast({ title: (e && e.message) || '取消失败', icon: 'none' })
 						}
-						order.status = 'cancelled'
-						order.statusText = '已取消'
-						order.price = 0
-						this.persist()
-						uni.showToast({ title: '订单已取消', icon: 'none' })
 					}
 				})
 			},
@@ -167,17 +125,18 @@
 					content: `需支付 ¥${amount}`,
 					confirmText: '立即支付',
 					confirmColor: '#e54148',
-					success: (res) => {
+					success: async (res) => {
 						if (!res.confirm) return
 						uni.showLoading({ title: '支付中', mask: true })
-						setTimeout(() => {
+						try {
+							await api.payOrder(order.id)
 							uni.hideLoading()
-							order.status = 'paid'
-							order.statusText = '待核销'
-							order.price = amount
-							this.persist()
 							uni.showToast({ title: '支付成功', icon: 'success' })
-						}, 700)
+							this.loadOrders()
+						} catch (e) {
+							uni.hideLoading()
+							uni.showToast({ title: (e && e.message) || '支付失败', icon: 'none' })
+						}
 					}
 				})
 			}
@@ -191,6 +150,13 @@
 		box-sizing: border-box;
 		padding: 24rpx 24rpx calc(40rpx + env(safe-area-inset-bottom));
 		background: #f5f5f5;
+	}
+
+	.empty {
+		text-align: center;
+		color: #999;
+		padding: 80rpx 0 40rpx;
+		font-size: 28rpx;
 	}
 
 	.order-card {
@@ -218,15 +184,15 @@
 	.store-bar {
 		width: 6rpx;
 		height: 28rpx;
-		border-radius: 3rpx;
-		background: #f08a3a;
+		border-radius: 6rpx;
+		background: #e54148;
 		margin-right: 12rpx;
 		flex-shrink: 0;
 	}
 
 	.store-name {
 		font-size: 28rpx;
-		color: #333333;
+		color: #222;
 		font-weight: 600;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -234,73 +200,64 @@
 	}
 
 	.order-status {
-		font-size: 28rpx;
-		color: #f08a3a;
+		font-size: 26rpx;
+		color: #e54148;
 		flex-shrink: 0;
 	}
 
 	.order-body {
 		display: flex;
-		align-items: stretch;
 	}
 
 	.thumb {
 		width: 160rpx;
 		height: 160rpx;
 		border-radius: 12rpx;
+		background: #f0f0f0;
 		flex-shrink: 0;
-		background: #eeeeee;
 	}
 
 	.info {
 		flex: 1;
-		min-width: 0;
 		margin-left: 20rpx;
+		min-width: 0;
 		display: flex;
 		flex-direction: column;
-		justify-content: space-between;
-		padding: 2rpx 0;
-		min-height: 160rpx;
 	}
 
-	.info-top,
-	.info-bottom {
+	.info-top {
 		display: flex;
-		align-items: flex-start;
 		justify-content: space-between;
-	}
-
-	.info-mid {
-		margin-top: 8rpx;
+		align-items: flex-start;
 	}
 
 	.title {
 		flex: 1;
-		min-width: 0;
 		font-size: 28rpx;
-		color: #222222;
+		color: #222;
 		line-height: 1.4;
-		display: -webkit-box;
-		-webkit-box-orient: vertical;
-		-webkit-line-clamp: 2;
-		overflow: hidden;
-		padding-right: 16rpx;
-		word-break: break-all;
+		padding-right: 12rpx;
 	}
 
 	.qty {
-		font-size: 26rpx;
-		color: #999999;
+		font-size: 24rpx;
+		color: #999;
 		flex-shrink: 0;
-		line-height: 1.4;
+	}
+
+	.info-mid {
+		margin-top: 12rpx;
 	}
 
 	.spec {
 		font-size: 24rpx;
-		color: #999999;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+		color: #888;
+	}
+
+	.info-bottom {
+		margin-top: auto;
+		display: flex;
+		justify-content: flex-end;
 	}
 
 	.spacer {
@@ -309,58 +266,57 @@
 
 	.price {
 		font-size: 32rpx;
-		color: #e54148;
-		font-weight: 700;
-		flex-shrink: 0;
-		line-height: 1;
+		color: #222;
+		font-weight: 600;
 	}
 
 	.order-actions {
-		margin-top: 28rpx;
+		margin-top: 24rpx;
+		padding-top: 20rpx;
+		border-top: 1rpx solid #f0f0f0;
 		display: flex;
 		justify-content: flex-end;
-		align-items: center;
+		gap: 16rpx;
 	}
 
 	.btn {
-		min-width: 168rpx;
+		min-width: 160rpx;
 		height: 64rpx;
+		line-height: 64rpx;
+		text-align: center;
+		border-radius: 64rpx;
+		font-size: 26rpx;
 		padding: 0 28rpx;
-		border-radius: 12rpx;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 28rpx;
 		box-sizing: border-box;
 	}
 
 	.btn.ghost {
-		margin-right: 16rpx;
-		background: #f3f3f3;
-		color: #333333;
+		color: #666;
+		border: 1rpx solid #ddd;
+		background: #fff;
 	}
 
 	.btn.solid {
+		color: #fff;
 		background: #e54148;
-		color: #ffffff;
 	}
 
 	.end-line {
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		padding: 40rpx 0 20rpx;
+		padding: 24rpx 0 8rpx;
 	}
 
 	.end-rule {
-		width: 80rpx;
+		width: 64rpx;
 		height: 1rpx;
-		background: #dddddd;
+		background: #ddd;
 	}
 
 	.end-text {
-		margin: 0 20rpx;
-		font-size: 24rpx;
-		color: #bbbbbb;
+		margin: 0 16rpx;
+		font-size: 22rpx;
+		color: #bbb;
 	}
 </style>

@@ -112,6 +112,9 @@
 </template>
 
 <script>
+	import { api } from '../../common/api.js'
+	import { isLoggedIn, silentLogin, refreshProfile, getUser, saveLogin, getOpenid } from '../../common/auth.js'
+
 	const WEEK_CN = ['日', '一', '二', '三', '四', '五', '六']
 	const STORAGE_KEY = 'checkin_makeup_claimed_date'
 
@@ -123,12 +126,13 @@
 	export default {
 		data() {
 			return {
-				signedToday: true,
-				monthPoints: 2,
-				signedDays: 1,
-				makeupDay: 18,
+				signedToday: false,
+				monthPoints: 0,
+				signedDays: 0,
+				makeupDay: 0,
 				makeupClaimed: false,
 				successVisible: false,
+				signedDates: [],
 				weeks: ['日', '一', '二', '三', '四', '五', '六'],
 				milestones: [
 					{ label: '签到5天', points: 2 },
@@ -145,13 +149,14 @@
 		onLoad(options) {
 			this.refreshClaimed()
 			this.buildCalendar(new Date())
+			this.loadMonth()
 			if (options && String(options.fromMakeup) === '1') {
 				this.handleShareEntry()
 			}
 		},
 		onShow() {
 			this.refreshClaimed()
-			this.buildCalendar(new Date())
+			this.loadMonth()
 		},
 		methods: {
 			refreshClaimed() {
@@ -161,10 +166,27 @@
 				uni.setStorageSync(STORAGE_KEY, todayKey())
 				this.makeupClaimed = true
 			},
+			async ensureLogin() {
+				if (!isLoggedIn()) await silentLogin()
+			},
+			async loadMonth() {
+				await this.ensureLogin()
+				const now = new Date()
+				try {
+					const res = await api.checkinMonth(now.getFullYear(), now.getMonth() + 1)
+					this.signedDates = res.dates || []
+					this.signedDays = res.signedDays || this.signedDates.length
+					this.monthPoints = res.monthPoints || 0
+					this.signedToday = this.signedDates.indexOf(todayKey()) >= 0
+					this.buildCalendar(now)
+				} catch (e) {
+					this.buildCalendar(now)
+				}
+			},
 			handleShareEntry() {
 				this.markClaimed()
 				this.successVisible = true
-				this.buildCalendar(new Date())
+				this.doCheckin(true)
 			},
 			buildCalendar(now) {
 				const y = now.getFullYear()
@@ -182,22 +204,30 @@
 					cells.push({ day: 0, mark: '', markText: '' })
 				}
 				for (let day = 1; day <= daysInMonth; day++) {
+					const key =
+						y + '-' + String(m + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0')
 					let mark = ''
 					let markText = ''
+					if (this.signedDates.indexOf(key) >= 0) {
+						mark = 'done'
+						markText = '✓'
+					}
 					if (day === d) {
-						mark = 'today'
-						markText = '今'
-					} else if (day === this.makeupDay && day < d) {
+						mark = this.signedToday ? 'done' : 'today'
+						markText = this.signedToday ? '✓' : '今'
+					} else if (!mark && day === this.makeupDay && day < d) {
 						mark = this.makeupClaimed ? 'done' : 'makeup'
 						markText = '补'
 					}
-					cells.push({ day, mark, markText })
+					cells.push({ day, mark, markText, key })
 				}
 				while (cells.length % 7 !== 0) {
 					cells.push({ day: 0, mark: '', markText: '' })
 				}
 				this.calendarCells = cells
-				this.signedDays = this.makeupClaimed ? 2 : 1
+				if (!this.signedDays) {
+					this.signedDays = this.signedDates.length || (this.makeupClaimed ? 2 : this.signedToday ? 1 : 0)
+				}
 			},
 			onRules() {
 				uni.showModal({
@@ -209,8 +239,36 @@
 			onDayTap(cell) {
 				if (cell.mark === 'makeup') {
 					this.onMakeup()
-				} else if (cell.mark === 'done') {
-					uni.showToast({ title: '已领取补签', icon: 'none' })
+					return
+				}
+				if (cell.mark === 'today' && !this.signedToday) {
+					this.doCheckin(false)
+					return
+				}
+				if (cell.mark === 'done') {
+					uni.showToast({ title: '已签到', icon: 'none' })
+				}
+			},
+			async doCheckin(makeup) {
+				await this.ensureLogin()
+				try {
+					const res = await api.checkin(!!makeup)
+					const data = (res && res.data) || {}
+					if (res && res.ok === false && !makeup) {
+						uni.showToast({ title: res.message || '今日已签到', icon: 'none' })
+						this.loadMonth()
+						return
+					}
+					if (data.balance != null) {
+						const user = getUser()
+						user.points = data.balance
+						saveLogin(user, getOpenid())
+					}
+					uni.showToast({ title: '签到成功 +' + (data.points || 2), icon: 'success' })
+					this.loadMonth()
+					await refreshProfile()
+				} catch (e) {
+					uni.showToast({ title: (e && e.message) || '签到失败', icon: 'none' })
 				}
 			},
 			onMakeup() {

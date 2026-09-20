@@ -1,3 +1,6 @@
+import { api } from './api.js'
+import { initCloud } from './cloud.js'
+
 const AUTH_KEY = 'gather_auth'
 const PRIVACY_KEY = 'gather_privacy'
 
@@ -9,7 +12,8 @@ const defaultUser = {
 	vip: 'V0会员',
 	vipLevel: 'V0',
 	vipIcon: '',
-	vipLabel: ''
+	vipLabel: '',
+	openid: ''
 }
 
 export function getPrivacyStatus() {
@@ -21,7 +25,6 @@ export function getPrivacyStatus() {
 }
 
 export function setPrivacyStatus(status) {
-	// agreed | declined
 	uni.setStorageSync(PRIVACY_KEY, status)
 }
 
@@ -45,15 +48,26 @@ export function getAuth() {
 export function getUser() {
 	const auth = getAuth()
 	if (auth && auth.user) {
-		return Object.assign({}, defaultUser, auth.user)
+		return Object.assign({}, defaultUser, auth.user, {
+			openid: auth.openid || (auth.user && auth.user.openid) || ''
+		})
 	}
 	return Object.assign({}, defaultUser)
 }
 
-export function saveLogin(user) {
+export function getOpenid() {
+	const auth = getAuth()
+	return (auth && auth.openid) || (auth && auth.user && auth.user.openid) || ''
+}
+
+export function saveLogin(user, openid) {
+	const merged = Object.assign({}, defaultUser, user || {})
+	const oid = openid || merged.openid || ''
+	if (oid) merged.openid = oid
 	const next = {
 		loggedIn: true,
-		user: Object.assign({}, defaultUser, user || {}),
+		openid: oid,
+		user: merged,
 		loginAt: Date.now()
 	}
 	uni.setStorageSync(AUTH_KEY, next)
@@ -65,33 +79,72 @@ export function logout() {
 	uni.removeStorageSync(AUTH_KEY)
 }
 
-/** 静默登录：拿微信登录态，并写入本地用户（演示环境模拟手机号） */
+function mapServerUser(raw, openid) {
+	const u = raw || {}
+	return {
+		nickname: u.nickname || '微信用户',
+		avatar: u.avatar || '',
+		phone: u.phone || '',
+		points: u.points != null ? u.points : 0,
+		vipLevel: u.vipLevel || u.vip_level || 'V0',
+		vip: u.vip || ((u.vipLevel || u.vip_level || 'V0') + '会员'),
+		vipIcon: u.vipIcon || '',
+		vipLabel: u.vipLabel || '',
+		openid: openid || u.openid || ''
+	}
+}
+
+/** 静默登录：wx.login 拿 code，换云托管用户 */
 export function silentLogin(extra) {
 	return new Promise((resolve) => {
-		const finish = (patch) => {
+		initCloud()
+		const finishLocal = (patch) => {
 			const base = getUser()
 			const user = Object.assign({}, base, {
 				nickname: (patch && patch.nickname) || base.nickname || '微信用户',
 				avatar: (patch && patch.avatar) || base.avatar || '',
-				phone: (patch && patch.phone) || base.phone || '13881794601',
+				phone: (patch && patch.phone) || base.phone || '',
 				points: base.points || 0,
 				vip: base.vip || 'V0会员'
 			}, extra || {})
-			const auth = saveLogin(user)
-			resolve(auth)
+			resolve(saveLogin(user, user.openid))
 		}
 
 		uni.login({
 			provider: 'weixin',
-			success: () => {
-				// 真机可继续换 openid / 解密手机号；此处做本地静默登录
-				finish({})
+			success: (loginRes) => {
+				const code = (loginRes && loginRes.code) || ''
+				api
+					.wxLogin({
+						code,
+						nickname: (extra && extra.nickname) || '',
+						avatar: (extra && extra.avatar) || '',
+						phone: (extra && extra.phone) || ''
+					})
+					.then((res) => {
+						const openid = res.openid || ''
+						const user = Object.assign({}, mapServerUser(res.user, openid), extra || {})
+						resolve(saveLogin(user, openid))
+					})
+					.catch(() => finishLocal(extra || {}))
 			},
-			fail: () => {
-				finish({})
-			}
+			fail: () => finishLocal(extra || {})
 		})
 	})
+}
+
+export function refreshProfile() {
+	if (!getOpenid()) {
+		return Promise.resolve(getUser())
+	}
+	return api
+		.profile()
+		.then((res) => {
+			const user = mapServerUser(res, getOpenid())
+			saveLogin(user, getOpenid())
+			return user
+		})
+		.catch(() => getUser())
 }
 
 export function needPhoneLoginPrompt() {

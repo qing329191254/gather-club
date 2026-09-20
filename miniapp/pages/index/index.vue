@@ -102,6 +102,7 @@
 		setPrivacyStatus,
 		silentLogin
 	} from '../../common/auth.js'
+	import { api } from '../../common/api.js'
 
 	export default {
 		data() {
@@ -150,10 +151,6 @@
 				this.privacyVisible = false
 			},
 			loadHome() {
-				this.banners = [
-					{ id: 1, image: '/static/banners/hotel.png', link: '/pages/recommend/recommend' },
-					{ id: 2, image: '/static/banners/nye.png', link: '/pages/nye/nye' }
-				]
 				this.primaryActions = [
 					{ key: 'steward', name: '联系管家', desc: '活动详情', icon: '/static/icons/chat.png' },
 					{ key: 'mall', name: '积分商城', desc: '快乐一整天', icon: '/static/icons/shop.png' }
@@ -162,58 +159,25 @@
 					{ key: 'order', name: '我的订单', icon: '/static/icons/order.png' },
 					{ key: 'checkin', name: '每日签到', icon: '/static/icons/checkin.png' }
 				]
-				this.stores = [
-					{
-						id: 'shibo',
-						name: '天天俱乐部上海世博店',
-						cover: '/static/stores/shibo.png',
-						address: '上海市上海市浦东新区长清路92号 中邻上钢里3楼',
-						route: '地铁长清路站7号线2号出口，13号线7号出口，步行后进入到中邻上钢里商场内3楼；公交：454路、761路等长清路昌里路站下',
-						phone: '4001919179',
-						lat: 31.1846,
-						lng: 121.4852
-					},
-					{
-						id: 'xinzhuang',
-						name: '天天俱乐部上海莘庄店',
-						cover: '/static/stores/xinzhuang.png',
-						address: '上海市闵行区都市路5001号5楼',
-						route: '地铁1/5号线莘庄站（南1口）出步行600米到达莘庄仲盛世界商城，商场一楼星巴克旁直达电梯上五楼出来向前走50米即可到达；公交：759路、闵行12路、闵行31路、莘庄工业区1路，莘庄地铁站南广场站下，直达商场北门',
-						phone: '4001919179',
-						lat: 31.1134,
-						lng: 121.3851
-					},
-					{
-						id: 'yaxin',
-						name: '天天俱乐部上海亚新店',
-						cover: '/static/stores/yaxin.png',
-						address: '上海市普陀区长寿路401号3号楼2楼',
-						route: '地铁7、13号线长寿路站7号口出来左转步行50米进入到亚新广场内',
-						phone: '4001919179',
-						lat: 31.2432,
-						lng: 121.4374
-					},
-					{
-						id: 'gongkang',
-						name: '天天俱乐部上海共康店',
-						cover: '/static/stores/gongkang.png',
-						address: '上海市宝山区共和新路5000弄绿地新都会1号楼二楼',
-						route: '地铁1号线共康路站下4号口出往北直行过共康路约200米，甬粤江南隔壁大门进2楼',
-						phone: '4001919179',
-						lat: 31.3208,
-						lng: 121.4476
-					},
-					{
-						id: 'ningbo',
-						name: '宁波天天俱乐部天一店',
-						cover: '/static/stores/ningbo.png',
-						address: '浙江省宁波市海曙区中山路220号第二百货商店7楼',
-						route: '地铁1号线东门口站A出口，公交药行街、东门口、灵桥西下',
-						phone: '4001919179',
-						lat: 29.8684,
-						lng: 121.5502
-					}
-				]
+				api
+					.home()
+					.then((res) => {
+						this.banners = (res.banners || []).map((b) => ({
+							id: b.id,
+							image: b.image,
+							link: b.link
+						}))
+						this.stores = res.stores || []
+						const app = getApp()
+						if (app.globalData) app.globalData.site = res.site || null
+					})
+					.catch(() => {
+						this.banners = [
+							{ id: 1, image: '/static/banners/hotel.png', link: '/pages/recommend/recommend' },
+							{ id: 2, image: '/static/banners/nye.png', link: '/pages/nye/nye' }
+						]
+						uni.showToast({ title: '首页数据加载失败', icon: 'none' })
+					})
 			},
 			onSwiperChange(e) {
 				this.current = e.detail.current
