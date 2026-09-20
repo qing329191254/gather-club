@@ -1,5 +1,7 @@
 """Lightweight schema patches for existing SQLite DBs."""
 
+from datetime import datetime
+
 from sqlalchemy import inspect, text
 
 from .database import engine
@@ -69,11 +71,13 @@ def ensure_schema() -> None:
                 ).fetchone()
                 if not marker:
                     conn.execute(text("UPDATE gather_products SET sold_text = ''"))
-                    # text() 会把 :true 当成绑定参数，标记值不要写成 JSON
+                    # 原始 INSERT 不走 ORM，MySQL 严格模式要求显式带上 updated_at
                     conn.execute(
                         text(
-                            "INSERT INTO site_configs (`key`, value) VALUES ('sold_text_manual_v1', '1')"
-                        )
+                            "INSERT INTO site_configs (`key`, value, updated_at) "
+                            "VALUES ('sold_text_manual_v1', '1', :updated_at)"
+                        ),
+                        {"updated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")},
                     )
         if "orders" in tables:
             cols = {c["name"] for c in inspector.get_columns("orders")}
