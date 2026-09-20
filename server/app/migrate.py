@@ -21,4 +21,8 @@ def ensure_schema() -> None:
             for name, sql in patches.items():
                 if name not in cols:
                     conn.execute(text(sql))
-        # addresses table is created by create_all
+        if "nye_stores" in tables:
+            cols = {c["name"] for c in inspector.get_columns("nye_stores")}
+            if "packages" not in cols:
+                conn.execute(text("ALTER TABLE nye_stores ADD COLUMN packages TEXT DEFAULT '[]'"))
+        # recommend_items / addresses created by create_all

@@ -41,6 +41,8 @@
 </template>
 
 <script>
+	import { api } from '../../common/api.js'
+
 	export default {
 		data() {
 			return {
@@ -86,6 +88,18 @@
 					}
 				]
 			}
+		},
+		onLoad() {
+			const apply = (lines) => {
+				if (!lines || !lines.length) return
+				this.sections = [{ title: '积分规则', paras: lines }]
+			}
+			api.site()
+				.then((site) => apply(site && site.mallRules))
+				.catch(() => {})
+			api.mallGoods()
+				.then((res) => apply(res && res.rules))
+				.catch(() => {})
 		}
 	}
 </script>

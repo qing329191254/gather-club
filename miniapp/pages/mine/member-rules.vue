@@ -24,6 +24,8 @@
 </template>
 
 <script>
+	import { api } from '../../common/api.js'
+
 	export default {
 		data() {
 			return {
@@ -161,6 +163,13 @@
 					}
 				]
 			}
+		},
+		onLoad() {
+			api.memberConfig()
+				.then((cfg) => {
+					if (cfg && cfg.rules && cfg.rules.length) this.sections = cfg.rules
+				})
+				.catch(() => {})
 		}
 	}
 </script>

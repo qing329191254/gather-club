@@ -17,6 +17,7 @@ from ..models import (
     NyeStore,
     Order,
     PointLedger,
+    RecommendItem,
     RoomSlot,
     Store,
     VideoLive,
@@ -32,6 +33,7 @@ from ..schemas import (
     OkResponse,
     OrderStatusIn,
     PointsAdjustIn,
+    RecommendItemIn,
     RoomSlotIn,
     StoreIn,
     TokenResponse,
@@ -260,6 +262,7 @@ def list_nye(db: Session = Depends(get_db), _: AdminUser = Depends(get_current_a
             "banners": loads(r.banners, []),
             "detail_images": loads(r.detail_images, []),
             "recent_buy": loads(r.recent_buy, {}),
+            "packages": loads(getattr(r, "packages", None) or "[]", []),
             "open_start": r.open_start,
             "open_end": r.open_end,
             "sort": r.sort,
@@ -288,6 +291,7 @@ def create_nye(payload: NyeStoreIn, db: Session = Depends(get_db), _: AdminUser 
         banners=dumps(data["banners"]),
         detail_images=dumps(data["detail_images"]),
         recent_buy=dumps(data["recent_buy"]),
+        packages=dumps(data.get("packages") or []),
         open_start=data["open_start"],
         open_end=data["open_end"],
         sort=data["sort"],
@@ -316,6 +320,7 @@ def update_nye(nye_id: str, payload: NyeStoreIn, db: Session = Depends(get_db), 
     row.banners = dumps(data["banners"])
     row.detail_images = dumps(data["detail_images"])
     row.recent_buy = dumps(data["recent_buy"])
+    row.packages = dumps(data.get("packages") or [])
     row.open_start = data["open_start"]
     row.open_end = data["open_end"]
     row.sort = data["sort"]
@@ -327,6 +332,71 @@ def update_nye(nye_id: str, payload: NyeStoreIn, db: Session = Depends(get_db), 
 @router.delete("/nye/{nye_id}")
 def delete_nye(nye_id: str, db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
     row = db.query(NyeStore).filter(NyeStore.id == nye_id).first()
+    if row:
+        db.delete(row)
+        db.commit()
+    return OkResponse()
+
+
+# ---- recommend ----
+def _recommend_out(row: RecommendItem) -> dict:
+    return {
+        "id": row.id,
+        "name": row.name,
+        "cover": row.cover,
+        "price": row.price,
+        "sort": row.sort,
+        "enabled": row.enabled,
+    }
+
+
+@router.get("/recommend")
+def list_recommend(db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
+    banners = (get_config(db, "recommend", {}) or {}).get("banners") or []
+    rows = db.query(RecommendItem).order_by(RecommendItem.sort.asc(), RecommendItem.id.asc()).all()
+    return {"banners": banners, "list": [_recommend_out(r) for r in rows]}
+
+
+@router.put("/recommend/banners")
+def update_recommend_banners(
+    payload: dict,
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    banners = payload.get("banners") or []
+    set_config(db, "recommend", {"banners": banners})
+    return {"banners": banners}
+
+
+@router.post("/recommend")
+def create_recommend(payload: RecommendItemIn, db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
+    row = RecommendItem(**payload.model_dump())
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return _recommend_out(row)
+
+
+@router.put("/recommend/{item_id}")
+def update_recommend(
+    item_id: int,
+    payload: RecommendItemIn,
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    row = db.query(RecommendItem).filter(RecommendItem.id == item_id).first()
+    if not row:
+        raise HTTPException(404, "不存在")
+    for k, v in payload.model_dump().items():
+        setattr(row, k, v)
+    db.commit()
+    db.refresh(row)
+    return _recommend_out(row)
+
+
+@router.delete("/recommend/{item_id}")
+def delete_recommend(item_id: int, db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
+    row = db.query(RecommendItem).filter(RecommendItem.id == item_id).first()
     if row:
         db.delete(row)
         db.commit()

@@ -160,7 +160,9 @@
 					uni.navigateTo({ url: '/pages/nye/detail?id=' + item.detailId })
 					return
 				}
-				uni.showToast({ title: '详情即将开放', icon: 'none' })
+				if (item && item.id) {
+					uni.navigateTo({ url: '/pages/gather/detail?id=' + item.id })
+				}
 			},
 			openSteward() {
 				this.stewardVisible = true

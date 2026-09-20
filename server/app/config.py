@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     admin_password: str = "admin123"
     wx_appid: str = ""
     wx_secret: str = ""
+    wx_mch_id: str = ""
+    wx_mch_key: str = ""
+    wx_notify_url: str = ""
     port: int = 80
 
 

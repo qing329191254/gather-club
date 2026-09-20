@@ -128,52 +128,27 @@
 		SLOTS,
 		formatDate,
 		getAvailability,
-		getMonthAvailability,
-		lockRooms,
-		ensureInventory
+		getMonthAvailability
 	} from '../../common/room-inventory.js'
 	import { prependOrder } from '../../common/orders-store.js'
 	import { api } from '../../common/api.js'
 	import { isLoggedIn, silentLogin } from '../../common/auth.js'
+	import { settlePay } from '../../common/pay.js'
 
-	const STORE_MAP = {
-		shibo: {
-			id: 'shibo',
-			name: '天天俱乐部上海世博店',
-			cover: '/static/stores/shibo.png',
-			address: '上海市浦东新区长清路92号 中邻上钢里3楼'
-		},
-		xinzhuang: {
-			id: 'xinzhuang',
-			name: '天天俱乐部上海莘庄店',
-			cover: '/static/stores/xinzhuang.png',
-			address: '上海市闵行区都市路5001号5楼'
-		},
-		yaxin: {
-			id: 'yaxin',
-			name: '天天俱乐部上海亚新店',
-			cover: '/static/stores/yaxin.png',
-			address: '上海市普陀区长寿路401号3号楼2楼'
-		},
-		gongkang: {
-			id: 'gongkang',
-			name: '天天俱乐部上海共康店',
-			cover: '/static/stores/gongkang.png',
-			address: '上海市宝山区共和新路5000弄绿地新都会1号楼二楼'
-		},
-		ningbo: {
-			id: 'ningbo',
-			name: '宁波天天俱乐部天一店',
-			cover: '/static/stores/ningbo.png',
-			address: '浙江省宁波市海曙区中山路220号第二百货商店7楼'
-		}
-	}
+	const FALLBACK_STORES = [
+		{ id: 'shibo', name: '天天俱乐部上海世博店', cover: '/static/stores/shibo.png', address: '上海市浦东新区长清路92号 中邻上钢里3楼' },
+		{ id: 'xinzhuang', name: '天天俱乐部上海莘庄店', cover: '/static/stores/xinzhuang.png', address: '上海市闵行区都市路5001号5楼' },
+		{ id: 'yaxin', name: '天天俱乐部上海亚新店', cover: '/static/stores/yaxin.png', address: '上海市普陀区长寿路401号3号楼2楼' },
+		{ id: 'gongkang', name: '天天俱乐部上海共康店', cover: '/static/stores/gongkang.png', address: '上海市宝山区共和新路5000弄绿地新都会1号楼二楼' },
+		{ id: 'ningbo', name: '宁波天天俱乐部天一店', cover: '/static/stores/ningbo.png', address: '浙江省宁波市海曙区中山路220号第二百货商店7楼' }
+	]
 
 	export default {
 		data() {
 			const now = new Date()
 			return {
 				storeId: 'shibo',
+				stores: [],
 				date: '',
 				slot: 'dinner',
 				name: '',
@@ -192,11 +167,13 @@
 		},
 		computed: {
 			store() {
-				return STORE_MAP[this.storeId] || STORE_MAP.shibo
+				return this.stores.find((s) => s.id === this.storeId) || this.stores[0] || { id: this.storeId, name: '', cover: '', address: '' }
 			},
 			currentAvail() {
 				this.tick
 				if (!this.date) return null
+				const fromMonth = this.monthMap && this.monthMap[this.date] && this.monthMap[this.date][this.slot]
+				if (fromMonth) return fromMonth
 				return getAvailability(this.storeId, this.date, this.slot)
 			},
 			canSubmit() {
@@ -252,19 +229,15 @@
 		},
 		onLoad(query) {
 			const id = (query && query.storeId) || 'shibo'
-			this.storeId = STORE_MAP[id] ? id : 'shibo'
-			ensureInventory(Object.keys(STORE_MAP))
+			this.storeId = id
 			const tomorrow = new Date()
 			tomorrow.setDate(tomorrow.getDate() + 1)
 			this.date = formatDate(tomorrow)
 			this.viewYear = tomorrow.getFullYear()
 			this.viewMonth = tomorrow.getMonth() + 1
-			this.refreshMonth()
-			this.tick++
-			this.loadRemoteMonth()
+			this.loadStores()
 		},
 		onShow() {
-			this.refreshMonth()
 			this.loadRemoteMonth()
 			this.tick++
 		},
@@ -272,17 +245,37 @@
 			pad2(n) {
 				return String(n).padStart(2, '0')
 			},
-			refreshMonth() {
+			async loadStores() {
+				try {
+					const home = await api.home()
+					if (home && home.stores && home.stores.length) this.stores = home.stores
+				} catch (e) {}
+				if (!this.stores.length) {
+					try {
+						const res = await api.stores()
+						if (res && res.list && res.list.length) this.stores = res.list
+					} catch (e) {}
+				}
+				if (!this.stores.length) this.stores = FALLBACK_STORES
+				if (!this.stores.find((s) => s.id === this.storeId)) {
+					this.storeId = this.stores[0].id
+				}
+				this.loadRemoteMonth()
+			},
+			fallbackMonth() {
 				this.monthMap = getMonthAvailability(this.storeId, this.viewYear, this.viewMonth)
+				this.tick++
 			},
 			async loadRemoteMonth() {
 				try {
 					const res = await api.roomMonth(this.storeId, this.viewYear, this.viewMonth)
-					if (res && typeof res === 'object') {
+					if (res && typeof res === 'object' && Object.keys(res).length) {
 						this.monthMap = res
 						this.tick++
+						return
 					}
 				} catch (e) {}
+				this.fallbackMonth()
 			},
 			slotInfo(key) {
 				this.tick
@@ -310,7 +303,6 @@
 				} else {
 					this.draftDate = ''
 				}
-				this.refreshMonth()
 				this.loadRemoteMonth()
 				this.calendarVisible = true
 			},
@@ -329,7 +321,6 @@
 				}
 				this.viewYear = y
 				this.viewMonth = m
-				this.refreshMonth()
 				this.loadRemoteMonth()
 			},
 			pickDate(cell) {
@@ -392,7 +383,8 @@
 						room_slot: this.slot
 					})
 					if (created && created.id) {
-						await api.payOrder(created.id)
+						const payRes = await api.payOrder(created.id)
+						await settlePay(payRes)
 					}
 					uni.hideLoading()
 					this.tick++

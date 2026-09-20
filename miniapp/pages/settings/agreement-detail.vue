@@ -20,6 +20,7 @@
 
 <script>
 	import { getAgreement } from '../../common/agreements.js'
+	import { api } from '../../common/api.js'
 
 	export default {
 		data() {
@@ -34,13 +35,20 @@
 		},
 		onLoad(query) {
 			const type = (query && query.type) || 'privacy'
-			const doc = getAgreement(type)
-			if (!doc) {
-				uni.showToast({ title: '协议不存在', icon: 'none' })
-				return
+			const local = getAgreement(type)
+			if (local) {
+				this.doc = local
+				uni.setNavigationBarTitle({ title: local.navTitle || '协议' })
 			}
-			this.doc = doc
-			uni.setNavigationBarTitle({ title: doc.navTitle || '协议' })
+			api.agreement(type)
+				.then((doc) => {
+					if (!doc) return
+					this.doc = doc
+					uni.setNavigationBarTitle({ title: doc.navTitle || '协议' })
+				})
+				.catch(() => {
+					if (!local) uni.showToast({ title: '协议不存在', icon: 'none' })
+				})
 		}
 	}
 </script>

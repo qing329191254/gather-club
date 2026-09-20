@@ -30,6 +30,7 @@
         <el-form-item label="路线"><el-input v-model="form.route" type="textarea" :rows="2" /></el-form-item>
         <el-form-item label="轮播图"><el-input v-model="bannersText" type="textarea" :rows="2" placeholder="每行一个图片地址" /></el-form-item>
         <el-form-item label="详情长图"><el-input v-model="detailText" type="textarea" :rows="2" placeholder="每行一个图片地址" /></el-form-item>
+        <el-form-item label="套餐 JSON"><el-input v-model="packagesText" type="textarea" :rows="8" placeholder="JSON 数组，留空则接口按价格自动生成" /></el-form-item>
         <el-form-item label="开放起"><el-input v-model="form.open_start" placeholder="YYYY-MM-DD" /></el-form-item>
         <el-form-item label="开放止"><el-input v-model="form.open_end" placeholder="YYYY-MM-DD" /></el-form-item>
         <el-form-item label="排序"><el-input-number v-model="form.sort" :min="0" /></el-form-item>
@@ -53,9 +54,10 @@ const visible = ref(false)
 const editing = ref(false)
 const bannersText = ref('')
 const detailText = ref('')
+const packagesText = ref('')
 const empty = () => ({
   id: '', name: '', cover: '', price: 0, origin_price: 0, tag: '年夜饭', address: '', route: '',
-  lat: 0, lng: 0, banners: [], detail_images: [], recent_buy: {},
+  lat: 0, lng: 0, banners: [], detail_images: [], recent_buy: {}, packages: [],
   open_start: '2027-02-05', open_end: '2027-02-12', sort: 0, enabled: true
 })
 const form = reactive(empty())
@@ -69,14 +71,26 @@ function openEdit(row) {
   Object.assign(form, empty(), row || {})
   bannersText.value = (form.banners || []).join('\n')
   detailText.value = (form.detail_images || []).join('\n')
+  packagesText.value = form.packages && form.packages.length ? JSON.stringify(form.packages, null, 2) : ''
   visible.value = true
 }
 
 async function onSave() {
+  let packages = []
+  if (packagesText.value.trim()) {
+    try {
+      packages = JSON.parse(packagesText.value)
+      if (!Array.isArray(packages)) throw new Error('not array')
+    } catch (e) {
+      ElMessage.error('套餐 JSON 格式不正确')
+      return
+    }
+  }
   const payload = {
     ...form,
     banners: bannersText.value.split(/\n/).map((s) => s.trim()).filter(Boolean),
-    detail_images: detailText.value.split(/\n/).map((s) => s.trim()).filter(Boolean)
+    detail_images: detailText.value.split(/\n/).map((s) => s.trim()).filter(Boolean),
+    packages
   }
   if (editing.value) await http.put(`/nye/${form.id}`, payload)
   else await http.post('/nye', payload)

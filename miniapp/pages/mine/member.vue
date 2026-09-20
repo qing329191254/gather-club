@@ -178,6 +178,7 @@
 
 <script>
 	import { memberLevels, monthCoupon } from '../../common/member-levels.js'
+	import { setVipLevelsFromServer } from '../../common/vip-levels.js'
 	import StewardDialog from '../../components/steward-dialog/steward-dialog.vue'
 	import { api } from '../../common/api.js'
 	import { isLoggedIn, silentLogin, getUser } from '../../common/auth.js'
@@ -256,12 +257,40 @@
 				this.activeIndex = idx
 			}
 			this.loadCouponClaim()
-			this.preloadThemeImages()
+			this.loadMember()
 		},
 		onShow() {
 			this.loadCouponClaim()
+			this.loadMember()
 		},
 		methods: {
+			async loadMember() {
+				try {
+					const cfg = await api.memberConfig()
+					if (cfg && Array.isArray(cfg.levels) && cfg.levels.length) {
+						this.levels = cfg.levels
+						setVipLevelsFromServer(cfg.levels)
+					}
+					if (cfg && cfg.monthCoupon) {
+						this.coupon = Object.assign({}, monthCoupon, cfg.monthCoupon)
+					}
+				} catch (e) {}
+				try {
+					if (!isLoggedIn()) await silentLogin()
+					const profile = await api.profile()
+					if (profile) {
+						if (typeof profile.tableCount === 'number') this.progress = profile.tableCount
+						if (profile.avatar) this.avatar = profile.avatar
+						const vip = String(profile.vipLevel || 'V0').toUpperCase()
+						const idx = this.levels.findIndex((row) => row.id === vip)
+						if (idx >= 0) {
+							this.userLevelIndex = idx
+							this.activeIndex = idx
+						}
+					}
+				} catch (e) {}
+				this.preloadThemeImages()
+			},
 			goBack() {
 				const pages = getCurrentPages()
 				if (pages && pages.length > 1) {

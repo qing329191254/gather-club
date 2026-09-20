@@ -6,6 +6,15 @@ from sqlalchemy.orm import Session
 
 from .config import get_settings
 from .deps import hash_password
+from .cms_data import (
+    AGREEMENTS,
+    MEMBER_CONFIG,
+    PRIVACY_COLLECT,
+    PRIVACY_SHARE,
+    RECOMMEND_BANNERS,
+    RECOMMEND_ITEMS,
+    default_nye_packages,
+)
 from .models import (
     AdminUser,
     Banner,
@@ -14,10 +23,11 @@ from .models import (
     GatherTab,
     MallGoods,
     NyeStore,
+    RecommendItem,
     Store,
     VideoLive,
 )
-from .utils import get_config, set_config
+from .utils import dumps, get_config, loads, set_config
 
 settings = get_settings()
 
@@ -226,10 +236,9 @@ def seed_all(db: Session) -> None:
         db.commit()
 
     if db.query(NyeStore).count() == 0:
-        from .utils import dumps
-
         for item in NYE_STORES:
             payload = dict(item)
+            pkgs = default_nye_packages(payload.get("price") or 2388, payload.get("cover") or "")
             db.add(
                 NyeStore(
                     **{
@@ -237,10 +246,23 @@ def seed_all(db: Session) -> None:
                         "banners": dumps(payload.get("banners", [])),
                         "detail_images": dumps(payload.get("detail_images", [])),
                         "recent_buy": dumps(payload.get("recent_buy", {})),
+                        "packages": dumps(pkgs),
                         "enabled": True,
                     }
                 )
             )
+        db.commit()
+    else:
+        # 已有门店补齐 packages
+        for row in db.query(NyeStore).all():
+            existing = loads(getattr(row, "packages", None) or "[]", [])
+            if not existing:
+                row.packages = dumps(default_nye_packages(row.price or 2388, row.cover or ""))
+        db.commit()
+
+    if db.query(RecommendItem).count() == 0:
+        for item in RECOMMEND_ITEMS:
+            db.add(RecommendItem(**item, enabled=True))
         db.commit()
 
     if db.query(MallGoods).count() == 0:
@@ -319,3 +341,13 @@ def seed_all(db: Session) -> None:
                 "finderUserName": "",
             },
         )
+    if not get_config(db, "recommend"):
+        set_config(db, "recommend", {"banners": RECOMMEND_BANNERS})
+    if not get_config(db, "agreements"):
+        set_config(db, "agreements", AGREEMENTS)
+    if not get_config(db, "privacy_collect"):
+        set_config(db, "privacy_collect", PRIVACY_COLLECT)
+    if not get_config(db, "privacy_share"):
+        set_config(db, "privacy_share", PRIVACY_SHARE)
+    if not get_config(db, "member"):
+        set_config(db, "member", MEMBER_CONFIG)

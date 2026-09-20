@@ -37,6 +37,8 @@
 </template>
 
 <script>
+	import { api } from '../../common/api.js'
+
 	export default {
 		data() {
 			return {
@@ -75,6 +77,13 @@
 					}
 				]
 			}
+		},
+		onLoad() {
+			api.privacyShare()
+				.then((res) => {
+					if (res && res.sections && res.sections.length) this.sections = res.sections
+				})
+				.catch(() => {})
 		}
 	}
 </script>

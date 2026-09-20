@@ -113,6 +113,30 @@ export const api = {
 	},
 	videoWatch(liveId) {
 		return request('/api/v1/video/watch', { method: 'POST', data: { liveId: liveId || 0 } })
+	},
+	recommend() {
+		return request('/api/v1/recommend')
+	},
+	gatherProduct(id) {
+		return request('/api/v1/gather/product/' + id)
+	},
+	stores() {
+		return request('/api/v1/stores')
+	},
+	agreements() {
+		return request('/api/v1/agreements')
+	},
+	agreement(type) {
+		return request('/api/v1/agreements/' + type)
+	},
+	privacyCollect() {
+		return request('/api/v1/privacy/collect')
+	},
+	privacyShare() {
+		return request('/api/v1/privacy/share')
+	},
+	memberConfig() {
+		return request('/api/v1/member/config')
 	}
 }
 

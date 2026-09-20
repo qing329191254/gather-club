@@ -19,6 +19,15 @@
 			}
 		},
 		{
+			"path": "pages/gather/detail",
+			"style": {
+				"navigationBarTitleText": "商品详情",
+				"navigationBarBackgroundColor": "#FFFFFF",
+				"navigationBarTextStyle": "black",
+				"backgroundColor": "#F5F5F5"
+			}
+		},
+		{
 			"path": "pages/video/video",
 			"style": {
 				"navigationBarTitleText": "视频号",

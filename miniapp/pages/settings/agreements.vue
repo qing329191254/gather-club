@@ -13,6 +13,8 @@
 </template>
 
 <script>
+	import { api } from '../../common/api.js'
+
 	export default {
 		data() {
 			return {
@@ -21,6 +23,17 @@
 					{ type: 'cancel', name: '注销账号协议' }
 				]
 			}
+		},
+		onLoad() {
+			api.agreements()
+				.then((data) => {
+					if (!data) return
+					const next = []
+					if (data.privacy) next.push({ type: 'privacy', name: data.privacy.title || data.privacy.navTitle || '用户隐私协议' })
+					if (data.cancel) next.push({ type: 'cancel', name: data.cancel.title || data.cancel.navTitle || '注销账号协议' })
+					if (next.length) this.list = next
+				})
+				.catch(() => {})
 		},
 		methods: {
 			openAgreement(item) {

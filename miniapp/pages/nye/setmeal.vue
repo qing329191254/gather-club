@@ -151,6 +151,7 @@
 	import { getAvailability, lockRooms } from '../../common/room-inventory.js'
 	import { prependOrder } from '../../common/orders-store.js'
 	import { api } from '../../common/api.js'
+	import { settlePay } from '../../common/pay.js'
 	import { isLoggedIn, silentLogin } from '../../common/auth.js'
 
 	export default {
@@ -386,7 +387,8 @@
 								room_slot: this.date ? this.roomSlot : ''
 							})
 							if (created && created.id) {
-								await api.payOrder(created.id)
+								const payRes = await api.payOrder(created.id)
+								await settlePay(payRes)
 							}
 							uni.hideLoading()
 							uni.showToast({ title: '支付成功', icon: 'success' })

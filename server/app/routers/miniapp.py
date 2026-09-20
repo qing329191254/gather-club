@@ -1,9 +1,18 @@
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
+from ..cms_data import (
+    AGREEMENTS,
+    MEMBER_CONFIG,
+    PRIVACY_COLLECT,
+    PRIVACY_SHARE,
+    RECOMMEND_BANNERS,
+    default_nye_packages,
+)
 from ..database import get_db
 from ..models import (
     Address,
@@ -17,6 +26,7 @@ from ..models import (
     NyeStore,
     Order,
     PointLedger,
+    RecommendItem,
     RoomSlot,
     Store,
     UserCoupon,
@@ -24,11 +34,21 @@ from ..models import (
     VideoLive,
     VideoReserve,
 )
+from ..pay import (
+    build_jsapi_payment,
+    notify_fail_xml,
+    notify_ok_xml,
+    parse_notify,
+    pay_configured,
+    unified_order,
+)
 from ..schemas import OrderCreateIn, OkResponse, WxLoginIn, WxPhoneIn
-from ..utils import STATUS_TEXT, get_config, loads
+from ..utils import STATUS_TEXT, dumps, get_config, loads
 from ..wx import code2session, phone_from_code, phone_from_encrypted, resolve_demo_openid, wx_configured
 
 router = APIRouter(prefix="/api/v1", tags=["miniapp"])
+
+TABLE_ORDER_TYPES = ("room", "nye", "recommend", "gather")
 
 
 def _user_by_openid(db: Session, openid: str) -> Optional[AppUser]:
@@ -53,8 +73,20 @@ def _ensure_user(db: Session, openid: str, nickname: str = "微信用户", avata
     return user
 
 
-def _user_out(user: AppUser) -> dict:
-    return {
+def _table_count(db: Session, user_id: int) -> int:
+    return (
+        db.query(Order)
+        .filter(
+            Order.user_id == user_id,
+            Order.status == "paid",
+            Order.type.in_(TABLE_ORDER_TYPES),
+        )
+        .count()
+    )
+
+
+def _user_out(user: AppUser, db: Optional[Session] = None) -> dict:
+    out = {
         "id": user.id,
         "nickname": user.nickname,
         "avatar": user.avatar,
@@ -66,6 +98,9 @@ def _user_out(user: AppUser) -> dict:
         "vipLevel": user.vip_level,
         "vip": f"{user.vip_level}会员",
     }
+    if db is not None:
+        out["tableCount"] = _table_count(db, user.id)
+    return out
 
 
 def _product_out(row: GatherProduct) -> dict:
@@ -81,6 +116,13 @@ def _product_out(row: GatherProduct) -> dict:
         "price": row.price,
         "originPrice": row.origin_price,
     }
+
+
+def _nye_packages_for(row: NyeStore) -> list:
+    stored = loads(getattr(row, "packages", None) or "[]", [])
+    if stored:
+        return stored
+    return default_nye_packages(row.price or 2388, row.cover or "")
 
 
 def _nye_out(row: NyeStore) -> dict:
@@ -125,6 +167,18 @@ def _order_out(row: Order) -> dict:
         "roomSlot": row.room_slot,
         "createdAt": row.created_at.isoformat() if row.created_at else None,
     }
+
+
+def _mark_order_paid(db: Session, order: Order, extra_patch: Optional[dict] = None) -> Order:
+    order.status = "paid"
+    order.status_text = "待核销"
+    extra = loads(order.extra or "{}", {})
+    if extra_patch:
+        extra.update(extra_patch)
+    order.extra = dumps(extra)
+    db.commit()
+    db.refresh(order)
+    return order
 
 
 def _slot_info(db: Session, store_id: str, date: str, slot: str) -> dict:
@@ -182,7 +236,7 @@ async def wx_login(payload: WxLoginIn, db: Session = Depends(get_db)):
         user.phone = payload.phone
     db.commit()
     db.refresh(user)
-    return {"openid": user.openid, "user": _user_out(user)}
+    return {"openid": user.openid, "user": _user_out(user, db)}
 
 
 @router.post("/auth/bind-phone")
@@ -214,7 +268,7 @@ async def bind_phone(
     if getattr(user, "cancelled", False):
         raise HTTPException(status_code=400, detail="账号已注销")
     if user.phone_edited and user.phone:
-        return {"openid": user.openid, "user": _user_out(user), "message": "手机号已绑定"}
+        return {"openid": user.openid, "user": _user_out(user, db), "message": "手机号已绑定"}
 
     if payload.code:
         if not wx_configured():
@@ -234,7 +288,37 @@ async def bind_phone(
     user.phone_edited = True
     db.commit()
     db.refresh(user)
-    return {"openid": user.openid, "user": _user_out(user), "message": "绑定成功"}
+    return {"openid": user.openid, "user": _user_out(user, db), "message": "绑定成功"}
+
+
+@router.get("/site")
+def site_config(db: Session = Depends(get_db)):
+    return get_config(db, "site", {}) or {}
+
+
+@router.get("/stores")
+def list_stores(db: Session = Depends(get_db)):
+    stores = (
+        db.query(Store)
+        .filter(Store.enabled.is_(True))
+        .order_by(Store.sort.asc(), Store.id.asc())
+        .all()
+    )
+    return {
+        "list": [
+            {
+                "id": s.id,
+                "name": s.name,
+                "cover": s.cover,
+                "address": s.address,
+                "route": s.route,
+                "phone": s.phone,
+                "lat": s.lat,
+                "lng": s.lng,
+            }
+            for s in stores
+        ]
+    }
 
 
 @router.get("/home")
@@ -322,19 +406,69 @@ def nye_detail(nye_id: str, db: Session = Depends(get_db)):
     if not row:
         raise HTTPException(status_code=404, detail="门店不存在")
     detail = _nye_out(row)
-    price = detail["price"] or 2388
-    cover = detail["cover"]
-    detail["packages"] = [
-        {"id": 1, "name": "喜气羊羊宴 (10-12人) 午市大厅", "meal": "喜气羊羊宴", "time": "10:00-14:00", "price": price, "people": 12, "cover": cover, "disabled": False},
-        {"id": 2, "name": "喜气羊羊宴 (10-12人) 晚市大厅", "meal": "喜气羊羊宴", "time": "17:00-21:00", "price": price + 200, "people": 12, "cover": cover, "disabled": False},
-        {"id": 3, "name": "喜气羊羊宴 (8-10人) 午市包厢", "meal": "喜气羊羊宴", "time": "10:00-14:00", "price": price + 300, "people": 10, "cover": "/static/nye/shibo.jpg", "disabled": False},
-        {"id": 4, "name": "团圆家宴 (8-10人) 晚市大厅", "meal": "团圆家宴", "time": "17:00-21:00", "price": price + 100, "people": 10, "cover": "/static/nye/yaxin.jpg", "disabled": False},
-        {"id": 5, "name": "团圆家宴 (6-8人) 午市包厢", "meal": "团圆家宴", "time": "10:00-14:00", "price": price - 400, "people": 8, "cover": "/static/nye/yaxin.jpg", "disabled": False},
-        {"id": 6, "name": "名羊四海宴 (12-14人) 午市大厅", "meal": "名羊四海宴", "time": "10:00-14:00", "price": price + 1100, "people": 14, "cover": "/static/nye/xinzhuang.jpg", "disabled": False},
-        {"id": 7, "name": "名羊四海宴 (16人) 晚市大厅", "meal": "名羊四海宴", "time": "17:00-21:00", "price": price + 2100, "people": 16, "cover": "/static/nye/xinzhuang.jpg", "disabled": True},
-        {"id": 8, "name": "名羊四海宴 (16人) 晚市包厢", "meal": "名羊四海宴", "time": "17:00-21:00", "price": price + 2100, "people": 16, "cover": "/static/nye/xinzhuang.jpg", "disabled": True},
-    ]
+    detail["packages"] = _nye_packages_for(row)
     return detail
+
+
+@router.get("/recommend")
+def recommend_list(db: Session = Depends(get_db)):
+    cfg = get_config(db, "recommend", {}) or {}
+    banners = cfg.get("banners") or RECOMMEND_BANNERS
+    rows = (
+        db.query(RecommendItem)
+        .filter(RecommendItem.enabled.is_(True))
+        .order_by(RecommendItem.sort.asc(), RecommendItem.id.asc())
+        .all()
+    )
+    return {
+        "banners": banners,
+        "list": [
+            {"id": r.id, "name": r.name, "cover": r.cover, "price": r.price, "sort": r.sort}
+            for r in rows
+        ],
+    }
+
+
+@router.get("/gather/product/{product_id}")
+def gather_product_detail(product_id: str, db: Session = Depends(get_db)):
+    row = (
+        db.query(GatherProduct)
+        .filter(GatherProduct.id == product_id, GatherProduct.enabled.is_(True))
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="商品不存在")
+    return _product_out(row)
+
+
+@router.get("/agreements")
+def agreements_all(db: Session = Depends(get_db)):
+    data = get_config(db, "agreements") or AGREEMENTS
+    return data
+
+
+@router.get("/agreements/{agree_type}")
+def agreement_one(agree_type: str, db: Session = Depends(get_db)):
+    data = get_config(db, "agreements") or AGREEMENTS
+    doc = (data or {}).get(agree_type)
+    if not doc:
+        raise HTTPException(status_code=404, detail="协议不存在")
+    return doc
+
+
+@router.get("/privacy/collect")
+def privacy_collect(db: Session = Depends(get_db)):
+    return get_config(db, "privacy_collect") or PRIVACY_COLLECT
+
+
+@router.get("/privacy/share")
+def privacy_share(db: Session = Depends(get_db)):
+    return get_config(db, "privacy_share") or PRIVACY_SHARE
+
+
+@router.get("/member/config")
+def member_config(db: Session = Depends(get_db)):
+    return get_config(db, "member") or MEMBER_CONFIG
 
 
 @router.get("/mall/goods")
@@ -511,16 +645,58 @@ def create_order(
 
 
 @router.post("/orders/{order_id}/pay")
-def pay_order(order_id: str, db: Session = Depends(get_db)):
+async def pay_order(order_id: str, request: Request, db: Session = Depends(get_db)):
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
     if order.status != "pending":
         raise HTTPException(status_code=400, detail="订单状态不可支付")
-    order.status = "paid"
-    order.status_text = "待核销"
+
+    amount = float(order.amount or order.price or 0)
+    # 金额为 0（如包房预约）或未配置商户号：直接 mock 标记已支付
+    if amount <= 0 or not pay_configured():
+        _mark_order_paid(db, order, {"mockPaid": True})
+        return {**_order_out(order), "needPay": False}
+
+    total_fee = int(round(amount * 100))
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    result = await unified_order(
+        openid=order.openid,
+        out_trade_no=order.id,
+        body=order.title or "天天俱乐部订单",
+        total_fee=total_fee,
+        client_ip=client_ip,
+    )
+    prepay_id = result["prepay_id"]
+    extra = loads(order.extra or "{}", {})
+    extra["prepay_id"] = prepay_id
+    order.extra = dumps(extra)
     db.commit()
-    return _order_out(order)
+    payment = build_jsapi_payment(prepay_id)
+    return {**_order_out(order), "needPay": True, "payment": payment}
+
+
+@router.post("/pay/notify")
+async def pay_notify(request: Request, db: Session = Depends(get_db)):
+    body = (await request.body()).decode("utf-8", errors="ignore")
+    try:
+        data = parse_notify(body)
+    except HTTPException:
+        return Response(content=notify_fail_xml("SIGN"), media_type="application/xml")
+    if data.get("return_code") != "SUCCESS" or data.get("result_code") != "SUCCESS":
+        return Response(content=notify_fail_xml("RESULT"), media_type="application/xml")
+    out_trade_no = data.get("out_trade_no") or ""
+    order = db.query(Order).filter(Order.id == out_trade_no).first()
+    if order and order.status == "pending":
+        _mark_order_paid(
+            db,
+            order,
+            {
+                "transaction_id": data.get("transaction_id") or "",
+                "prepay_id": loads(order.extra or "{}", {}).get("prepay_id"),
+            },
+        )
+    return Response(content=notify_ok_xml(), media_type="application/xml")
 
 
 @router.post("/orders/{order_id}/cancel")
@@ -604,11 +780,11 @@ def user_profile(
     if not oid:
         raise HTTPException(status_code=400, detail="缺少 openid")
     user = _ensure_user(db, oid)
-    return _profile_out(user)
+    return _profile_out(user, db)
 
 
-def _profile_out(user: AppUser) -> dict:
-    return {
+def _profile_out(user: AppUser, db: Optional[Session] = None) -> dict:
+    out = {
         "id": user.id,
         "nickname": user.nickname,
         "avatar": user.avatar,
@@ -620,7 +796,11 @@ def _profile_out(user: AppUser) -> dict:
         "vipLevel": user.vip_level,
         "vip": f"{user.vip_level}会员",
         "cancelled": bool(getattr(user, "cancelled", False)),
+        "tableCount": 0,
     }
+    if db is not None:
+        out["tableCount"] = _table_count(db, user.id)
+    return out
 
 
 @router.put("/user/profile")
@@ -658,7 +838,7 @@ def update_profile(
                 user.phone_edited = True
     db.commit()
     db.refresh(user)
-    return _profile_out(user)
+    return _profile_out(user, db)
 
 
 @router.post("/user/cancel")
@@ -893,11 +1073,6 @@ def order_detail(
     if oid and row.openid and row.openid != oid:
         raise HTTPException(status_code=403, detail="无权查看")
     return _order_out(row)
-
-
-@router.get("/site")
-def public_site(db: Session = Depends(get_db)):
-    return get_config(db, "site", {}) or {}
 
 
 @router.get("/user/points")

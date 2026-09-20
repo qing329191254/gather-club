@@ -53,6 +53,7 @@
 
 <script>
 	import { api } from '../../common/api.js'
+	import { settlePay } from '../../common/pay.js'
 	import { isLoggedIn, silentLogin } from '../../common/auth.js'
 
 	export default {
@@ -148,7 +149,8 @@
 						if (!res.confirm) return
 						uni.showLoading({ title: '支付中', mask: true })
 						try {
-							await api.payOrder(order.id)
+							const payRes = await api.payOrder(order.id)
+							await settlePay(payRes)
 							uni.hideLoading()
 							uni.showToast({ title: '支付成功', icon: 'success' })
 							this.loadOrders()

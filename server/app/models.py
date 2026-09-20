@@ -107,10 +107,23 @@ class NyeStore(Base):
     banners: Mapped[str] = mapped_column(Text, default="[]")
     detail_images: Mapped[str] = mapped_column(Text, default="[]")
     recent_buy: Mapped[str] = mapped_column(Text, default="{}")
+    packages: Mapped[str] = mapped_column(Text, default="[]")  # JSON array of packages
     open_start: Mapped[str] = mapped_column(String(16), default="2027-02-05")
     open_end: Mapped[str] = mapped_column(String(16), default="2027-02-12")
     sort: Mapped[int] = mapped_column(Integer, default=0)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class RecommendItem(Base):
+    __tablename__ = "recommend_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(255))
+    cover: Mapped[str] = mapped_column(String(512), default="")
+    price: Mapped[float] = mapped_column(Float, default=0)
+    sort: Mapped[int] = mapped_column(Integer, default=0)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
 
 
 class MallGoods(Base):

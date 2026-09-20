@@ -99,10 +99,23 @@ class NyeStoreIn(BaseModel):
     banners: list[str] = Field(default_factory=list)
     detail_images: list[str] = Field(default_factory=list)
     recent_buy: dict[str, Any] = Field(default_factory=dict)
+    packages: list[Any] = Field(default_factory=list)
     open_start: str = "2027-02-05"
     open_end: str = "2027-02-12"
     sort: int = 0
     enabled: bool = True
+
+
+class RecommendItemIn(BaseModel):
+    name: str
+    cover: str = ""
+    price: float = 0
+    sort: int = 0
+    enabled: bool = True
+
+
+class RecommendItemOut(RecommendItemIn, ORMModel):
+    id: int
 
 
 class NyeStoreOut(NyeStoreIn, ORMModel):
