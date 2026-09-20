@@ -29,6 +29,7 @@
 				<view class="coupon-right">
 					<text class="name">{{ item.name }}</text>
 					<text class="expire">{{ item.expire }}</text>
+					<text v-if="current === 'unused' && item.verifyCode" class="code">核销码 {{ item.verifyCode }}</text>
 				</view>
 			</view>
 		</view>
@@ -201,5 +202,13 @@
 	.expire {
 		font-size: 22rpx;
 		color: #999999;
+	}
+
+	.code {
+		margin-top: 12rpx;
+		font-size: 30rpx;
+		font-weight: 700;
+		letter-spacing: 2rpx;
+		color: #e85a4a;
 	}
 </style>

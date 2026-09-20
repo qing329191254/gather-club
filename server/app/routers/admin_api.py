@@ -62,7 +62,17 @@ from ..schemas import (
     TokenResponse,
 )
 from ..storage import diagnose_storage, storage_configured, upload_file
-from ..utils import STATUS_TEXT, dumps, get_config, loads, normalize_page, page_payload, set_config
+from ..utils import (
+    STATUS_TEXT,
+    dumps,
+    ensure_coupon_verify_code,
+    ensure_order_verify_code,
+    get_config,
+    loads,
+    normalize_page,
+    page_payload,
+    set_config,
+)
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -677,10 +687,136 @@ def update_order_status(
     if prev not in ("paid", "completed") and next_status in ("paid", "completed"):
         bump_sold_on_paid(db, row, user)
         award_order_points(db, row, user)
+        if next_status == "paid":
+            ensure_order_verify_code(db, row)
     elif user and next_status in ("paid", "completed", "cancelled", "refunded"):
         sync_user_vip(db, user)
     db.commit()
     return OkResponse(data={"id": row.id, "status": row.status, "status_text": row.status_text})
+
+
+def _verify_order_item(db: Session, row: Order, user: Optional[AppUser] = None) -> dict:
+    if row.status == "paid" and not (row.verify_code or "").strip():
+        ensure_order_verify_code(db, row)
+    phone = row.contact_phone or ""
+    nickname = ""
+    if row.user_id:
+        if user is None or user.id != row.user_id:
+            user = db.query(AppUser).filter(AppUser.id == row.user_id).first()
+        if user:
+            phone = phone or user.phone or ""
+            nickname = user.nickname or ""
+    return {
+        "kind": "order",
+        "id": row.id,
+        "verify_code": row.verify_code or "",
+        "title": row.title or "",
+        "spec": row.spec or "",
+        "store_name": row.store_name or "",
+        "amount": row.amount or 0,
+        "status": row.status,
+        "status_text": row.status_text or "",
+        "contact_name": row.contact_name or nickname,
+        "contact_phone": phone,
+        "room_date": row.room_date or "",
+        "room_slot": row.room_slot or "",
+        "people": row.people or 0,
+        "can_verify": row.status == "paid",
+    }
+
+
+def _verify_coupon_item(db: Session, row: UserCoupon) -> dict:
+    if row.status == "unused" and not (row.verify_code or "").strip():
+        ensure_coupon_verify_code(db, row)
+    user = db.query(AppUser).filter(AppUser.id == row.user_id).first()
+    return {
+        "kind": "coupon",
+        "id": row.id,
+        "verify_code": row.verify_code or "",
+        "title": row.name or "",
+        "spec": row.condition or "",
+        "amount": row.amount or 0,
+        "expire": row.expire or "",
+        "status": row.status,
+        "status_text": {"unused": "未使用", "used": "已使用", "expired": "已失效"}.get(row.status, row.status),
+        "contact_name": user.nickname if user else "",
+        "contact_phone": user.phone if user else "",
+        "can_verify": row.status == "unused",
+    }
+
+
+@router.get("/verify")
+def search_verify(
+    q: str = Query(""),
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    keyword = (q or "").strip()
+    if not keyword:
+        raise HTTPException(400, "请输入手机号或核销码")
+    orders: list[Order] = []
+    coupons: list[UserCoupon] = []
+    if keyword.isdigit() and len(keyword) == 8:
+        orders = db.query(Order).filter(Order.verify_code == keyword).all()
+        coupons = db.query(UserCoupon).filter(UserCoupon.verify_code == keyword).all()
+    else:
+        like = f"%{keyword}%"
+        users = db.query(AppUser).filter(AppUser.phone.like(like)).all()
+        user_ids = [u.id for u in users]
+        oq = db.query(Order).filter(Order.status == "paid")
+        cq = db.query(UserCoupon).filter(UserCoupon.status == "unused")
+        if user_ids:
+            oq = oq.filter((Order.contact_phone.like(like)) | (Order.user_id.in_(user_ids)))
+            cq = cq.filter(UserCoupon.user_id.in_(user_ids))
+        else:
+            oq = oq.filter(Order.contact_phone.like(like))
+            cq = cq.filter(UserCoupon.id == -1)
+        orders = oq.order_by(Order.created_at.desc()).limit(20).all()
+        coupons = cq.order_by(UserCoupon.id.desc()).limit(20).all()
+    payload = [_verify_order_item(db, r) for r in orders] + [_verify_coupon_item(db, r) for r in coupons]
+    db.commit()
+    return {"list": payload}
+
+
+@router.post("/verify")
+def confirm_verify(
+    payload: dict,
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(get_current_admin),
+):
+    kind = str(payload.get("kind") or "")
+    item_id = payload.get("id")
+    if kind == "order":
+        row = db.query(Order).filter(Order.id == str(item_id)).first()
+        if not row:
+            raise HTTPException(404, "订单不存在")
+        if row.status == "completed":
+            return {"ok": False, "message": "该订单已核销", "item": _verify_order_item(db, row)}
+        if row.status != "paid":
+            raise HTTPException(400, f"当前状态不可核销：{row.status_text or row.status}")
+        row.status = "completed"
+        row.status_text = STATUS_TEXT.get("completed", "已完成")
+        user = db.query(AppUser).filter(AppUser.id == row.user_id).first() if row.user_id else None
+        if user:
+            sync_user_vip(db, user)
+        db.commit()
+        return {"ok": True, "message": "订单已核销", "item": _verify_order_item(db, row)}
+    if kind == "coupon":
+        try:
+            cid = int(item_id)
+        except (TypeError, ValueError):
+            raise HTTPException(400, "优惠券无效")
+        row = db.query(UserCoupon).filter(UserCoupon.id == cid).first()
+        if not row:
+            raise HTTPException(404, "优惠券不存在")
+        if row.status == "used":
+            return {"ok": False, "message": "该优惠券已核销", "item": _verify_coupon_item(db, row)}
+        if row.status != "unused":
+            raise HTTPException(400, "该优惠券不可核销")
+        row.status = "used"
+        db.commit()
+        return {"ok": True, "message": "优惠券已核销", "item": _verify_coupon_item(db, row)}
+    raise HTTPException(400, "核销类型无效")
 
 
 # ---- rooms ----
@@ -940,6 +1076,8 @@ def issue_user_coupon(
     )
     coupon.claimed = int(coupon.claimed or 0) + 1
     db.add(row)
+    db.flush()
+    ensure_coupon_verify_code(db, row)
     db.commit()
     db.refresh(row)
     return {

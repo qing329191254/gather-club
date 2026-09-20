@@ -129,6 +129,8 @@ def ensure_schema() -> None:
                     """
                 )
             )
+            if "verify_code" not in cols:
+                conn.execute(text("ALTER TABLE orders ADD COLUMN verify_code VARCHAR(16) DEFAULT ''"))
             conn.execute(
                 text(
                     """
@@ -153,4 +155,8 @@ def ensure_schema() -> None:
                     """
                 )
             )
+        if "user_coupons" in tables:
+            cols = {c["name"] for c in inspector.get_columns("user_coupons")}
+            if "verify_code" not in cols:
+                conn.execute(text("ALTER TABLE user_coupons ADD COLUMN verify_code VARCHAR(16) DEFAULT ''"))
         # recommend_items / addresses created by create_all

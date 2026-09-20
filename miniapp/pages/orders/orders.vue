@@ -43,6 +43,12 @@
 				</view>
 			</view>
 
+			<view v-if="order.status === 'paid' && order.verifyCode" class="verify-box" @tap.stop="onShowCode(order)">
+				<text class="verify-label">到店核销码</text>
+				<text class="verify-code">{{ order.verifyCode }}</text>
+				<text class="verify-tip">向前台出示此码</text>
+			</view>
+
 			<view v-if="order.status === 'pending'" class="order-actions" @tap.stop>
 				<view class="btn ghost" @tap="onCancel(order)">取消订单</view>
 				<view class="btn solid" @tap="onPay(order)">立即支付</view>
@@ -109,7 +115,8 @@
 					price: row.price,
 					amount: row.amount,
 					roomDate: row.roomDate,
-					roomSlot: row.roomSlot
+					roomSlot: row.roomSlot,
+					verifyCode: row.verifyCode || ''
 				}
 			},
 			async reloadOrders() {
@@ -154,6 +161,7 @@
 							detail.title || '',
 							detail.spec || '',
 							detail.statusText || '',
+							detail.verifyCode && detail.status === 'paid' ? `核销码：${detail.verifyCode}` : '',
 							detail.roomDate ? `用餐：${detail.roomDate} ${detail.roomSlot || ''}` : '',
 							detail.contactPhone ? `联系人：${detail.contactName || ''} ${detail.contactPhone}` : ''
 						].filter(Boolean)
@@ -166,6 +174,13 @@
 					.catch(() => {
 						uni.showToast({ title: '订单详情加载失败', icon: 'none' })
 					})
+			},
+			onShowCode(order) {
+				uni.showModal({
+					title: '到店核销码',
+					content: order.verifyCode + '\n请向前台出示，由工作人员在后台核销',
+					showCancel: false
+				})
 			},
 			onCancel(order) {
 				uni.showModal({
@@ -388,6 +403,35 @@
 		font-size: 32rpx;
 		color: #222;
 		font-weight: 600;
+	}
+
+	.verify-box {
+		margin-top: 20rpx;
+		padding: 20rpx 24rpx;
+		border-radius: 12rpx;
+		background: #fff6f5;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+	}
+
+	.verify-label {
+		font-size: 22rpx;
+		color: #e85a4a;
+	}
+
+	.verify-code {
+		margin-top: 6rpx;
+		font-size: 44rpx;
+		font-weight: 700;
+		letter-spacing: 6rpx;
+		color: #222222;
+	}
+
+	.verify-tip {
+		margin-top: 4rpx;
+		font-size: 22rpx;
+		color: #999999;
 	}
 
 	.order-actions {

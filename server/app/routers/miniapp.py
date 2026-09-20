@@ -62,7 +62,19 @@ from ..pay import (
     unified_order,
 )
 from ..schemas import OrderCreateIn, OkResponse, WxLoginIn, WxPhoneIn
-from ..utils import STATUS_TEXT, dumps, get_config, loads, month_cn, normalize_page, now_cn, page_payload, today_cn
+from ..utils import (
+    STATUS_TEXT,
+    dumps,
+    ensure_coupon_verify_code,
+    ensure_order_verify_code,
+    get_config,
+    loads,
+    month_cn,
+    normalize_page,
+    now_cn,
+    page_payload,
+    today_cn,
+)
 from ..wx import code2session, phone_from_code, phone_from_encrypted, resolve_demo_openid, wx_configured
 
 router = APIRouter(prefix="/api/v1", tags=["miniapp"])
@@ -224,6 +236,7 @@ def _order_out(row: Order) -> dict:
         "remark": row.remark,
         "roomDate": row.room_date,
         "roomSlot": row.room_slot,
+        "verifyCode": (row.verify_code or "") if row.status == "paid" else "",
         "extra": loads(row.extra or "{}", {}) or {},
         "createdAt": row.created_at.isoformat() if row.created_at else None,
     }
@@ -237,6 +250,7 @@ def _mark_order_paid(db: Session, order: Order, extra_patch: Optional[dict] = No
     if extra_patch:
         extra.update(extra_patch)
     order.extra = dumps(extra)
+    ensure_order_verify_code(db, order)
     if not already_paid:
         user = db.query(AppUser).filter(AppUser.id == order.user_id).first() if order.user_id else None
         bump_sold_on_paid(db, order, user)
@@ -829,6 +843,13 @@ def list_orders(
     q = q.order_by(Order.created_at.desc())
     total = q.count()
     rows = q.offset(offset).limit(page_size).all()
+    dirty = False
+    for r in rows:
+        if r.status == "paid" and not (r.verify_code or "").strip():
+            ensure_order_verify_code(db, r)
+            dirty = True
+    if dirty:
+        db.commit()
     return page_payload([_order_out(r) for r in rows], total, page, page_size)
 
 
@@ -1090,11 +1111,16 @@ def mall_redeem(
                     "region": region,
                     "detail": addr.detail,
                 },
-                "redeemCode": f"R{user.id}{int(datetime.utcnow().timestamp()) % 1000000:06d}",
+                "redeemCode": "",
             }
         ),
     )
     db.add(order)
+    db.flush()
+    code = ensure_order_verify_code(db, order)
+    extra = loads(order.extra or "{}", {}) or {}
+    extra["redeemCode"] = code
+    order.extra = dumps(extra)
     db.commit()
     db.refresh(user)
     extra = loads(order.extra or "{}", {}) or {}
@@ -1377,6 +1403,8 @@ def claim_coupon(
     )
     coupon.claimed += 1
     db.add(row)
+    db.flush()
+    ensure_coupon_verify_code(db, row)
     db.commit()
     return OkResponse(
         message="领取成功",
@@ -1434,6 +1462,9 @@ def order_detail(
         raise HTTPException(status_code=404, detail="订单不存在")
     if row.openid and row.openid != oid:
         raise HTTPException(status_code=403, detail="无权查看")
+    if row.status == "paid" and not (row.verify_code or "").strip():
+        ensure_order_verify_code(db, row)
+        db.commit()
     return _order_out(row)
 
 
@@ -1482,6 +1513,13 @@ def user_coupons(
     oid = _require_openid(x_openid, "", openid)
     user = _ensure_user(db, oid)
     rows = db.query(UserCoupon).filter(UserCoupon.user_id == user.id).order_by(UserCoupon.id.desc()).all()
+    dirty = False
+    for r in rows:
+        if r.status == "unused" and not (r.verify_code or "").strip():
+            ensure_coupon_verify_code(db, r)
+            dirty = True
+    if dirty:
+        db.commit()
     grouped = {"unused": [], "used": [], "expired": []}
     for r in rows:
         bucket = r.status if r.status in grouped else "unused"
@@ -1492,6 +1530,7 @@ def user_coupons(
                 "amount": r.amount,
                 "condition": r.condition,
                 "expire": r.expire,
+                "verifyCode": (r.verify_code or "") if r.status == "unused" else "",
             }
         )
     return grouped

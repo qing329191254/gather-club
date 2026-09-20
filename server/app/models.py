@@ -214,6 +214,7 @@ class Order(Base):
     room_date: Mapped[str] = mapped_column(String(16), default="")
     room_slot: Mapped[str] = mapped_column(String(16), default="")
     extra: Mapped[str] = mapped_column(Text, default="{}")
+    verify_code: Mapped[str] = mapped_column(String(16), default="", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=now, onupdate=now)
 
@@ -256,6 +257,7 @@ class UserCoupon(Base):
     condition: Mapped[str] = mapped_column(String(128), default="")
     expire: Mapped[str] = mapped_column(String(64), default="")
     status: Mapped[str] = mapped_column(String(16), default="unused")  # unused|used|expired
+    verify_code: Mapped[str] = mapped_column(String(16), default="", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
 
 

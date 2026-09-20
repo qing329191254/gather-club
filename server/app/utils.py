@@ -81,3 +81,38 @@ def page_payload(items: list, total: int, page: int, page_size: int) -> dict:
         "page_size": page_size,
         "has_more": page * page_size < int(total or 0),
     }
+
+
+def alloc_verify_code(db: Session) -> str:
+    """8 位数字核销码，订单与到店券全局不重复。"""
+    import secrets
+
+    from .models import Order, UserCoupon
+
+    for _ in range(40):
+        code = f"{secrets.randbelow(90000000) + 10000000}"
+        taken_order = db.query(Order.id).filter(Order.verify_code == code).first()
+        taken_coupon = db.query(UserCoupon.id).filter(UserCoupon.verify_code == code).first()
+        if not taken_order and not taken_coupon:
+            return code
+    raise RuntimeError("核销码生成失败")
+
+
+def ensure_order_verify_code(db: Session, order) -> str:
+    code = (getattr(order, "verify_code", "") or "").strip()
+    if code:
+        return code
+    if getattr(order, "status", "") != "paid":
+        return ""
+    order.verify_code = alloc_verify_code(db)
+    return order.verify_code
+
+
+def ensure_coupon_verify_code(db: Session, row) -> str:
+    code = (getattr(row, "verify_code", "") or "").strip()
+    if code:
+        return code
+    if getattr(row, "status", "") != "unused":
+        return ""
+    row.verify_code = alloc_verify_code(db)
+    return row.verify_code

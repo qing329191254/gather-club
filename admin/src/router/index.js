@@ -21,6 +21,7 @@ const routes = [
       { path: 'recommend', name: 'recommend', meta: { title: '订酒店' }, component: () => import('../views/Recommend.vue') },
       { path: 'content', name: 'content', meta: { title: '内容配置' }, component: () => import('../views/Content.vue') },
       { path: 'orders', name: 'orders', meta: { title: '订单管理' }, component: () => import('../views/Orders.vue') },
+      { path: 'verify', name: 'verify', meta: { title: '到店核销' }, component: () => import('../views/Verify.vue') },
       { path: 'rooms', name: 'rooms', meta: { title: '包房库存' }, component: () => import('../views/Rooms.vue') },
       { path: 'coupons', name: 'coupons', meta: { title: '优惠券' }, component: () => import('../views/Coupons.vue') },
       { path: 'users', name: 'users', meta: { title: '用户' }, component: () => import('../views/Users.vue') },
