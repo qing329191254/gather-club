@@ -19,12 +19,19 @@
 		</view>
 
 		<view class="card">
-			<view class="row" @tap="onNickname">
+			<view class="row nick-row">
 				<text class="label">昵称</text>
-				<view class="right">
-					<text class="value">{{ form.nickname || '请输入昵称' }}</text>
-					<view class="arrow" />
-				</view>
+				<input
+					class="nick-field"
+					type="nickname"
+					:value="form.nickname"
+					placeholder="点击填写，可选用微信昵称"
+					placeholder-class="nick-ph"
+					maxlength="20"
+					@blur="onNickChange"
+					@change="onNickChange"
+					@nicknamereview="onNickReview"
+				/>
 			</view>
 			<view class="row" @tap="openBirthday">
 				<text class="label">生日</text>
@@ -73,32 +80,6 @@
 			@cancel="phoneTipVisible = false"
 			@close="phoneTipVisible = false"
 		/>
-
-		<!-- 微信昵称：type=nickname 可拉起选用微信昵称 -->
-		<view
-			v-if="nickSheetVisible"
-			class="nick-mask"
-			@tap="closeNickSheet"
-			@touchmove.stop.prevent="preventTouchMove"
-		>
-			<view class="nick-sheet" @tap.stop @touchmove.stop.prevent="preventTouchMove">
-				<text class="nick-title">修改昵称</text>
-				<input
-					class="nick-input"
-					type="nickname"
-					:value="nickDraft"
-					placeholder="点击输入，可选用微信昵称"
-					placeholder-class="nick-ph"
-					maxlength="20"
-					@input="onNickInput"
-					@blur="onNickBlur"
-				/>
-				<view class="nick-actions">
-					<view class="nick-btn ghost" @tap="closeNickSheet">取消</view>
-					<view class="nick-btn solid" @tap="confirmNick">确定</view>
-				</view>
-			</view>
-		</view>
 	</view>
 </template>
 
@@ -123,8 +104,6 @@
 				phoneTipVisible: false,
 				phoneTipMessage: '您仅有一次修改机会\n是否确认修改?',
 				phoneEditLabel: '修改手机号 >',
-				nickSheetVisible: false,
-				nickDraft: '',
 				form: {
 					avatar: '',
 					nickname: '微信用户',
@@ -145,7 +124,6 @@
 			this.loadProfile()
 		},
 		methods: {
-			preventTouchMove() {},
 			async loadProfile() {
 				if (!isLoggedIn()) await silentLogin()
 				else await refreshProfile()
@@ -176,51 +154,16 @@
 					this.form.avatar = url
 				}
 			},
-			onNickname() {
-				uni.showActionSheet({
-					itemList: ['使用微信昵称', '手动输入'],
-					success: (res) => {
-						if (res.tapIndex === 0) {
-							this.nickDraft = this.form.nickname || ''
-							this.nickSheetVisible = true
-						} else if (res.tapIndex === 1) {
-							this.editNicknameManual()
-						}
-					}
-				})
+			onNickChange(e) {
+				const name = String((e && e.detail && e.detail.value) || '').trim()
+				if (name) this.form.nickname = name
 			},
-			editNicknameManual() {
-				uni.showModal({
-					title: '修改昵称',
-					editable: true,
-					placeholderText: '请输入昵称',
-					content: this.form.nickname,
-					success: (res) => {
-						if (res.confirm && res.content != null) {
-							const name = String(res.content).trim()
-							if (name) this.form.nickname = name
-						}
-					}
-				})
-			},
-			onNickInput(e) {
-				this.nickDraft = (e && e.detail && e.detail.value) || ''
-			},
-			onNickBlur(e) {
-				const v = (e && e.detail && e.detail.value) || this.nickDraft
-				this.nickDraft = String(v || '').trim()
-			},
-			confirmNick() {
-				const name = String(this.nickDraft || '').trim()
-				if (!name) {
-					uni.showToast({ title: '请输入昵称', icon: 'none' })
-					return
+			onNickReview(e) {
+				// pass=审核通过；fail 时微信会清空，保持原昵称
+				const pass = e && e.detail && e.detail.pass
+				if (pass === false) {
+					uni.showToast({ title: '昵称未通过审核', icon: 'none' })
 				}
-				this.form.nickname = name
-				this.closeNickSheet()
-			},
-			closeNickSheet() {
-				this.nickSheetVisible = false
 			},
 			openBirthday() {
 				this.birthdayVisible = true
@@ -427,6 +370,26 @@
 		flex-shrink: 0;
 	}
 
+	.nick-row {
+		padding-right: 20rpx;
+	}
+
+	.nick-field {
+		flex: 1;
+		min-width: 0;
+		text-align: right;
+		font-size: 28rpx;
+		color: #333333;
+		height: 48rpx;
+		line-height: 48rpx;
+		margin-left: 24rpx;
+	}
+
+	.nick-ph {
+		color: #bbbbbb;
+		text-align: right;
+	}
+
 	.save-wrap {
 		position: fixed;
 		left: 0;
@@ -446,78 +409,5 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-	}
-
-	.nick-mask {
-		position: fixed;
-		left: 0;
-		right: 0;
-		top: 0;
-		bottom: 0;
-		z-index: 11000;
-		background: rgba(0, 0, 0, 0.45);
-		display: flex;
-		align-items: flex-end;
-		justify-content: center;
-	}
-
-	.nick-sheet {
-		width: 100%;
-		background: #ffffff;
-		border-radius: 28rpx 28rpx 0 0;
-		padding: 40rpx 36rpx calc(40rpx + env(safe-area-inset-bottom));
-		box-sizing: border-box;
-	}
-
-	.nick-title {
-		display: block;
-		text-align: center;
-		font-size: 32rpx;
-		font-weight: 700;
-		color: #222;
-		margin-bottom: 28rpx;
-	}
-
-	.nick-input {
-		height: 88rpx;
-		border-radius: 16rpx;
-		background: #f6f6f6;
-		padding: 0 28rpx;
-		font-size: 30rpx;
-		color: #222;
-		box-sizing: border-box;
-		margin-bottom: 32rpx;
-	}
-
-	.nick-ph {
-		color: #bbbbbb;
-	}
-
-	.nick-actions {
-		display: flex;
-		gap: 20rpx;
-	}
-
-	.nick-btn {
-		flex: 1;
-		height: 84rpx;
-		border-radius: 999rpx;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 30rpx;
-		font-weight: 600;
-		box-sizing: border-box;
-	}
-
-	.nick-btn.ghost {
-		background: #ffffff;
-		border: 2rpx solid #dddddd;
-		color: #666666;
-	}
-
-	.nick-btn.solid {
-		background: #e23636;
-		color: #ffffff;
 	}
 </style>

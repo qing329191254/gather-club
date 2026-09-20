@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from sqlalchemy.orm import Session
 
 from ..cms_data import AGREEMENTS, MEMBER_CONFIG, PRIVACY_COLLECT, PRIVACY_SHARE
-from ..commerce import bump_sold_on_paid, sync_user_vip, table_count
+from ..commerce import bump_sold_on_paid, sync_user_vip, table_count, add_points
 from ..database import get_db
 from ..deps import create_access_token, get_current_admin, verify_password
 from ..models import (
@@ -814,8 +814,7 @@ def adjust_points(
     user = db.query(AppUser).filter(AppUser.id == user_id).first()
     if not user:
         raise HTTPException(404, "用户不存在")
-    user.points = max(0, user.points + payload.points)
-    db.add(PointLedger(user_id=user.id, title=payload.title or "后台调整", value=payload.points))
+    add_points(db, user, payload.title or "后台调整", int(payload.points or 0))
     db.commit()
     db.refresh(user)
     return {"id": user.id, "points": user.points}

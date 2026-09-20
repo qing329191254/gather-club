@@ -14,6 +14,9 @@ from ..cms_data import (
     default_nye_packages,
 )
 from ..commerce import (
+    add_points,
+    award_checkin_milestones,
+    award_order_points,
     bump_sold_on_paid,
     display_sold_text,
     nye_recent_buy,
@@ -208,6 +211,7 @@ def _mark_order_paid(db: Session, order: Order, extra_patch: Optional[dict] = No
     if not already_paid:
         user = db.query(AppUser).filter(AppUser.id == order.user_id).first() if order.user_id else None
         bump_sold_on_paid(db, order, user)
+        award_order_points(db, order, user)
     db.commit()
     db.refresh(order)
     return order
@@ -943,9 +947,8 @@ def mall_redeem(
         raise HTTPException(status_code=400, detail="库存不足")
     if user.points < row.cost:
         raise HTTPException(status_code=400, detail="积分不足")
-    user.points -= row.cost
     row.stock -= 1
-    db.add(PointLedger(user_id=user.id, title=f"兑换-{row.name}", value=-row.cost))
+    add_points(db, user, f"积分兑换-{row.name}", -row.cost)
     order = Order(
         id=f"mall{int(datetime.utcnow().timestamp() * 1000)}",
         user_id=user.id,
@@ -1399,8 +1402,14 @@ def checkin(
                 ok=False, message="暂无可补签日期", data={"points": 0, "balance": user.points}
             )
         db.add(CheckinRecord(user_id=user.id, date=target, points=points, is_makeup=True))
-        user.points += points
-        db.add(PointLedger(user_id=user.id, title="补签", value=points))
+        add_points(db, user, "补签", points)
+        y, m = int(today[:4]), int(today[5:7])
+        signed = (
+            db.query(CheckinRecord)
+            .filter(CheckinRecord.user_id == user.id, CheckinRecord.date.like(f"{y}-{m:02d}%"))
+            .count()
+        )
+        award_checkin_milestones(db, user, y, m, signed)
         db.commit()
         db.refresh(user)
         return OkResponse(ok=True, message="补签成功", data={"points": points, "balance": user.points})
@@ -1413,8 +1422,14 @@ def checkin(
     if exists:
         return OkResponse(ok=False, message="今日已签到", data={"points": 0, "balance": user.points})
     db.add(CheckinRecord(user_id=user.id, date=today, points=points, is_makeup=False))
-    user.points += points
-    db.add(PointLedger(user_id=user.id, title="每日签到", value=points))
+    add_points(db, user, "每日签到", points)
+    y, m = int(today[:4]), int(today[5:7])
+    signed = (
+        db.query(CheckinRecord)
+        .filter(CheckinRecord.user_id == user.id, CheckinRecord.date.like(f"{y}-{m:02d}%"))
+        .count()
+    )
+    award_checkin_milestones(db, user, y, m, signed)
     db.commit()
     db.refresh(user)
     return OkResponse(ok=True, message="签到成功", data={"points": points, "balance": user.points})
@@ -1534,8 +1549,7 @@ def video_reserve(
     gained = live.points or 0
     db.add(VideoReserve(user_id=user.id, live_id=live.id, points=gained))
     if gained:
-        user.points += gained
-        db.add(PointLedger(user_id=user.id, title="预约直播", value=gained))
+        add_points(db, user, "预约直播", gained)
     db.commit()
     db.refresh(user)
     profile = get_config(db, "video", {}) or {}

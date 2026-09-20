@@ -16,7 +16,7 @@
 					<text class="item-time">{{ item.time }}</text>
 				</view>
 				<text class="item-value" :class="{ minus: item.value < 0 }">
-					{{ item.value > 0 ? item.value : item.value }}
+					{{ formatValue(item.value) }}
 				</text>
 			</view>
 		</view>
@@ -47,6 +47,11 @@
 			this.loadMore()
 		},
 		methods: {
+			formatValue(v) {
+				const n = Number(v) || 0
+				if (n > 0) return '+' + n
+				return String(n)
+			},
 			async reloadPoints() {
 				if (!isLoggedIn()) await silentLogin()
 				else await refreshProfile()
