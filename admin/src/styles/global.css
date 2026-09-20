@@ -1,0 +1,5 @@
+/* 禁止多行输入框右下角拖拽缩放 */
+textarea,
+.el-textarea__inner {
+  resize: none !important;
+}
