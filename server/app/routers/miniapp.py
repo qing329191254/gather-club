@@ -13,6 +13,13 @@ from ..cms_data import (
     RECOMMEND_BANNERS,
     default_nye_packages,
 )
+from ..commerce import (
+    bump_sold_on_paid,
+    display_sold_text,
+    nye_recent_buy,
+    sync_user_vip,
+    table_count,
+)
 from ..database import get_db
 from ..models import (
     Address,
@@ -48,7 +55,6 @@ from ..wx import code2session, phone_from_code, phone_from_encrypted, resolve_de
 
 router = APIRouter(prefix="/api/v1", tags=["miniapp"])
 
-TABLE_ORDER_TYPES = ("room", "nye", "recommend", "gather")
 ROOM_HOLD_MINUTES = 30
 
 
@@ -95,15 +101,7 @@ def _ensure_user(db: Session, openid: str, nickname: str = "微信用户", avata
 
 
 def _table_count(db: Session, user_id: int) -> int:
-    return (
-        db.query(Order)
-        .filter(
-            Order.user_id == user_id,
-            Order.status == "paid",
-            Order.type.in_(TABLE_ORDER_TYPES),
-        )
-        .count()
-    )
+    return table_count(db, user_id)
 
 
 def _user_out(user: AppUser, db: Optional[Session] = None) -> dict:
@@ -120,6 +118,10 @@ def _user_out(user: AppUser, db: Optional[Session] = None) -> dict:
         "vip": f"{user.vip_level}会员",
     }
     if db is not None:
+        sync_user_vip(db, user)
+        db.commit()
+        out["vipLevel"] = user.vip_level
+        out["vip"] = f"{user.vip_level}会员"
         out["tableCount"] = _table_count(db, user.id)
     return out
 
@@ -133,7 +135,8 @@ def _product_out(row: GatherProduct) -> dict:
         "title": row.title,
         "tag": row.tag,
         "tags": loads(row.tags, []),
-        "soldText": row.sold_text,
+        "soldText": display_sold_text(getattr(row, "sold_count", 0) or 0, row.sold_text),
+        "soldCount": int(getattr(row, "sold_count", 0) or 0),
         "price": row.price,
         "originPrice": row.origin_price,
     }
@@ -146,7 +149,8 @@ def _nye_packages_for(row: NyeStore) -> list:
     return default_nye_packages(row.price or 2388, row.cover or "")
 
 
-def _nye_out(row: NyeStore) -> dict:
+def _nye_out(row: NyeStore, db: Optional[Session] = None) -> dict:
+    recent = nye_recent_buy(db, row) if db is not None else (loads(row.recent_buy, {}) or {})
     return {
         "id": row.id,
         "name": row.name,
@@ -160,8 +164,9 @@ def _nye_out(row: NyeStore) -> dict:
         "lng": row.lng,
         "banners": loads(row.banners, []),
         "detailImages": loads(row.detail_images, []),
-				"recentBuy": loads(row.recent_buy, {}) or {},
-				"openStart": row.open_start,
+        "recentBuy": recent,
+        "soldCount": int(getattr(row, "sold_count", 0) or 0),
+        "openStart": row.open_start,
         "openEnd": row.open_end,
     }
 
@@ -191,12 +196,16 @@ def _order_out(row: Order) -> dict:
 
 
 def _mark_order_paid(db: Session, order: Order, extra_patch: Optional[dict] = None) -> Order:
+    already_paid = order.status in ("paid", "completed")
     order.status = "paid"
     order.status_text = "待核销"
     extra = loads(order.extra or "{}", {})
     if extra_patch:
         extra.update(extra_patch)
     order.extra = dumps(extra)
+    if not already_paid:
+        user = db.query(AppUser).filter(AppUser.id == order.user_id).first() if order.user_id else None
+        bump_sold_on_paid(db, order, user)
     db.commit()
     db.refresh(order)
     return order
@@ -550,7 +559,7 @@ def nye_detail(nye_id: str, db: Session = Depends(get_db)):
     row = db.query(NyeStore).filter(NyeStore.id == nye_id, NyeStore.enabled.is_(True)).first()
     if not row:
         raise HTTPException(status_code=404, detail="门店不存在")
-    detail = _nye_out(row)
+    detail = _nye_out(row, db)
     detail["packages"] = _nye_packages_for(row)
     return detail
 
@@ -980,6 +989,10 @@ def _profile_out(user: AppUser, db: Optional[Session] = None) -> dict:
         "tableCount": 0,
     }
     if db is not None:
+        sync_user_vip(db, user)
+        db.commit()
+        out["vipLevel"] = user.vip_level
+        out["vip"] = f"{user.vip_level}会员"
         out["tableCount"] = _table_count(db, user.id)
     return out
 

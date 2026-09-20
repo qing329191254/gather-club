@@ -49,7 +49,8 @@
         <el-table-column prop="title" label="商品标题" min-width="220" show-overflow-tooltip />
         <el-table-column prop="price" label="现价" width="90" />
         <el-table-column prop="origin_price" label="原价" width="90" />
-        <el-table-column prop="sold_text" label="已购文案" width="120" show-overflow-tooltip />
+        <el-table-column prop="sold_count" label="实付销量" width="90" />
+        <el-table-column prop="sold_text" label="已购文案(无销量时)" width="140" show-overflow-tooltip />
         <el-table-column label="是否上架" width="100">
           <template #default="{ row }">
             <el-tag :type="row.enabled ? 'success' : 'info'" size="small">
@@ -131,7 +132,7 @@
           <el-input v-model="tagsText" placeholder="多个用逗号分隔，例如：近地铁,包厢" />
         </el-form-item>
         <el-form-item label="已购文案">
-          <el-input v-model="productForm.sold_text" placeholder="例如：1.2万+人已购" />
+          <el-input v-model="productForm.sold_text" placeholder="实付后自动显示「N人已购」；此项仅在尚无销量时展示" />
         </el-form-item>
         <el-form-item label="现价">
           <el-input-number v-model="productForm.price" :min="0" :precision="0" />

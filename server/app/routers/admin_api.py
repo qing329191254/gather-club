@@ -4,6 +4,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
+from ..commerce import bump_sold_on_paid, sync_user_vip, table_count
 from ..database import get_db
 from ..deps import create_access_token, get_current_admin, verify_password
 from ..models import (
@@ -243,6 +244,7 @@ def list_gather_products(
                 "tag": r.tag,
                 "tags": loads(r.tags, []),
                 "sold_text": r.sold_text,
+                "sold_count": int(getattr(r, "sold_count", 0) or 0),
                 "price": r.price,
                 "origin_price": r.origin_price,
                 "sort": r.sort,
@@ -590,6 +592,14 @@ def update_order_status(
             slot.booked -= 1
     row.status = next_status
     row.status_text = payload.status_text or STATUS_TEXT.get(next_status, next_status)
+    # 后台把待支付标成已支付时，同样累计销量 / 会员桌数
+    if prev not in ("paid", "completed") and next_status in ("paid", "completed"):
+        user = db.query(AppUser).filter(AppUser.id == row.user_id).first() if row.user_id else None
+        bump_sold_on_paid(db, row, user)
+    elif row.user_id and next_status in ("paid", "completed", "cancelled"):
+        user = db.query(AppUser).filter(AppUser.id == row.user_id).first()
+        if user:
+            sync_user_vip(db, user)
     db.commit()
     return OkResponse(data={"id": row.id, "status": row.status, "status_text": row.status_text})
 
@@ -721,6 +731,7 @@ def list_users(
                 "phone": r.phone or "",
                 "points": r.points or 0,
                 "vip_level": r.vip_level or "",
+                "table_count": table_count(db, r.id),
                 "created_at": r.created_at.isoformat() if r.created_at else None,
             }
             for r in rows
@@ -760,7 +771,7 @@ def update_vip(
         raise HTTPException(404, "用户不存在")
     user.vip_level = vip_level.upper()
     db.commit()
-    return {"id": user.id, "vip_level": user.vip_level}
+    return {"id": user.id, "vip_level": user.vip_level, "table_count": table_count(db, user.id)}
 
 
 # ---- site config ----

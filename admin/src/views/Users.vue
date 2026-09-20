@@ -9,6 +9,7 @@
       <el-table-column prop="nickname" label="昵称" width="120" />
       <el-table-column prop="phone" label="手机" width="120" />
       <el-table-column prop="points" label="积分" width="90" />
+      <el-table-column prop="table_count" label="近1年桌数" width="110" />
       <el-table-column prop="vip_level" label="会员" width="90" />
       <el-table-column prop="openid" label="OpenID" min-width="160" show-overflow-tooltip />
       <el-table-column label="操作" width="220" fixed="right">
@@ -70,7 +71,7 @@ async function setVip(row) {
     inputValue: row.vip_level || 'V0'
   })
   await http.put(`/users/${row.id}/vip`, null, { params: { vip_level: value } })
-  ElMessage.success('已更新')
+  ElMessage.success('已更新（用户打开会员页时会按近1年桌数自动校正）')
   load()
 }
 

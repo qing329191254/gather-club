@@ -84,7 +84,8 @@ class GatherProduct(Base):
     title: Mapped[str] = mapped_column(String(255))
     tag: Mapped[str] = mapped_column(String(64), default="")
     tags: Mapped[str] = mapped_column(Text, default="[]")  # JSON array
-    sold_text: Mapped[str] = mapped_column(String(64), default="")
+    sold_text: Mapped[str] = mapped_column(String(64), default="")  # 留空则按 sold_count 自动生成
+    sold_count: Mapped[int] = mapped_column(Integer, default=0)
     price: Mapped[float] = mapped_column(Float, default=0)
     origin_price: Mapped[float] = mapped_column(Float, default=0)
     sort: Mapped[int] = mapped_column(Integer, default=0)
@@ -107,6 +108,7 @@ class NyeStore(Base):
     banners: Mapped[str] = mapped_column(Text, default="[]")
     detail_images: Mapped[str] = mapped_column(Text, default="[]")
     recent_buy: Mapped[str] = mapped_column(Text, default="{}")
+    sold_count: Mapped[int] = mapped_column(Integer, default=0)
     packages: Mapped[str] = mapped_column(Text, default="[]")  # JSON array of packages
     open_start: Mapped[str] = mapped_column(String(16), default="2027-02-05")
     open_end: Mapped[str] = mapped_column(String(16), default="2027-02-12")
