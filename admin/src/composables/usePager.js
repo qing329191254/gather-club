@@ -17,8 +17,11 @@ export function usePager(defaultSize = 20) {
     return list
   }
 
+  /** Reset to page 1. Returns true if page actually changed (caller can skip load if pagination will fire). */
   function resetPage() {
+    if (page.value === 1) return false
     page.value = 1
+    return true
   }
 
   function pageParams(extra = {}) {

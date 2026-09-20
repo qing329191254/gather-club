@@ -64,7 +64,13 @@ async function onUpload(option) {
     body.append('file', file)
     body.append('folder', props.folder || 'uploads')
     const res = await http.post('/upload', body)
-    inner.value = res.url || res.fileId || ''
+    const url = res.url || res.fileId || ''
+    if (!url) {
+      ElMessage.error('上传失败：未返回图片地址')
+      option.onError && option.onError(new Error('empty url'))
+      return
+    }
+    inner.value = url
     emitValue()
     ElMessage.success('上传成功')
     option.onSuccess && option.onSuccess(res)

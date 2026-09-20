@@ -126,8 +126,7 @@ async function load() {
 }
 
 function onSearch() {
-  resetPage()
-  load()
+  if (!resetPage()) load()
 }
 
 function openEdit(row) {

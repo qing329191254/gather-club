@@ -379,6 +379,7 @@
 								quantity: this.quantity,
 								price: amount,
 								amount,
+								package_id: String(cur.id || ''),
 								contact_name: this.name,
 								contact_phone: this.phone,
 								people: this.people,

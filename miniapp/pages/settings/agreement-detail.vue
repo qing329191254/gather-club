@@ -43,8 +43,14 @@
 			api.agreement(type)
 				.then((doc) => {
 					if (!doc) return
-					this.doc = doc
-					uni.setNavigationBarTitle({ title: doc.navTitle || '协议' })
+					this.doc = {
+						title: doc.title || '',
+						intro: doc.intro || '',
+						blocks: doc.blocks || [],
+						confirm: doc.confirm || '',
+						navTitle: doc.navTitle || ''
+					}
+					uni.setNavigationBarTitle({ title: this.doc.navTitle || '协议' })
 				})
 				.catch(() => {
 					if (!local) uni.showToast({ title: '协议不存在', icon: 'none' })

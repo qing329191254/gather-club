@@ -79,8 +79,7 @@ async function load() {
 }
 
 function onSearch() {
-  resetPage()
-  load()
+  if (!resetPage()) load()
 }
 
 async function setStatus(row, next) {

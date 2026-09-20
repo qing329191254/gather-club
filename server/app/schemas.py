@@ -184,6 +184,7 @@ class OrderCreateIn(BaseModel):
     room_date: str = ""
     room_slot: str = ""
     openid: str = ""
+    package_id: str = ""  # 年夜饭套餐 id，服务端以此算价
 
 
 class RoomSlotIn(BaseModel):

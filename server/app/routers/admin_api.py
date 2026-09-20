@@ -557,8 +557,28 @@ def update_order_status(
     row = db.query(Order).filter(Order.id == order_id).first()
     if not row:
         raise HTTPException(404, "订单不存在")
-    row.status = payload.status
-    row.status_text = payload.status_text or STATUS_TEXT.get(payload.status, payload.status)
+    prev = row.status
+    next_status = payload.status
+    if (
+        prev in ("pending", "paid")
+        and next_status == "cancelled"
+        and row.room_date
+        and row.room_slot
+        and row.store_id
+    ):
+        slot = (
+            db.query(RoomSlot)
+            .filter(
+                RoomSlot.store_id == row.store_id,
+                RoomSlot.date == row.room_date,
+                RoomSlot.slot == row.room_slot,
+            )
+            .first()
+        )
+        if slot and slot.booked > 0:
+            slot.booked -= 1
+    row.status = next_status
+    row.status_text = payload.status_text or STATUS_TEXT.get(next_status, next_status)
     db.commit()
     return OkResponse(data={"id": row.id, "status": row.status, "status_text": row.status_text})
 
@@ -680,7 +700,24 @@ def list_users(
         )
     total = q.count()
     rows = q.offset(offset).limit(page_size).all()
-    return page_payload(rows, total, page, page_size)
+    return page_payload(
+        [
+            {
+                "id": r.id,
+                "openid": r.openid,
+                "nickname": r.nickname or "",
+                "avatar": r.avatar or "",
+                "phone": r.phone or "",
+                "points": r.points or 0,
+                "vip_level": r.vip_level or "",
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ],
+        total,
+        page,
+        page_size,
+    )
 
 
 @router.post("/users/{user_id}/points")

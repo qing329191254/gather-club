@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request
@@ -43,12 +43,33 @@ from ..pay import (
     unified_order,
 )
 from ..schemas import OrderCreateIn, OkResponse, WxLoginIn, WxPhoneIn
-from ..utils import STATUS_TEXT, dumps, get_config, loads, normalize_page, page_payload
+from ..utils import STATUS_TEXT, dumps, get_config, loads, month_cn, normalize_page, now_cn, page_payload, today_cn
 from ..wx import code2session, phone_from_code, phone_from_encrypted, resolve_demo_openid, wx_configured
 
 router = APIRouter(prefix="/api/v1", tags=["miniapp"])
 
 TABLE_ORDER_TYPES = ("room", "nye", "recommend", "gather")
+ROOM_HOLD_MINUTES = 30
+
+
+def _client_openid(
+    x_openid: str = "",
+    x_wx_openid: str = "",
+    openid: str = "",
+) -> str:
+    """Prefer WeChat Cloud trusted X-WX-OPENID over client-supplied identity."""
+    return (x_wx_openid or x_openid or openid or "").strip()
+
+
+def _require_openid(
+    x_openid: str = "",
+    x_wx_openid: str = "",
+    openid: str = "",
+) -> str:
+    oid = _client_openid(x_openid, x_wx_openid, openid)
+    if not oid or oid == "anonymous":
+        raise HTTPException(status_code=401, detail="请先登录")
+    return oid
 
 
 def _user_by_openid(db: Session, openid: str) -> Optional[AppUser]:
@@ -139,8 +160,8 @@ def _nye_out(row: NyeStore) -> dict:
         "lng": row.lng,
         "banners": loads(row.banners, []),
         "detailImages": loads(row.detail_images, []),
-        "recentBuy": loads(row.recent_buy, {}),
-        "openStart": row.open_start,
+				"recentBuy": loads(row.recent_buy, {}) or {},
+				"openStart": row.open_start,
         "openEnd": row.open_end,
     }
 
@@ -207,6 +228,130 @@ def _slot_info(db: Session, store_id: str, date: str, slot: str) -> dict:
         "full": full,
         "statusText": "已满" if full else (f"仅剩{remain}间" if remain <= 2 else f"剩余{remain}间"),
     }
+
+
+def _release_room_slot(db: Session, order: Order) -> None:
+    if not (order.room_date and order.room_slot and order.store_id):
+        return
+    row = (
+        db.query(RoomSlot)
+        .filter(
+            RoomSlot.store_id == order.store_id,
+            RoomSlot.date == order.room_date,
+            RoomSlot.slot == order.room_slot,
+        )
+        .first()
+    )
+    if row and row.booked > 0:
+        row.booked -= 1
+
+
+def _release_stale_room_holds(db: Session) -> None:
+    """Cancel abandoned pending room orders and free inventory."""
+    cutoff = datetime.utcnow() - timedelta(minutes=ROOM_HOLD_MINUTES)
+    stale = (
+        db.query(Order)
+        .filter(
+            Order.type == "room",
+            Order.status == "pending",
+            Order.created_at < cutoff,
+        )
+        .all()
+    )
+    if not stale:
+        return
+    for order in stale:
+        _release_room_slot(db, order)
+        order.status = "cancelled"
+        order.status_text = STATUS_TEXT["cancelled"]
+    db.commit()
+
+
+def _resolve_order_price(db: Session, payload: OrderCreateIn) -> tuple[float, float, str, str, str]:
+    """Return (unit_price, amount, title, cover, spec) from catalog. Ignores client amounts for paid types."""
+    qty = max(1, int(payload.quantity or 1))
+    otype = (payload.type or "").strip()
+
+    if otype == "room":
+        return 0.0, 0.0, payload.title or "包房预约", payload.cover or "", payload.spec or ""
+
+    if otype == "gather":
+        row = (
+            db.query(GatherProduct)
+            .filter(GatherProduct.id == payload.store_id, GatherProduct.enabled.is_(True))
+            .first()
+        )
+        if not row:
+            raise HTTPException(status_code=404, detail="商品不存在或已下架")
+        unit = float(row.price or 0)
+        if unit <= 0:
+            raise HTTPException(status_code=400, detail="商品价格异常")
+        return (
+            unit,
+            round(unit * qty, 2),
+            row.title,
+            row.cover or payload.cover or "",
+            payload.spec or row.tag or "去哪聚",
+        )
+
+    if otype == "recommend":
+        try:
+            rid = int(payload.store_id)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="推荐商品无效")
+        row = (
+            db.query(RecommendItem)
+            .filter(RecommendItem.id == rid, RecommendItem.enabled.is_(True))
+            .first()
+        )
+        if not row:
+            raise HTTPException(status_code=404, detail="推荐商品不存在")
+        unit = float(row.price or 0)
+        if unit <= 0:
+            raise HTTPException(status_code=400, detail="商品价格异常")
+        return unit, round(unit * qty, 2), row.name, row.cover or "", payload.spec or "推荐位"
+
+    if otype == "nye":
+        store = (
+            db.query(NyeStore)
+            .filter(NyeStore.id == payload.store_id, NyeStore.enabled.is_(True))
+            .first()
+        )
+        if not store:
+            raise HTTPException(status_code=404, detail="门店不存在或已下架")
+        packages = _nye_packages_for(store)
+        pkg = None
+        pid = str(payload.package_id or "").strip()
+        if pid:
+            for p in packages:
+                if str(p.get("id")) == pid and not p.get("disabled"):
+                    pkg = p
+                    break
+        if not pkg and payload.spec:
+            for p in packages:
+                name = str(p.get("name") or "")
+                if name and payload.spec.startswith(name) and not p.get("disabled"):
+                    pkg = p
+                    break
+        if not pkg:
+            enabled = [p for p in packages if not p.get("disabled")]
+            pkg = enabled[0] if enabled else None
+        if not pkg:
+            raise HTTPException(status_code=400, detail="暂无可用套餐")
+        unit = float(pkg.get("price") or 0)
+        if unit <= 0:
+            raise HTTPException(status_code=400, detail="套餐价格异常")
+        title = payload.title or f"{store.name}-年夜饭"
+        cover = pkg.get("cover") or store.cover or payload.cover or ""
+        spec = payload.spec or str(pkg.get("name") or "")
+        return unit, round(unit * qty, 2), title, cover, spec
+
+    # Unknown paid type: reject client zero / free-ride
+    unit = float(payload.price or 0)
+    amount = float(payload.amount or payload.price or 0)
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="订单金额无效")
+    return unit, amount, payload.title or "", payload.cover or "", payload.spec or ""
 
 
 @router.get("/health")
@@ -453,6 +598,10 @@ def agreement_one(agree_type: str, db: Session = Depends(get_db)):
     doc = (data or {}).get(agree_type)
     if not doc:
         raise HTTPException(status_code=404, detail="协议不存在")
+    if isinstance(doc, dict):
+        out = dict(doc)
+        out["blocks"] = out.get("blocks") or []
+        return out
     return doc
 
 
@@ -545,7 +694,8 @@ def room_month(
 ):
     import calendar
 
-    today = datetime.utcnow().strftime("%Y-%m-%d")
+    _release_stale_room_holds(db)
+    today = today_cn()
     days = calendar.monthrange(year, month)[1]
     result = {}
     for d in range(1, days + 1):
@@ -570,16 +720,15 @@ def room_month(
 @router.get("/orders")
 def list_orders(
     x_openid: str = Header(default="", alias="X-Openid"),
+    x_wx_openid: str = Header(default="", alias="X-WX-OPENID"),
     openid: str = Query(default=""),
     page: int = Query(1),
     page_size: int = Query(20),
     db: Session = Depends(get_db),
 ):
     page, page_size, offset = normalize_page(page, page_size)
-    oid = x_openid or openid
-    q = db.query(Order).order_by(Order.created_at.desc())
-    if oid:
-        q = q.filter(Order.openid == oid)
+    oid = _require_openid(x_openid, x_wx_openid, openid)
+    q = db.query(Order).filter(Order.openid == oid).order_by(Order.created_at.desc())
     total = q.count()
     rows = q.offset(offset).limit(page_size).all()
     return page_payload([_order_out(r) for r in rows], total, page, page_size)
@@ -589,13 +738,17 @@ def list_orders(
 def create_order(
     payload: OrderCreateIn,
     x_openid: str = Header(default="", alias="X-Openid"),
+    x_wx_openid: str = Header(default="", alias="X-WX-OPENID"),
     db: Session = Depends(get_db),
 ):
-    openid = payload.openid or x_openid or "anonymous"
+    openid = _require_openid(x_openid, x_wx_openid, payload.openid)
     user = _ensure_user(db, openid)
     order_id = f"o{int(datetime.utcnow().timestamp() * 1000)}"
+    qty = max(1, int(payload.quantity or 1))
+    unit_price, amount, title, cover, spec = _resolve_order_price(db, payload)
 
     if payload.room_date and payload.room_slot and payload.store_id:
+        _release_stale_room_holds(db)
         info = _slot_info(db, payload.store_id, payload.room_date, payload.room_slot)
         if info["full"] or info["remain"] < 1:
             raise HTTPException(status_code=400, detail="该时段包房已满，请换日期或时段")
@@ -606,6 +759,7 @@ def create_order(
                 RoomSlot.date == payload.room_date,
                 RoomSlot.slot == payload.room_slot,
             )
+            .with_for_update()
             .first()
         )
         if not row:
@@ -618,6 +772,8 @@ def create_order(
             )
             db.add(row)
             db.flush()
+        if row.booked >= row.capacity:
+            raise HTTPException(status_code=400, detail="该时段包房已满，请换日期或时段")
         row.booked += 1
 
     order = Order(
@@ -627,12 +783,12 @@ def create_order(
         type=payload.type,
         store_id=payload.store_id,
         store_name=payload.store_name,
-        title=payload.title,
-        spec=payload.spec,
-        cover=payload.cover,
-        quantity=payload.quantity,
-        price=payload.price,
-        amount=payload.amount or payload.price,
+        title=title,
+        spec=spec,
+        cover=cover,
+        quantity=qty,
+        price=unit_price,
+        amount=amount,
         status="pending",
         status_text=STATUS_TEXT["pending"],
         contact_name=payload.contact_name,
@@ -649,18 +805,33 @@ def create_order(
 
 
 @router.post("/orders/{order_id}/pay")
-async def pay_order(order_id: str, request: Request, db: Session = Depends(get_db)):
+async def pay_order(
+    order_id: str,
+    request: Request,
+    x_openid: str = Header(default="", alias="X-Openid"),
+    x_wx_openid: str = Header(default="", alias="X-WX-OPENID"),
+    openid: str = Query(default=""),
+    db: Session = Depends(get_db),
+):
+    oid = _require_openid(x_openid, x_wx_openid, openid)
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
+    if order.openid and order.openid != oid:
+        raise HTTPException(status_code=403, detail="无权支付该订单")
     if order.status != "pending":
         raise HTTPException(status_code=400, detail="订单状态不可支付")
 
     amount = float(order.amount or order.price or 0)
-    # 金额为 0（如包房预约）或未配置商户号：直接 mock 标记已支付
-    if amount <= 0 or not pay_configured():
+    # 仅包房预约允许 0 元直接确认；付费单必须走真实支付
+    if amount <= 0:
+        if order.type != "room":
+            raise HTTPException(status_code=400, detail="订单金额异常，无法支付")
         _mark_order_paid(db, order, {"mockPaid": True})
         return {**_order_out(order), "needPay": False}
+
+    if not pay_configured():
+        raise HTTPException(status_code=503, detail="支付暂未开通，请稍后重试")
 
     total_fee = int(round(amount * 100))
     client_ip = request.client.host if request.client else "127.0.0.1"
@@ -692,6 +863,13 @@ async def pay_notify(request: Request, db: Session = Depends(get_db)):
     out_trade_no = data.get("out_trade_no") or ""
     order = db.query(Order).filter(Order.id == out_trade_no).first()
     if order and order.status == "pending":
+        expected = int(round(float(order.amount or order.price or 0) * 100))
+        try:
+            paid_fee = int(data.get("total_fee") or 0)
+        except (TypeError, ValueError):
+            paid_fee = 0
+        if expected > 0 and paid_fee != expected:
+            return Response(content=notify_fail_xml("FEE"), media_type="application/xml")
         _mark_order_paid(
             db,
             order,
@@ -704,24 +882,23 @@ async def pay_notify(request: Request, db: Session = Depends(get_db)):
 
 
 @router.post("/orders/{order_id}/cancel")
-def cancel_order(order_id: str, db: Session = Depends(get_db)):
+def cancel_order(
+    order_id: str,
+    x_openid: str = Header(default="", alias="X-Openid"),
+    x_wx_openid: str = Header(default="", alias="X-WX-OPENID"),
+    openid: str = Query(default=""),
+    db: Session = Depends(get_db),
+):
+    oid = _require_openid(x_openid, x_wx_openid, openid)
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
-    if order.status not in ("pending", "paid"):
+    if order.openid and order.openid != oid:
+        raise HTTPException(status_code=403, detail="无权取消该订单")
+    # 用户侧仅允许取消待支付；已支付请走后台
+    if order.status != "pending":
         raise HTTPException(status_code=400, detail="订单状态不可取消")
-    if order.room_date and order.room_slot and order.store_id:
-        row = (
-            db.query(RoomSlot)
-            .filter(
-                RoomSlot.store_id == order.store_id,
-                RoomSlot.date == order.room_date,
-                RoomSlot.slot == order.room_slot,
-            )
-            .first()
-        )
-        if row and row.booked > 0:
-            row.booked -= 1
+    _release_room_slot(db, order)
     order.status = "cancelled"
     order.status_text = STATUS_TEXT["cancelled"]
     db.commit()
@@ -989,17 +1166,21 @@ def set_default_address(
 def claim_coupon(
     payload: dict = Body(default={}),
     x_openid: str = Header(default="", alias="X-Openid"),
+    x_wx_openid: str = Header(default="", alias="X-WX-OPENID"),
     openid: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
-    user = _ensure_user(db, x_openid or openid or "anonymous")
+    user = _ensure_user(db, _require_openid(x_openid, x_wx_openid, openid))
     coupon_id = payload.get("couponId") or payload.get("coupon_id")
-    month_key = payload.get("month") or datetime.utcnow().strftime("%Y-%m")
-    # 会员月券：默认领第一张启用优惠券，每月一次
-    if coupon_id:
-        coupon = db.query(Coupon).filter(Coupon.id == int(coupon_id), Coupon.enabled.is_(True)).first()
-    else:
-        coupon = db.query(Coupon).filter(Coupon.enabled.is_(True)).order_by(Coupon.id.asc()).first()
+    # 月份一律服务端按上海时区计算，忽略客户端伪造
+    month_key = month_cn()
+    try:
+        if coupon_id:
+            coupon = db.query(Coupon).filter(Coupon.id == int(coupon_id), Coupon.enabled.is_(True)).first()
+        else:
+            coupon = db.query(Coupon).filter(Coupon.enabled.is_(True)).order_by(Coupon.id.asc()).first()
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="优惠券无效")
     if not coupon:
         raise HTTPException(status_code=404, detail="暂无可领优惠券")
     exists = (
@@ -1073,14 +1254,15 @@ def mall_records(
 def order_detail(
     order_id: str,
     x_openid: str = Header(default="", alias="X-Openid"),
+    x_wx_openid: str = Header(default="", alias="X-WX-OPENID"),
     openid: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
-    oid = x_openid or openid
+    oid = _require_openid(x_openid, x_wx_openid, openid)
     row = db.query(Order).filter(Order.id == order_id).first()
     if not row:
         raise HTTPException(status_code=404, detail="订单不存在")
-    if oid and row.openid and row.openid != oid:
+    if row.openid and row.openid != oid:
         raise HTTPException(status_code=403, detail="无权查看")
     return _order_out(row)
 
@@ -1148,25 +1330,66 @@ def user_coupons(
 @router.post("/checkin")
 def checkin(
     x_openid: str = Header(default="", alias="X-Openid"),
+    x_wx_openid: str = Header(default="", alias="X-WX-OPENID"),
     openid: str = Query(default=""),
     makeup: bool = Query(False),
     db: Session = Depends(get_db),
 ):
-    oid = x_openid or openid
-    user = _ensure_user(db, oid or "anonymous")
-    today = datetime.utcnow().strftime("%Y-%m-%d")
+    oid = _require_openid(x_openid, x_wx_openid, openid)
+    user = _ensure_user(db, oid)
+    today = today_cn()
+    points = 2
+
+    if makeup:
+        # 每日仅一次补签：填补近 7 天内最近一个未签日期
+        day_start_utc = (now_cn().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(hours=8)).replace(
+            tzinfo=None
+        )
+        already = (
+            db.query(PointLedger)
+            .filter(
+                PointLedger.user_id == user.id,
+                PointLedger.title == "补签",
+                PointLedger.created_at >= day_start_utc,
+            )
+            .first()
+        )
+        if already:
+            return OkResponse(
+                ok=False, message="今日已补签", data={"points": 0, "balance": user.points}
+            )
+        target = None
+        for delta in range(1, 8):
+            d = (now_cn() - timedelta(days=delta)).strftime("%Y-%m-%d")
+            exists_day = (
+                db.query(CheckinRecord)
+                .filter(CheckinRecord.user_id == user.id, CheckinRecord.date == d)
+                .first()
+            )
+            if not exists_day:
+                target = d
+                break
+        if not target:
+            return OkResponse(
+                ok=False, message="暂无可补签日期", data={"points": 0, "balance": user.points}
+            )
+        db.add(CheckinRecord(user_id=user.id, date=target, points=points, is_makeup=True))
+        user.points += points
+        db.add(PointLedger(user_id=user.id, title="补签", value=points))
+        db.commit()
+        db.refresh(user)
+        return OkResponse(ok=True, message="补签成功", data={"points": points, "balance": user.points})
+
     exists = (
         db.query(CheckinRecord)
         .filter(CheckinRecord.user_id == user.id, CheckinRecord.date == today)
         .first()
     )
-    if exists and not makeup:
+    if exists:
         return OkResponse(ok=False, message="今日已签到", data={"points": 0, "balance": user.points})
-    points = 2
-    if not exists:
-        db.add(CheckinRecord(user_id=user.id, date=today, points=points, is_makeup=makeup))
+    db.add(CheckinRecord(user_id=user.id, date=today, points=points, is_makeup=False))
     user.points += points
-    db.add(PointLedger(user_id=user.id, title="每日签到" if not makeup else "补签", value=points))
+    db.add(PointLedger(user_id=user.id, title="每日签到", value=points))
     db.commit()
     db.refresh(user)
     return OkResponse(ok=True, message="签到成功", data={"points": points, "balance": user.points})

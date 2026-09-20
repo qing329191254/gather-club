@@ -167,7 +167,12 @@
 		onLoad() {
 			api.memberConfig()
 				.then((cfg) => {
-					if (cfg && cfg.rules && cfg.rules.length) this.sections = cfg.rules
+					if (cfg && cfg.rules && cfg.rules.length) {
+						this.sections = cfg.rules.map((block) => ({
+							...block,
+							paras: block.paras || []
+						}))
+					}
 				})
 				.catch(() => {})
 		}

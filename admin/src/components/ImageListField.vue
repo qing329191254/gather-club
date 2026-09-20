@@ -20,7 +20,7 @@
         multiple
       >
         <div class="add-box">
-          <div class="add-title">{{ loading ? '上传中…' : '+ 上传' }}</div>
+          <div class="add-title">{{ loading ? `上传中 ${pending}…` : '+ 上传' }}</div>
         </div>
       </el-upload>
     </div>
@@ -39,6 +39,8 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue'])
 
 const loading = ref(false)
+const pending = ref(0)
+const queue = ref(Promise.resolve())
 const list = computed(() => (Array.isArray(props.modelValue) ? props.modelValue : []).filter(Boolean))
 
 function setList(next) {
@@ -60,24 +62,37 @@ function move(idx, delta) {
   setList(next)
 }
 
-async function onUpload(option) {
+async function uploadOne(file) {
+  const body = new FormData()
+  body.append('file', file)
+  body.append('folder', props.folder || 'uploads')
+  const res = await http.post('/upload', body)
+  const url = res.url || res.fileId || ''
+  if (!url) throw new Error('empty url')
+  setList([...list.value, url])
+  return res
+}
+
+function onUpload(option) {
   const file = option.file
   if (!file) return
+  pending.value += 1
   loading.value = true
-  try {
-    const body = new FormData()
-    body.append('file', file)
-    body.append('folder', props.folder || 'uploads')
-    const res = await http.post('/upload', body)
-    const url = res.url || res.fileId || ''
-    if (url) setList([...list.value, url])
-    ElMessage.success('上传成功')
-    option.onSuccess && option.onSuccess(res)
-  } catch (e) {
-    option.onError && option.onError(e)
-  } finally {
-    loading.value = false
-  }
+  queue.value = queue.value
+    .then(async () => {
+      try {
+        const res = await uploadOne(file)
+        ElMessage.success('上传成功')
+        option.onSuccess && option.onSuccess(res)
+      } catch (e) {
+        ElMessage.error('上传失败')
+        option.onError && option.onError(e)
+      } finally {
+        pending.value = Math.max(0, pending.value - 1)
+        if (pending.value === 0) loading.value = false
+      }
+    })
+    .catch(() => {})
 }
 </script>
 
@@ -94,6 +109,7 @@ async function onUpload(option) {
   border-radius: 8px;
   overflow: hidden;
   background: #fff;
+  position: relative;
 }
 .thumb {
   width: 140px;
@@ -103,8 +119,8 @@ async function onUpload(option) {
 }
 .badge {
   position: absolute;
-  margin-top: -96px;
-  margin-left: 6px;
+  top: 6px;
+  left: 6px;
   min-width: 20px;
   height: 20px;
   padding: 0 6px;
@@ -115,9 +131,6 @@ async function onUpload(option) {
   line-height: 20px;
   text-align: center;
   pointer-events: none;
-}
-.item {
-  position: relative;
 }
 .ops {
   display: flex;

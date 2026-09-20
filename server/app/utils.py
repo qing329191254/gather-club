@@ -1,9 +1,24 @@
 import json
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy.orm import Session
 
 from .models import SiteConfig
+
+CN_TZ = timezone(timedelta(hours=8))
+
+
+def now_cn() -> datetime:
+    return datetime.now(CN_TZ)
+
+
+def today_cn() -> str:
+    return now_cn().strftime("%Y-%m-%d")
+
+
+def month_cn() -> str:
+    return now_cn().strftime("%Y-%m")
 
 
 def dumps(data: Any) -> str:
@@ -14,9 +29,12 @@ def loads(raw: str | None, default: Any = None) -> Any:
     if raw is None or raw == "":
         return default if default is not None else {}
     try:
-        return json.loads(raw)
+        data = json.loads(raw)
     except Exception:
         return default if default is not None else {}
+    if data is None:
+        return default if default is not None else {}
+    return data
 
 
 def get_config(db: Session, key: str, default: Any = None) -> Any:
