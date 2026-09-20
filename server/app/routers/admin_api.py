@@ -130,9 +130,16 @@ def list_stores(db: Session = Depends(get_db), _: AdminUser = Depends(get_curren
 
 @router.post("/stores")
 def create_store(payload: StoreIn, db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
-    if db.query(Store).filter(Store.id == payload.id).first():
-        raise HTTPException(400, "门店 ID 已存在")
-    row = Store(**payload.model_dump())
+    data = payload.model_dump()
+    store_id = (data.get("id") or "").strip()
+    if not store_id:
+        store_id = f"store_{int(datetime.utcnow().timestamp())}"
+        while db.query(Store).filter(Store.id == store_id).first():
+            store_id = f"store_{int(datetime.utcnow().timestamp())}_{datetime.utcnow().microsecond}"
+    elif db.query(Store).filter(Store.id == store_id).first():
+        raise HTTPException(400, "门店已存在")
+    data["id"] = store_id
+    row = Store(**data)
     db.add(row)
     db.commit()
     db.refresh(row)

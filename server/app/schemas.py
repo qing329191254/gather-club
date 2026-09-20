@@ -38,7 +38,7 @@ class BannerOut(BannerIn, ORMModel):
 
 
 class StoreIn(BaseModel):
-    id: str
+    id: str = ""
     name: str
     cover: str = ""
     address: str = ""
