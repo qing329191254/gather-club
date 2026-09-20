@@ -169,7 +169,7 @@ const tabVisible = ref(false)
 const productVisible = ref(false)
 const productEditing = ref(false)
 const tagsText = ref('')
-const { page, pageSize, total, applyPage, resetPage, pageParams } = usePager()
+const { page, pageSize, total, applyPage, pageParams } = usePager()
 const tabForm = reactive({ id: null, key: '', name: '', show_sold: true, sort: 0, enabled: true })
 const productForm = reactive({
   id: '',
