@@ -5,7 +5,7 @@
         <img class="logo" :src="`${base}brand.png`" alt="天天聚" />
       </div>
       <h2>天天俱乐部后台</h2>
-      <p class="tip">管理小程序内容、订单与库存</p>
+      <p class="tip">管理门店、订单与会员</p>
       <el-form :model="form" @submit.prevent>
         <el-form-item label="账号">
           <el-input v-model="form.username" placeholder="请输入账号" />

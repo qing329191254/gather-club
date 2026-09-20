@@ -4,7 +4,6 @@
       <el-button type="primary" @click="openEdit()">新增优惠券</el-button>
     </div>
     <el-table :data="list" stripe>
-      <el-table-column prop="id" label="ID" width="70" />
       <el-table-column prop="name" label="名称" min-width="160" />
       <el-table-column prop="amount" label="面额" width="90" />
       <el-table-column prop="condition" label="条件" min-width="140" />

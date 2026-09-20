@@ -38,7 +38,7 @@ const cards = computed(() => [
     tone: 'tone-amber'
   },
   { label: '积分商品', value: stats.value.mallGoods ?? '-', path: '/mall', icon: 'Goods', tone: 'tone-rose' },
-  { label: '优惠券模板', value: stats.value.coupons ?? '-', path: '/coupons', icon: 'Ticket', tone: 'tone-violet' }
+  { label: '优惠券', value: stats.value.coupons ?? '-', path: '/coupons', icon: 'Ticket', tone: 'tone-violet' }
 ])
 
 function go(item) {

@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -19,6 +20,44 @@ def today_cn() -> str:
 
 def month_cn() -> str:
     return now_cn().strftime("%Y-%m")
+
+
+def coupon_is_expired(expire: str, now: datetime | None = None) -> bool:
+    """月份键 YYYY-MM 在当月最后一天 23:59:59 后失效；纯文案有效期不自动过期。"""
+    raw = (expire or "").strip()
+    current = now or now_cn()
+    month = re.fullmatch(r"(\d{4})-(\d{2})", raw)
+    if month:
+        year, mon = int(month.group(1)), int(month.group(2))
+        if not 1 <= mon <= 12:
+            return False
+        if mon == 12:
+            end = datetime(year + 1, 1, 1, tzinfo=CN_TZ)
+        else:
+            end = datetime(year, mon + 1, 1, tzinfo=CN_TZ)
+        return current >= end
+    day = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", raw)
+    if day:
+        return current.strftime("%Y-%m-%d") > raw
+    stamped = re.fullmatch(r"(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})", raw)
+    if stamped:
+        try:
+            end = datetime.strptime(
+                f"{stamped.group(1)} {stamped.group(2)}", "%Y-%m-%d %H:%M:%S"
+            ).replace(tzinfo=CN_TZ)
+        except ValueError:
+            return False
+        return current > end
+    return False
+
+
+def mark_coupon_expired(row) -> bool:
+    if getattr(row, "status", "") != "unused":
+        return False
+    if not coupon_is_expired(getattr(row, "expire", "") or ""):
+        return False
+    row.status = "expired"
+    return True
 
 
 def dumps(data: Any) -> str:

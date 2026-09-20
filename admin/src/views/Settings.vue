@@ -6,7 +6,7 @@
     </div>
     <el-form label-width="120px" style="max-width: 780px">
       <el-form-item label="品牌 Logo">
-        <ImageField v-model="form.logo" folder="site" placeholder="小程序品牌 Logo" />
+        <ImageField v-model="form.logo" folder="site" placeholder="品牌 Logo" />
       </el-form-item>
       <el-form-item label="客服热线"><el-input v-model="form.hotline" /></el-form-item>
       <el-form-item label="管家标题"><el-input v-model="form.stewardTitle" /></el-form-item>
@@ -52,7 +52,7 @@
       </el-form-item>
 
       <el-divider content-position="left">每日签到</el-divider>
-      <p class="section-tip">里程碑按「当月累计签到天数」发放，每档每月只发一次；与小程序签到页展示一致。</p>
+      <p class="section-tip">按当月累计签到天数发放，每档每月只发一次。</p>
       <el-form-item label="每日签到积分">
         <el-input-number v-model="checkin.dailyPoints" :min="0" />
       </el-form-item>
@@ -64,7 +64,7 @@
         <span class="inline-tip">当月每天都签到时额外发放</span>
       </el-form-item>
       <el-form-item label="签到规则文案">
-        <el-input v-model="checkin.rules" type="textarea" :rows="3" placeholder="小程序「查看规则」弹窗内容" />
+        <el-input v-model="checkin.rules" type="textarea" :rows="3" placeholder="签到页「查看规则」中显示的内容" />
       </el-form-item>
       <el-form-item label="累计奖励档">
         <div class="mile-list">

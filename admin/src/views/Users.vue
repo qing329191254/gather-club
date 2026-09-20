@@ -1,17 +1,15 @@
 <template>
   <el-card>
     <div class="toolbar">
-      <el-input v-model="keyword" placeholder="昵称/手机/openid" style="width: 240px" clearable @keyup.enter="onSearch" />
+      <el-input v-model="keyword" placeholder="昵称或手机号" style="width: 240px" clearable @keyup.enter="onSearch" />
       <el-button type="primary" @click="onSearch">查询</el-button>
     </div>
     <el-table :data="list" stripe>
-      <el-table-column prop="id" label="ID" width="70" />
       <el-table-column prop="nickname" label="昵称" width="120" />
       <el-table-column prop="phone" label="手机" width="120" />
       <el-table-column prop="points" label="积分" width="90" />
       <el-table-column prop="table_count" label="近1年桌数" width="110" />
       <el-table-column prop="vip_level" label="会员" width="90" />
-      <el-table-column prop="openid" label="OpenID" min-width="160" show-overflow-tooltip />
       <el-table-column label="操作" width="260" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="openDetail(row)">详情</el-button>
@@ -44,7 +42,6 @@
 
         <template v-if="detailTab === 'profile'">
           <el-descriptions :column="1" border size="small">
-            <el-descriptions-item label="ID">{{ detail.id }}</el-descriptions-item>
             <el-descriptions-item label="昵称">{{ detail.nickname || '-' }}</el-descriptions-item>
             <el-descriptions-item label="手机">{{ detail.phone || '-' }}</el-descriptions-item>
             <el-descriptions-item label="生日">{{ detail.birthday || '-' }}</el-descriptions-item>
@@ -52,14 +49,10 @@
             <el-descriptions-item label="积分">{{ detail.points ?? 0 }}</el-descriptions-item>
             <el-descriptions-item label="会员">
               {{ detail.vip_level || '-' }}
-              <span v-if="detail.vip_manual">（已锁定）</span>
+              <span v-if="detail.vip_manual">（已固定）</span>
             </el-descriptions-item>
             <el-descriptions-item label="近1年桌数">{{ detail.table_count ?? 0 }}</el-descriptions-item>
-            <el-descriptions-item label="手机已改">{{ detail.phone_edited ? '是' : '否' }}</el-descriptions-item>
             <el-descriptions-item label="已注销">{{ detail.cancelled ? '是' : '否' }}</el-descriptions-item>
-            <el-descriptions-item label="OpenID">
-              <span class="mono">{{ detail.openid || '-' }}</span>
-            </el-descriptions-item>
             <el-descriptions-item label="注册时间">{{ formatTime(detail.created_at) }}</el-descriptions-item>
           </el-descriptions>
           <div class="detail-actions">
@@ -299,11 +292,11 @@ async function adjust(row, visual) {
 async function setVip(row, visual) {
   if (!row?.id) return
   return run('vip-' + row.id, async () => {
-  const { value } = await ElMessageBox.prompt('输入等级：V0 / V1 / V2 / V3。保存后锁定，不再被桌数自动覆盖。', '修改会员等级', {
+  const { value } = await ElMessageBox.prompt('请输入 V0、V1、V2 或 V3。保存后不再随消费桌数自动变化。', '修改会员等级', {
     inputValue: row.vip_level || detail.vip_level || 'V0'
   })
   await http.put(`/users/${row.id}/vip`, null, { params: { vip_level: value, lock: true } })
-  ElMessage.success('已锁定该等级')
+  ElMessage.success('已保存该等级')
   load()
   if (drawer.value && detail.id === row.id) {
     const res = await http.get(`/users/${row.id}`)

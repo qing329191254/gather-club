@@ -3,7 +3,7 @@
     <el-card class="mb">
       <template #header>
         <div class="head">
-          <span>地区（小程序顶部城市选择）</span>
+          <span>地区</span>
           <el-button type="primary" size="small" @click="openRegion()">新增地区</el-button>
         </div>
       </template>
@@ -29,7 +29,7 @@
     <el-card class="mb">
       <template #header>
         <div class="head">
-          <span>分类（小程序顶部 Tab）</span>
+          <span>分类</span>
           <el-button type="primary" size="small" @click="openTab()">新增分类</el-button>
         </div>
       </template>
@@ -79,7 +79,7 @@
         <el-table-column prop="price" label="现价" width="90" />
         <el-table-column prop="origin_price" label="原价" width="90" />
         <el-table-column prop="sold_count" label="实付销量" width="90" />
-        <el-table-column prop="sold_text" label="已购文案(手动)" width="140" show-overflow-tooltip />
+        <el-table-column prop="sold_text" label="已购文案" width="140" show-overflow-tooltip />
         <el-table-column label="是否上架" width="100">
           <template #default="{ row }">
             <el-tag :type="row.enabled ? 'success' : 'info'" size="small">
@@ -165,10 +165,10 @@
               :value="r.id"
             />
           </el-select>
-          <div class="hint block">不选则全国可见；选中后仅「全部」与该地区展示</div>
+          <div class="hint block">不选则各地都能看到</div>
         </el-form-item>
         <el-form-item label="商品标题" required>
-          <el-input v-model="productForm.title" placeholder="小程序列表展示的标题" />
+          <el-input v-model="productForm.title" placeholder="商品标题" />
         </el-form-item>
         <el-form-item label="封面图">
           <ImageField v-model="productForm.cover" folder="gather" />
@@ -178,7 +178,7 @@
             v-model="productForm.detail_id"
             clearable
             filterable
-            placeholder="跳转详情时关联的门店，可选"
+            placeholder="选填"
             style="width: 100%"
           >
             <el-option v-for="s in stores" :key="s.id" :label="s.name" :value="s.id" />

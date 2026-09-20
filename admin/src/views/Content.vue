@@ -20,7 +20,7 @@
         </div>
         <el-form label-width="100px" class="form">
           <el-form-item label="导航标题">
-            <el-input v-model="agreeDoc.navTitle" placeholder="小程序顶部标题" />
+            <el-input v-model="agreeDoc.navTitle" placeholder="页面标题" />
           </el-form-item>
           <el-form-item label="协议标题">
             <el-input v-model="agreeDoc.title" placeholder="正文大标题" />
@@ -227,7 +227,7 @@
           <h3>用户可选标签</h3>
           <el-button type="primary" size="small" @click="addHobbyItem">新增标签</el-button>
         </div>
-        <p class="hint">小程序兴趣页只展示「启用」的标签；用户已选过的旧标签仍会保留在资料里。</p>
+        <p class="hint">只展示已启用的标签。会员已经选过的标签会保留。</p>
         <div v-for="(item, i) in hobbies" :key="item._key" class="card">
           <div class="card-head">
             <strong>标签 {{ i + 1 }}</strong>

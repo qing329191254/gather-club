@@ -40,7 +40,7 @@
     <el-dialog v-model="visible" :title="editing ? '编辑专题门店' : '新增专题门店'" width="720px" top="6vh">
       <el-form label-width="100px">
         <el-form-item label="名称" required>
-          <el-input v-model="form.name" placeholder="例如：上海莘庄店·春节家宴 / 商务午宴" />
+          <el-input v-model="form.name" placeholder="门店或宴席名称" />
         </el-form-item>
         <el-form-item label="封面">
           <ImageField v-model="form.cover" folder="nye" />
@@ -52,7 +52,7 @@
           <el-input-number v-model="form.origin_price" :min="0" :precision="0" controls-position="right" class="num" />
         </el-form-item>
         <el-form-item label="角标文案">
-          <el-input v-model="form.tag" placeholder="例如：家宴、商务宴，可自定义" />
+          <el-input v-model="form.tag" placeholder="角标文字" />
         </el-form-item>
         <el-form-item label="地址">
           <el-input v-model="form.address" placeholder="门店详细地址" />
@@ -114,12 +114,12 @@
           <el-row :gutter="12">
             <el-col :span="12">
               <el-form-item label="展示名称">
-                <el-input v-model="pkg.name" placeholder="例如：喜气羊羊宴 (10-12人) 午市大厅" />
+                <el-input v-model="pkg.name" placeholder="套餐名称" />
               </el-form-item>
             </el-col>
             <el-col :span="12">
               <el-form-item label="宴席名称">
-                <el-input v-model="pkg.meal" placeholder="例如：喜气羊羊宴" />
+                <el-input v-model="pkg.meal" placeholder="宴席名称" />
               </el-form-item>
             </el-col>
             <el-col :span="12">

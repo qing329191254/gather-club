@@ -13,13 +13,17 @@
     </div>
     <el-table :data="list" stripe>
       <el-table-column prop="id" label="订单号" width="160" />
-      <el-table-column prop="type" label="类型" width="80" />
+      <el-table-column label="类型" width="100">
+        <template #default="{ row }">{{ typeLabel(row.type) }}</template>
+      </el-table-column>
       <el-table-column prop="store_name" label="门店" min-width="140" />
       <el-table-column prop="title" label="标题" min-width="180" show-overflow-tooltip />
       <el-table-column prop="amount" label="金额" width="90" />
       <el-table-column prop="contact_phone" label="手机" width="120" />
       <el-table-column prop="room_date" label="用餐日" width="110" />
-      <el-table-column prop="room_slot" label="时段" width="90" />
+      <el-table-column label="时段" width="90">
+        <template #default="{ row }">{{ slotLabel(row.room_slot) }}</template>
+      </el-table-column>
       <el-table-column prop="status_text" label="状态" width="90" />
       <el-table-column label="操作" width="200" fixed="right">
         <template #default="{ row }">
@@ -55,20 +59,16 @@
     <el-drawer v-model="drawer" title="订单详情" size="480px">
       <el-descriptions v-if="current" :column="1" border size="small">
         <el-descriptions-item label="订单号">{{ current.id }}</el-descriptions-item>
-        <el-descriptions-item label="类型">{{ current.type }}</el-descriptions-item>
-        <el-descriptions-item label="用户ID">{{ current.user_id || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="类型">{{ typeLabel(current.type) }}</el-descriptions-item>
         <el-descriptions-item label="门店">{{ current.store_name }}</el-descriptions-item>
         <el-descriptions-item label="标题">{{ current.title }}</el-descriptions-item>
         <el-descriptions-item label="规格">{{ current.spec }}</el-descriptions-item>
         <el-descriptions-item label="金额">{{ current.amount }}</el-descriptions-item>
         <el-descriptions-item label="联系人">{{ current.contact_name }} {{ current.contact_phone }}</el-descriptions-item>
         <el-descriptions-item label="人数">{{ current.people || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="用餐">{{ current.room_date || '-' }} {{ current.room_slot || '' }}</el-descriptions-item>
+        <el-descriptions-item label="用餐">{{ current.room_date || '-' }} {{ slotLabel(current.room_slot) }}</el-descriptions-item>
         <el-descriptions-item label="备注">{{ current.remark || '-' }}</el-descriptions-item>
         <el-descriptions-item label="状态">{{ current.status_text }}</el-descriptions-item>
-        <el-descriptions-item label="扩展">
-          <pre class="extra">{{ formatExtra(current.extra) }}</pre>
-        </el-descriptions-item>
       </el-descriptions>
     </el-drawer>
   </el-card>
@@ -91,13 +91,20 @@ const drawer = ref(false)
 const current = ref(null)
 const { page, pageSize, total, applyPage, resetPage, pageParams } = usePager()
 
-function formatExtra(extra) {
-  if (!extra || typeof extra !== 'object') return '-'
-  try {
-    return JSON.stringify(extra, null, 2)
-  } catch {
-    return String(extra)
-  }
+function typeLabel(type) {
+  return {
+    gather: '去哪聚',
+    nye: '宴会',
+    room: '包房',
+    recommend: '订酒店',
+    mall: '积分兑换'
+  }[type] || type || '-'
+}
+
+function slotLabel(slot) {
+  if (slot === 'lunch') return '午市'
+  if (slot === 'dinner') return '晚市'
+  return slot || ''
 }
 
 function showDetail(row) {
@@ -156,12 +163,5 @@ onMounted(() => {
   margin-top: 16px;
   display: flex;
   justify-content: flex-end;
-}
-.extra {
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-all;
-  font-size: 12px;
-  line-height: 1.4;
 }
 </style>

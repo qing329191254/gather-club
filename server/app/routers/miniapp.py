@@ -69,6 +69,7 @@ from ..utils import (
     ensure_order_verify_code,
     get_config,
     loads,
+    mark_coupon_expired,
     month_cn,
     normalize_page,
     now_cn,
@@ -869,24 +870,6 @@ def create_order(
     qty = max(1, int(payload.quantity or 1))
     unit_price, amount, title, cover, spec = _resolve_order_price(db, payload)
 
-    coupon_discount = 0.0
-    user_coupon = None
-    coupon_id = int(getattr(payload, "coupon_id", 0) or 0)
-    if coupon_id and amount > 0:
-        user_coupon = (
-            db.query(UserCoupon)
-            .filter(
-                UserCoupon.id == coupon_id,
-                UserCoupon.user_id == user.id,
-                UserCoupon.status == "unused",
-            )
-            .first()
-        )
-        if not user_coupon:
-            raise HTTPException(status_code=400, detail="优惠券不可用")
-        coupon_discount = min(float(user_coupon.amount or 0), float(amount))
-        amount = round(max(0.0, float(amount) - coupon_discount), 2)
-
     if payload.room_date and payload.room_slot and payload.store_id:
         _release_stale_room_holds(db)
         info = _slot_info(db, payload.store_id, payload.room_date, payload.room_slot)
@@ -937,18 +920,9 @@ def create_order(
         remark=payload.remark,
         room_date=payload.room_date,
         room_slot=payload.room_slot,
-        extra=dumps(
-            {
-                "couponId": user_coupon.id if user_coupon else 0,
-                "couponDiscount": coupon_discount,
-            }
-        )
-        if user_coupon
-        else "{}",
+        extra="{}",
     )
     db.add(order)
-    if user_coupon:
-        user_coupon.status = "used"
     db.commit()
     db.refresh(order)
     return _order_out(order)
@@ -1524,6 +1498,9 @@ def user_coupons(
     rows = db.query(UserCoupon).filter(UserCoupon.user_id == user.id).order_by(UserCoupon.id.desc()).all()
     dirty = False
     for r in rows:
+        if mark_coupon_expired(r):
+            dirty = True
+            continue
         if r.status == "unused" and not (r.verify_code or "").strip():
             ensure_coupon_verify_code(db, r)
             dirty = True

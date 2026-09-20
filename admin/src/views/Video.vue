@@ -12,8 +12,8 @@
         <el-form-item label="头像"><ImageField v-model="profile.avatar" folder="video" /></el-form-item>
         <el-form-item label="封面"><ImageField v-model="profile.cover" folder="video" /></el-form-item>
         <el-form-item label="简介"><el-input v-model="profile.intro" type="textarea" :rows="3" /></el-form-item>
-        <el-form-item label="视频号 ID">
-          <el-input v-model="profile.finderUserName" placeholder="视频号 ID" />
+        <el-form-item label="视频号">
+          <el-input v-model="profile.finderUserName" placeholder="视频号" />
         </el-form-item>
         <el-form-item>
           <el-button type="primary" :loading="profileSaving" @click="saveProfile(true)">保存资料</el-button>
@@ -26,7 +26,6 @@
         <el-button type="primary" @click="openEdit()">新增直播</el-button>
       </div>
       <el-table :data="list" stripe>
-        <el-table-column prop="id" label="ID" width="70" />
         <el-table-column label="状态" width="100">
           <template #default="{ row }">{{ row.status === 'living' ? '直播中' : '预约' }}</template>
         </el-table-column>
@@ -34,7 +33,7 @@
         <el-table-column prop="line1" label="标题" min-width="160" />
         <el-table-column prop="line2" label="副标题" min-width="120" />
         <el-table-column prop="points" label="积分" width="80" />
-        <el-table-column prop="notice_id" label="预告 ID" min-width="140" />
+        <el-table-column prop="notice_id" label="直播预告" min-width="140" />
         <el-table-column prop="sort" label="排序" width="70" />
         <el-table-column label="启用" width="80">
           <template #default="{ row }">{{ row.enabled ? '是' : '否' }}</template>
@@ -60,8 +59,8 @@
         <el-form-item label="标题"><el-input v-model="form.line1" /></el-form-item>
         <el-form-item label="副标题"><el-input v-model="form.line2" /></el-form-item>
         <el-form-item label="预约积分"><el-input-number v-model="form.points" :min="0" /></el-form-item>
-        <el-form-item label="头像"><ImageField v-model="form.avatar" folder="video" placeholder="可选，留空使用视频号头像" /></el-form-item>
-        <el-form-item label="预告 ID"><el-input v-model="form.notice_id" placeholder="直播预告 ID" /></el-form-item>
+        <el-form-item label="头像"><ImageField v-model="form.avatar" folder="video" placeholder="选填" /></el-form-item>
+        <el-form-item label="直播预告"><el-input v-model="form.notice_id" placeholder="选填" /></el-form-item>
         <el-form-item label="排序"><el-input-number v-model="form.sort" :min="0" /></el-form-item>
         <el-form-item label="启用"><el-switch v-model="form.enabled" /></el-form-item>
       </el-form>

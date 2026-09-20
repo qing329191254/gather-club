@@ -69,6 +69,7 @@ from ..utils import (
     ensure_order_verify_code,
     get_config,
     loads,
+    mark_coupon_expired,
     normalize_page,
     page_payload,
     set_config,
@@ -757,13 +758,13 @@ def search_verify(
     orders: list[Order] = []
     coupons: list[UserCoupon] = []
     if keyword.isdigit() and len(keyword) == 8:
-        orders = db.query(Order).filter(Order.verify_code == keyword).all()
+        orders = [r for r in db.query(Order).filter(Order.verify_code == keyword).all() if r.type != "mall"]
         coupons = db.query(UserCoupon).filter(UserCoupon.verify_code == keyword).all()
     else:
         like = f"%{keyword}%"
         users = db.query(AppUser).filter(AppUser.phone.like(like)).all()
         user_ids = [u.id for u in users]
-        oq = db.query(Order).filter(Order.status == "paid")
+        oq = db.query(Order).filter(Order.status == "paid", Order.type != "mall")
         cq = db.query(UserCoupon).filter(UserCoupon.status == "unused")
         if user_ids:
             oq = oq.filter((Order.contact_phone.like(like)) | (Order.user_id.in_(user_ids)))
@@ -773,6 +774,9 @@ def search_verify(
             cq = cq.filter(UserCoupon.id == -1)
         orders = oq.order_by(Order.created_at.desc()).limit(20).all()
         coupons = cq.order_by(UserCoupon.id.desc()).limit(20).all()
+    for row in coupons:
+        mark_coupon_expired(row)
+    coupons = [row for row in coupons if row.status == "unused" or (keyword.isdigit() and len(keyword) == 8)]
     payload = [_verify_order_item(db, r) for r in orders] + [_verify_coupon_item(db, r) for r in coupons]
     db.commit()
     return {"list": payload}
@@ -790,6 +794,8 @@ def confirm_verify(
         row = db.query(Order).filter(Order.id == str(item_id)).first()
         if not row:
             raise HTTPException(404, "订单不存在")
+        if row.type == "mall":
+            raise HTTPException(400, "积分兑换请按收货地址发货，不能到店核销")
         if row.status == "completed":
             return {"ok": False, "message": "该订单已核销", "item": _verify_order_item(db, row)}
         if row.status != "paid":
@@ -809,6 +815,9 @@ def confirm_verify(
         row = db.query(UserCoupon).filter(UserCoupon.id == cid).first()
         if not row:
             raise HTTPException(404, "优惠券不存在")
+        if mark_coupon_expired(row):
+            db.commit()
+            return {"ok": False, "message": "该优惠券已过期", "item": _verify_coupon_item(db, row)}
         if row.status == "used":
             return {"ok": False, "message": "该优惠券已核销", "item": _verify_coupon_item(db, row)}
         if row.status != "unused":
@@ -1037,6 +1046,12 @@ def list_user_coupons(
         .order_by(UserCoupon.id.desc())
         .all()
     )
+    dirty = False
+    for row in rows:
+        if mark_coupon_expired(row):
+            dirty = True
+    if dirty:
+        db.commit()
     return [
         {
             "id": r.id,

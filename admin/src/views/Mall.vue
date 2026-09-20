@@ -4,7 +4,6 @@
       <el-button type="primary" @click="openEdit()">新增商品</el-button>
     </div>
     <el-table :data="list" stripe>
-      <el-table-column prop="id" label="ID" width="70" />
       <el-table-column prop="name" label="名称" min-width="180" />
       <el-table-column prop="cost" label="积分" width="90" />
       <el-table-column prop="stock" label="库存" width="90" />
