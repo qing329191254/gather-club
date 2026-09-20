@@ -30,7 +30,7 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="visible" :title="editing ? '编辑年夜饭门店' : '新增年夜饭门店'" width="720px">
+    <el-dialog v-model="visible" :title="editing ? '编辑年夜饭门店' : '新增年夜饭门店'" width="820px" top="5vh">
       <el-form label-width="100px">
         <el-form-item label="名称" required>
           <el-input v-model="form.name" placeholder="例如：上海莘庄店-天天俱乐部-2027年夜饭" />
@@ -53,15 +53,68 @@
         <el-form-item label="路线说明">
           <el-input v-model="form.route" type="textarea" :rows="2" placeholder="怎么走、地铁公交等，可选" />
         </el-form-item>
+
+        <el-divider content-position="left">详情页轮播图</el-divider>
         <el-form-item label="轮播图">
-          <el-input v-model="bannersText" type="textarea" :rows="2" placeholder="每行一个图片链接" />
+          <ImageListField v-model="banners" folder="nye" />
         </el-form-item>
+
+        <el-divider content-position="left">详情长图</el-divider>
         <el-form-item label="详情长图">
-          <el-input v-model="detailText" type="textarea" :rows="2" placeholder="每行一个图片链接" />
+          <ImageListField v-model="detailImages" folder="nye" />
         </el-form-item>
-        <el-form-item label="套餐配置">
-          <el-input v-model="packagesText" type="textarea" :rows="8" placeholder="套餐列表（技术配置，一般不用改）" />
-        </el-form-item>
+
+        <el-divider content-position="left">套餐列表</el-divider>
+        <div class="pkg-head">
+          <span class="pkg-tip">用户选规格时看到的套餐，可逐条添加</span>
+          <el-button type="primary" size="small" @click="addPackage">新增套餐</el-button>
+        </div>
+        <div v-if="!packages.length" class="pkg-empty">暂无套餐，点击右上角新增</div>
+        <div v-for="(pkg, idx) in packages" :key="pkg._key" class="pkg-card">
+          <div class="pkg-card-head">
+            <strong>套餐 {{ idx + 1 }}</strong>
+            <el-button link type="danger" @click="removePackage(idx)">删除</el-button>
+          </div>
+          <el-row :gutter="12">
+            <el-col :span="12">
+              <el-form-item label="展示名称">
+                <el-input v-model="pkg.name" placeholder="例如：喜气羊羊宴 (10-12人) 午市大厅" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="宴席名称">
+                <el-input v-model="pkg.meal" placeholder="例如：喜气羊羊宴" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="用餐时段">
+                <el-input v-model="pkg.time" placeholder="例如：10:00-14:00" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="价格">
+                <el-input-number v-model="pkg.price" :min="0" :precision="0" style="width: 100%" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="人数">
+                <el-input-number v-model="pkg.people" :min="1" :precision="0" style="width: 100%" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="套餐封面">
+                <ImageField v-model="pkg.cover" folder="nye" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="可否预订">
+                <el-switch v-model="pkg.bookable" active-text="可订" inactive-text="已满/停售" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </div>
+
+        <el-divider />
         <el-form-item label="开放起">
           <el-input v-model="form.open_start" placeholder="YYYY-MM-DD" />
         </el-form-item>
@@ -89,22 +142,73 @@ import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
 import ImageField from '../components/ImageField.vue'
+import ImageListField from '../components/ImageListField.vue'
 
 const list = ref([])
 const visible = ref(false)
 const editing = ref(false)
-const bannersText = ref('')
-const detailText = ref('')
-const packagesText = ref('')
+const banners = ref([])
+const detailImages = ref([])
+const packages = ref([])
+let pkgSeq = 1
+
 const empty = () => ({
-  id: '', name: '', cover: '', price: 0, origin_price: 0, tag: '年夜饭', address: '', route: '',
-  lat: 0, lng: 0, banners: [], detail_images: [], recent_buy: {}, packages: [],
-  open_start: '2027-02-05', open_end: '2027-02-12', sort: 0, enabled: true
+  id: '',
+  name: '',
+  cover: '',
+  price: 0,
+  origin_price: 0,
+  tag: '年夜饭',
+  address: '',
+  route: '',
+  lat: 0,
+  lng: 0,
+  banners: [],
+  detail_images: [],
+  recent_buy: {},
+  packages: [],
+  open_start: '2027-02-05',
+  open_end: '2027-02-12',
+  sort: 0,
+  enabled: true
 })
 const form = reactive(empty())
 
 function genId() {
   return `nye${Date.now().toString(36)}`
+}
+
+function toPackageForm(p = {}) {
+  return {
+    _key: `k${pkgSeq++}`,
+    id: p.id || pkgSeq,
+    name: p.name || '',
+    meal: p.meal || '',
+    time: p.time || '',
+    price: Number(p.price) || 0,
+    people: Number(p.people) || 10,
+    cover: p.cover || '',
+    bookable: !p.disabled
+  }
+}
+
+function addPackage() {
+  packages.value.push(
+    toPackageForm({
+      id: Date.now(),
+      name: '',
+      meal: '',
+      time: '10:00-14:00',
+      price: form.price || 0,
+      people: 10,
+      cover: form.cover || '',
+      disabled: false
+    })
+  )
+}
+
+function removePackage(idx) {
+  packages.value.splice(idx, 1)
 }
 
 async function load() {
@@ -114,9 +218,9 @@ async function load() {
 function openEdit(row) {
   editing.value = !!row
   Object.assign(form, empty(), row || {})
-  bannersText.value = (form.banners || []).join('\n')
-  detailText.value = (form.detail_images || []).join('\n')
-  packagesText.value = form.packages && form.packages.length ? JSON.stringify(form.packages, null, 2) : ''
+  banners.value = [...(form.banners || [])]
+  detailImages.value = [...(form.detail_images || [])]
+  packages.value = (form.packages || []).map((p) => toPackageForm(p))
   visible.value = true
 }
 
@@ -125,23 +229,22 @@ async function onSave() {
     ElMessage.warning('请填写名称')
     return
   }
-  let packages = []
-  if (packagesText.value.trim()) {
-    try {
-      packages = JSON.parse(packagesText.value)
-      if (!Array.isArray(packages)) throw new Error('not array')
-    } catch (e) {
-      ElMessage.error('套餐配置格式不正确，请联系技术处理')
-      return
-    }
-  }
   const payload = {
     ...form,
-    id: editing.value ? form.id : (form.id || genId()),
+    id: editing.value ? form.id : form.id || genId(),
     name: form.name.trim(),
-    banners: bannersText.value.split(/\n/).map((s) => s.trim()).filter(Boolean),
-    detail_images: detailText.value.split(/\n/).map((s) => s.trim()).filter(Boolean),
-    packages
+    banners: banners.value.filter(Boolean),
+    detail_images: detailImages.value.filter(Boolean),
+    packages: packages.value.map((p, i) => ({
+      id: p.id || i + 1,
+      name: (p.name || '').trim(),
+      meal: (p.meal || '').trim(),
+      time: (p.time || '').trim(),
+      price: Number(p.price) || 0,
+      people: Number(p.people) || 0,
+      cover: p.cover || '',
+      disabled: !p.bookable
+    }))
   }
   if (editing.value) await http.put(`/nye/${form.id}`, payload)
   else await http.post('/nye', payload)
@@ -163,4 +266,32 @@ onMounted(load)
 .toolbar { margin-bottom: 12px; }
 .hint { margin-left: 8px; color: #94a3b8; font-size: 12px; }
 .muted { color: #94a3b8; font-size: 12px; }
+.pkg-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0 0 12px;
+}
+.pkg-tip { color: #64748b; font-size: 13px; }
+.pkg-empty {
+  padding: 24px;
+  text-align: center;
+  color: #94a3b8;
+  background: #f8fafc;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+.pkg-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 12px 0;
+  margin-bottom: 12px;
+  background: #fafafa;
+}
+.pkg-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
 </style>
