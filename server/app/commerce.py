@@ -28,11 +28,11 @@ def format_sold_text(count: int) -> str:
 
 
 def display_sold_text(sold_count: int, sold_text: str = "") -> str:
-    """有实付销量时用自动文案；暂无成交时回退到后台营销文案。"""
-    auto = format_sold_text(sold_count)
-    if auto:
-        return auto
-    return (sold_text or "").strip()
+    """手动设置了已购文案则用手动文案；否则按真实销量生成。"""
+    custom = (sold_text or "").strip()
+    if custom:
+        return custom
+    return format_sold_text(sold_count)
 
 
 def table_count(db: Session, user_id: int, days: int = 365) -> int:

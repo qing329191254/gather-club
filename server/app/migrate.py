@@ -61,6 +61,18 @@ def ensure_schema() -> None:
                         """
                     )
                 )
+            # 已购文案改为「手动优先」：一次性清空历史营销文案，默认走真实销量
+            if "site_configs" in tables:
+                marker = conn.execute(
+                    text("SELECT id FROM site_configs WHERE `key` = 'sold_text_manual_v1' LIMIT 1")
+                ).fetchone()
+                if not marker:
+                    conn.execute(text("UPDATE gather_products SET sold_text = ''"))
+                    conn.execute(
+                        text(
+                            "INSERT INTO site_configs (`key`, value) VALUES ('sold_text_manual_v1', '{\"ok\":true}')"
+                        )
+                    )
         if "orders" in tables:
             cols = {c["name"] for c in inspector.get_columns("orders")}
             if "extra" not in cols:

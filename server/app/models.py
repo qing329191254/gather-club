@@ -94,7 +94,7 @@ class GatherProduct(Base):
     title: Mapped[str] = mapped_column(String(255))
     tag: Mapped[str] = mapped_column(String(64), default="")
     tags: Mapped[str] = mapped_column(Text, default="[]")  # JSON array
-    sold_text: Mapped[str] = mapped_column(String(64), default="")  # 留空则按 sold_count 自动生成
+    sold_text: Mapped[str] = mapped_column(String(64), default="")  # 留空则按真实 sold_count 显示；有值则优先用手动文案
     sold_count: Mapped[int] = mapped_column(Integer, default=0)
     price: Mapped[float] = mapped_column(Float, default=0)
     origin_price: Mapped[float] = mapped_column(Float, default=0)
