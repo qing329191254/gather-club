@@ -1,6 +1,9 @@
 <template>
   <div class="login-page">
     <el-card class="card">
+      <div class="brand-wrap">
+        <img class="logo" :src="`${base}brand.png`" alt="天天聚" />
+      </div>
       <h2>天天俱乐部后台</h2>
       <p class="tip">管理小程序内容、订单与库存</p>
       <el-form :model="form" @submit.prevent>
@@ -23,6 +26,7 @@ import { ElMessage } from 'element-plus'
 import http from '../api/http'
 
 const router = useRouter()
+const base = import.meta.env.BASE_URL
 const loading = ref(false)
 const form = reactive({ username: '', password: '' })
 
@@ -52,11 +56,23 @@ async function onLogin() {
   width: 380px;
   border-radius: 16px;
 }
+.brand-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+.logo {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+}
 h2 {
   margin: 0 0 4px;
+  text-align: center;
 }
 .tip {
   margin: 0 0 20px;
   color: #64748b;
+  text-align: center;
 }
 </style>

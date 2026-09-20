@@ -311,6 +311,7 @@ def seed_all(db: Session) -> None:
             db,
             "site",
             {
+                "logo": "/static/icons/brand.png",
                 "hotline": "4001919179",
                 "stewardTitle": "添加管家企业微信",
                 "stewardTip": "长按二维码添加管家微信",
@@ -327,6 +328,11 @@ def seed_all(db: Session) -> None:
                 "nyeOpenEnd": "2027-02-12",
             },
         )
+    else:
+        site = dict(get_config(db, "site") or {})
+        if not site.get("logo"):
+            site["logo"] = "/static/icons/brand.png"
+            set_config(db, "site", site)
     if not get_config(db, "video"):
         set_config(
             db,

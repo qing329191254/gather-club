@@ -1,6 +1,9 @@
 <template>
   <el-card>
     <el-form label-width="120px" style="max-width: 720px">
+      <el-form-item label="品牌 Logo">
+        <ImageField v-model="form.logo" folder="site" placeholder="小程序品牌 Logo" />
+      </el-form-item>
       <el-form-item label="客服热线"><el-input v-model="form.hotline" /></el-form-item>
       <el-form-item label="管家标题"><el-input v-model="form.stewardTitle" /></el-form-item>
       <el-form-item label="管家提示"><el-input v-model="form.stewardTip" /></el-form-item>
@@ -27,6 +30,7 @@ import ImageField from '../components/ImageField.vue'
 
 const rulesText = ref('')
 const form = reactive({
+  logo: '/static/icons/brand.png',
   hotline: '',
   stewardTitle: '',
   stewardTip: '',
@@ -40,6 +44,7 @@ const form = reactive({
 async function load() {
   const res = await http.get('/config/site')
   Object.assign(form, {
+    logo: '/static/icons/brand.png',
     hotline: '',
     stewardTitle: '',
     stewardTip: '',
@@ -49,6 +54,7 @@ async function load() {
     nyeOpenStart: '2027-02-05',
     nyeOpenEnd: '2027-02-12'
   }, res.value || {})
+  if (!form.logo) form.logo = '/static/icons/brand.png'
   if (!form.roomCapacity) form.roomCapacity = { lunch: 4, dinner: 8 }
   rulesText.value = (form.mallRules || []).join('\n')
 }

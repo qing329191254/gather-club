@@ -1,7 +1,13 @@
 <template>
   <el-container class="layout">
     <el-aside width="220px" class="aside">
-      <div class="brand">天天俱乐部</div>
+      <div class="brand">
+        <img class="brand-logo" :src="`${base}brand.png`" alt="天天聚" />
+        <div class="brand-text">
+          <div class="brand-name">天天俱乐部</div>
+          <div class="brand-sub">管理后台</div>
+        </div>
+      </div>
       <el-menu :default-active="route.path" router background-color="#111827" text-color="#cbd5e1" active-text-color="#fff">
         <el-menu-item v-for="item in menus" :key="item.path" :index="item.path">
           <el-icon><component :is="item.icon" /></el-icon>
@@ -30,6 +36,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
 const router = useRouter()
+const base = import.meta.env.BASE_URL
 const username = computed(() => localStorage.getItem('gather_admin_user') || 'admin')
 
 const menus = [
@@ -65,13 +72,34 @@ function logout() {
   color: #fff;
 }
 .brand {
-  height: 56px;
+  min-height: 72px;
+  padding: 12px 14px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  letter-spacing: 1px;
+  gap: 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.brand-logo {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+.brand-text {
+  min-width: 0;
+}
+.brand-name {
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.5px;
+  line-height: 1.2;
+}
+.brand-sub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #94a3b8;
 }
 .header {
   background: #fff;
