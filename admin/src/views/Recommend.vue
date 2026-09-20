@@ -1,18 +1,24 @@
 <template>
   <el-card>
     <div class="toolbar">
-      <el-button type="primary" @click="openEdit()">新增推荐</el-button>
-      <el-button @click="openBanners">轮播图</el-button>
+      <el-button type="primary" @click="openEdit()">新增精选</el-button>
+      <el-button @click="openBanners">顶部轮播</el-button>
     </div>
     <el-table :data="list" stripe>
-      <el-table-column prop="id" label="ID" width="70" />
+      <el-table-column label="封面" width="100">
+        <template #default="{ row }">
+          <el-image v-if="row.cover" :src="row.cover" style="width: 72px; height: 48px" fit="cover" />
+          <span v-else class="muted">暂无</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="name" label="名称" min-width="220" show-overflow-tooltip />
-      <el-table-column prop="cover" label="封面" min-width="180" show-overflow-tooltip />
       <el-table-column prop="price" label="价格" width="90" />
       <el-table-column prop="sort" label="排序" width="80" />
-      <el-table-column label="启用" width="80">
+      <el-table-column label="是否展示" width="100">
         <template #default="{ row }">
-          <el-tag :type="row.enabled ? 'success' : 'info'">{{ row.enabled ? '是' : '否' }}</el-tag>
+          <el-tag :type="row.enabled ? 'success' : 'info'" size="small">
+            {{ row.enabled ? '展示' : '隐藏' }}
+          </el-tag>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="140" fixed="right">
@@ -23,13 +29,24 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="visible" :title="form.id ? '编辑推荐' : '新增推荐'" width="520px">
-      <el-form label-width="80px">
-        <el-form-item label="名称"><el-input v-model="form.name" /></el-form-item>
-        <el-form-item label="封面"><ImageField v-model="form.cover" folder="recommend" /></el-form-item>
-        <el-form-item label="价格"><el-input-number v-model="form.price" :min="0" /></el-form-item>
-        <el-form-item label="排序"><el-input-number v-model="form.sort" :min="0" /></el-form-item>
-        <el-form-item label="启用"><el-switch v-model="form.enabled" /></el-form-item>
+    <el-dialog v-model="visible" :title="form.id ? '编辑精选' : '新增精选'" width="560px">
+      <el-form label-width="90px">
+        <el-form-item label="名称" required>
+          <el-input v-model="form.name" placeholder="酒店 / 门店 / 合作方名称" />
+        </el-form-item>
+        <el-form-item label="封面">
+          <ImageField v-model="form.cover" folder="recommend" />
+        </el-form-item>
+        <el-form-item label="参考价">
+          <el-input-number v-model="form.price" :min="0" :precision="0" />
+        </el-form-item>
+        <el-form-item label="排序">
+          <el-input-number v-model="form.sort" :min="0" />
+          <span class="hint">数字越小越靠前</span>
+        </el-form-item>
+        <el-form-item label="是否展示">
+          <el-switch v-model="form.enabled" active-text="展示" inactive-text="隐藏" />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="visible = false">取消</el-button>
@@ -37,13 +54,8 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="bannerVisible" title="推荐轮播" width="520px">
-      <el-input v-model="bannersText" type="textarea" :rows="6" placeholder="每行一个图片地址" />
-      <div style="margin-top: 8px">
-        <el-upload :show-file-list="false" :http-request="appendBannerUpload" accept="image/*">
-          <el-button>上传并追加</el-button>
-        </el-upload>
-      </div>
+    <el-dialog v-model="bannerVisible" title="精选页顶部轮播" width="640px">
+      <ImageListField v-model="banners" folder="recommend" />
       <template #footer>
         <el-button @click="bannerVisible = false">取消</el-button>
         <el-button type="primary" @click="saveBanners">保存</el-button>
@@ -57,36 +69,18 @@ import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
 import ImageField from '../components/ImageField.vue'
+import ImageListField from '../components/ImageListField.vue'
 
 const list = ref([])
 const visible = ref(false)
 const bannerVisible = ref(false)
-const bannersText = ref('')
+const banners = ref([])
 const form = reactive({ id: null, name: '', cover: '', price: 0, sort: 0, enabled: true })
-
-async function appendBannerUpload(option) {
-  const file = option.file
-  if (!file) return
-  try {
-    const body = new FormData()
-    body.append('file', file)
-    body.append('folder', 'recommend')
-    const res = await http.post('/upload', body)
-    const url = res.url || ''
-    if (url) {
-      bannersText.value = bannersText.value ? bannersText.value + '\n' + url : url
-      ElMessage.success('已添加')
-    }
-    option.onSuccess && option.onSuccess(res)
-  } catch (e) {
-    option.onError && option.onError(e)
-  }
-}
 
 async function load() {
   const res = await http.get('/recommend')
   list.value = res.list || []
-  bannersText.value = (res.banners || []).join('\n')
+  banners.value = [...(res.banners || [])]
 }
 
 function openEdit(row) {
@@ -99,7 +93,17 @@ function openBanners() {
 }
 
 async function onSave() {
-  const payload = { name: form.name, cover: form.cover, price: form.price, sort: form.sort, enabled: form.enabled }
+  if (!form.name?.trim()) {
+    ElMessage.warning('请填写名称')
+    return
+  }
+  const payload = {
+    name: form.name.trim(),
+    cover: form.cover,
+    price: form.price,
+    sort: form.sort,
+    enabled: form.enabled
+  }
   if (form.id) await http.put(`/recommend/${form.id}`, payload)
   else await http.post('/recommend', payload)
   ElMessage.success('已保存')
@@ -108,14 +112,13 @@ async function onSave() {
 }
 
 async function saveBanners() {
-  const banners = bannersText.value.split(/\n/).map((s) => s.trim()).filter(Boolean)
-  await http.put('/recommend/banners', { banners })
+  await http.put('/recommend/banners', { banners: banners.value.filter(Boolean) })
   ElMessage.success('已保存')
   bannerVisible.value = false
 }
 
 async function onRemove(row) {
-  await ElMessageBox.confirm('确认删除？', '提示')
+  await ElMessageBox.confirm(`确认删除「${row.name}」？`, '提示')
   await http.delete(`/recommend/${row.id}`)
   load()
 }
@@ -125,4 +128,6 @@ onMounted(load)
 
 <style scoped>
 .toolbar { margin-bottom: 12px; display: flex; gap: 8px; }
+.hint { margin-left: 8px; color: #94a3b8; font-size: 12px; }
+.muted { color: #94a3b8; font-size: 12px; }
 </style>

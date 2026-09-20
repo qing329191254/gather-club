@@ -113,7 +113,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="角标文案">
-          <el-input v-model="productForm.tag" placeholder="例如：年夜饭、招牌，可选" />
+          <el-input v-model="productForm.tag" placeholder="例如：招牌、家宴，可选" />
         </el-form-item>
         <el-form-item label="标签">
           <el-input v-model="tagsText" placeholder="多个用逗号分隔，例如：近地铁,包厢" />

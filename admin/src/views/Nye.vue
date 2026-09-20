@@ -1,7 +1,7 @@
 <template>
   <el-card>
     <div class="toolbar">
-      <el-button type="primary" @click="openEdit()">新增年夜饭门店</el-button>
+      <el-button type="primary" @click="openEdit()">新增专题门店</el-button>
     </div>
     <el-table :data="list" stripe>
       <el-table-column label="封面" width="100">
@@ -30,10 +30,10 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="visible" :title="editing ? '编辑年夜饭门店' : '新增年夜饭门店'" width="820px" top="5vh">
+    <el-dialog v-model="visible" :title="editing ? '编辑专题门店' : '新增专题门店'" width="820px" top="5vh">
       <el-form label-width="100px">
         <el-form-item label="名称" required>
-          <el-input v-model="form.name" placeholder="例如：上海莘庄店-天天俱乐部-2027年夜饭" />
+          <el-input v-model="form.name" placeholder="例如：上海莘庄店·春节家宴 / 商务午宴" />
         </el-form-item>
         <el-form-item label="封面">
           <ImageField v-model="form.cover" folder="nye" />
@@ -45,7 +45,7 @@
           <el-input-number v-model="form.origin_price" :min="0" :precision="0" />
         </el-form-item>
         <el-form-item label="角标文案">
-          <el-input v-model="form.tag" placeholder="例如：年夜饭" />
+          <el-input v-model="form.tag" placeholder="例如：家宴、商务宴，可自定义" />
         </el-form-item>
         <el-form-item label="地址">
           <el-input v-model="form.address" placeholder="门店详细地址" />
@@ -158,7 +158,7 @@ const empty = () => ({
   cover: '',
   price: 0,
   origin_price: 0,
-  tag: '年夜饭',
+  tag: '宴会',
   address: '',
   route: '',
   lat: 0,

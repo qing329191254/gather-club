@@ -10,8 +10,8 @@
       <el-form-item label="管家二维码"><ImageField v-model="form.stewardQr" folder="site" /></el-form-item>
       <el-form-item label="午市库存默认"><el-input-number v-model="form.roomCapacity.lunch" :min="0" /></el-form-item>
       <el-form-item label="晚市库存默认"><el-input-number v-model="form.roomCapacity.dinner" :min="0" /></el-form-item>
-      <el-form-item label="年夜饭开放起"><el-input v-model="form.nyeOpenStart" /></el-form-item>
-      <el-form-item label="年夜饭开放止"><el-input v-model="form.nyeOpenEnd" /></el-form-item>
+      <el-form-item label="专题开放起"><el-input v-model="form.nyeOpenStart" placeholder="宴会专题可预订开始日期" /></el-form-item>
+      <el-form-item label="专题开放止"><el-input v-model="form.nyeOpenEnd" placeholder="宴会专题可预订结束日期" /></el-form-item>
       <el-form-item label="积分规则">
         <el-input v-model="rulesText" type="textarea" :rows="6" placeholder="每行一条规则" />
       </el-form-item>
