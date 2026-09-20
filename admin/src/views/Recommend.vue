@@ -65,7 +65,7 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
 import ImageField from '../components/ImageField.vue'
@@ -76,6 +76,7 @@ const visible = ref(false)
 const bannerVisible = ref(false)
 const banners = ref([])
 const form = reactive({ id: null, name: '', cover: '', price: 0, sort: 0, enabled: true })
+let bannerTimer = null
 
 async function load() {
   const res = await http.get('/recommend')
@@ -86,10 +87,6 @@ async function load() {
 function openEdit(row) {
   Object.assign(form, row || { id: null, name: '', cover: '', price: 0, sort: 0, enabled: true })
   visible.value = true
-}
-
-function openBanners() {
-  bannerVisible.value = true
 }
 
 async function onSave() {
@@ -111,11 +108,27 @@ async function onSave() {
   load()
 }
 
-async function saveBanners() {
+async function saveBanners(showToast = true) {
   await http.put('/recommend/banners', { banners: banners.value.filter(Boolean) })
-  ElMessage.success('已保存')
-  bannerVisible.value = false
+  if (showToast) {
+    ElMessage.success('已保存')
+    bannerVisible.value = false
+  }
 }
+
+function openBanners() {
+  bannerVisible.value = true
+}
+
+watch(
+  banners,
+  () => {
+    if (!bannerVisible.value) return
+    if (bannerTimer) clearTimeout(bannerTimer)
+    bannerTimer = setTimeout(() => saveBanners(false), 600)
+  },
+  { deep: true }
+)
 
 async function onRemove(row) {
   await ElMessageBox.confirm(`确认删除「${row.name}」？`, '提示')

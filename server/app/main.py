@@ -15,6 +15,9 @@ from .seed import seed_all
 settings = get_settings()
 BASE_DIR = Path(__file__).resolve().parent.parent
 ADMIN_DIST = BASE_DIR / "static" / "admin"
+# 小程序本地静态资源（icons/banners 等），后台预览 /static/... 时复用
+MINIAPP_STATIC = BASE_DIR.parent / "miniapp" / "static"
+SERVER_STATIC = BASE_DIR / "static"
 
 app = FastAPI(title=settings.app_name, docs_url="/api/docs", redoc_url="/api/redoc")
 
@@ -28,6 +31,12 @@ app.add_middleware(
 
 app.include_router(miniapp.router)
 app.include_router(admin_api.router)
+
+# 必须在 catch-all 的 /admin 路由之前挂载，否则静态文件会被 SPA 吞掉
+if MINIAPP_STATIC.exists():
+    app.mount("/static", StaticFiles(directory=str(MINIAPP_STATIC)), name="miniapp-static")
+elif SERVER_STATIC.exists():
+    app.mount("/static", StaticFiles(directory=str(SERVER_STATIC)), name="server-static")
 
 
 @app.on_event("startup")

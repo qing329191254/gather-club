@@ -11,7 +11,7 @@
       <!-- 协议 -->
       <template v-if="tab === 'agreements'">
         <div class="toolbar">
-          <el-radio-group v-model="agreeKey" @change="loadAgreementDoc">
+          <el-radio-group :model-value="agreeKey" @change="onAgreeKeyChange">
             <el-radio-button value="privacy">用户隐私协议</el-radio-button>
             <el-radio-button value="cancel">注销账号协议</el-radio-button>
           </el-radio-group>
@@ -396,13 +396,9 @@ async function loadCurrent() {
   }
 }
 
-function onTabChange() {
-  loadCurrent()
-}
-
-function buildAgreementPayload() {
+function stashAgreementDoc(key = agreeKey.value) {
   const next = { ...agreementsRaw.value }
-  next[agreeKey.value] = {
+  next[key] = {
     navTitle: agreeDoc.navTitle.trim(),
     title: agreeDoc.title.trim(),
     intro: agreeDoc.intro,
@@ -416,7 +412,28 @@ function buildAgreementPayload() {
       }))
     }))
   }
-  return next
+  agreementsRaw.value = next
+}
+
+function onAgreeKeyChange(nextKey) {
+  stashAgreementDoc(agreeKey.value)
+  agreeKey.value = nextKey
+  loadAgreementDoc()
+}
+
+async function onTabChange() {
+  // 切 Tab 前先把当前页写入服务器，避免上传/改文案后丢掉
+  try {
+    await onSave(false)
+  } catch {
+    /* ignore */
+  }
+  loadCurrent()
+}
+
+function buildAgreementPayload() {
+  stashAgreementDoc(agreeKey.value)
+  return { ...agreementsRaw.value }
 }
 
 function buildMemberPayload() {
@@ -449,7 +466,7 @@ function buildMemberPayload() {
   }
 }
 
-async function onSave() {
+async function onSave(showToast = true) {
   saving.value = true
   try {
     let value
@@ -480,7 +497,7 @@ async function onSave() {
 
     await http.put(`/config/${tab.value}`, { value })
     if (tab.value === 'agreements') agreementsRaw.value = value
-    ElMessage.success('已保存')
+    if (showToast) ElMessage.success('已保存')
   } finally {
     saving.value = false
   }
