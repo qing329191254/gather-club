@@ -13,7 +13,7 @@ from fastapi import HTTPException
 
 from .config import get_settings
 
-_TOKEN_CACHE: dict[str, Any] = {"token": "", "expires_at": 0.0}
+_TOKEN_CACHE: dict[str, Any] = {"token": "", "expires_at": 0.0, "key": ""}
 
 
 def wx_configured() -> bool:
@@ -58,22 +58,35 @@ async def code2session(js_code: str) -> dict[str, str]:
 
 async def get_access_token() -> str:
     settings = get_settings()
-    if not settings.wx_appid or not settings.wx_secret:
+    appid = (settings.wx_appid or "").strip().strip('"').strip("'")
+    secret = (settings.wx_secret or "").strip().strip('"').strip("'")
+    if not appid or not secret:
         raise HTTPException(status_code=500, detail="未配置 WX_APPID / WX_SECRET")
 
     now = time.time()
-    if _TOKEN_CACHE["token"] and _TOKEN_CACHE["expires_at"] > now + 60:
+    cache_key = f"{appid}:{secret[:8]}"
+    if (
+        _TOKEN_CACHE.get("key") == cache_key
+        and _TOKEN_CACHE.get("token")
+        and _TOKEN_CACHE.get("expires_at", 0) > now + 60
+    ):
         return str(_TOKEN_CACHE["token"])
 
     url = "https://api.weixin.qq.com/cgi-bin/token"
     params = {
         "grant_type": "client_credential",
-        "appid": settings.wx_appid,
-        "secret": settings.wx_secret,
+        "appid": appid,
+        "secret": secret,
     }
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.get(url, params=params)
-        data = resp.json()
+        try:
+            data = resp.json()
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(
+                status_code=502,
+                detail=f"获取 access_token 失败: 微信返回非 JSON HTTP {resp.status_code}",
+            ) from exc
 
     token = data.get("access_token") or ""
     if not token:
@@ -81,6 +94,7 @@ async def get_access_token() -> str:
             status_code=400,
             detail=f"获取 access_token 失败: {data.get('errmsg') or data}",
         )
+    _TOKEN_CACHE["key"] = cache_key
     _TOKEN_CACHE["token"] = token
     _TOKEN_CACHE["expires_at"] = now + int(data.get("expires_in") or 7200)
     return token

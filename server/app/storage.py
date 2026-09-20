@@ -117,23 +117,18 @@ async def diagnose_storage() -> dict:
         "access_token_ok": token_ok,
         "access_token_error": token_err,
         "hint": (
-            "若 access_token_ok=false，请检查 WX_APPID/WX_SECRET 是否与小程序一致、有无多余空格或引号；"
-            "若 token 正常仍上传失败，请在云托管「云调用」开启开放接口服务，并白名单 /tcb/uploadfile，然后重新发布版本。"
+            "正常只需 WX_APPID+WX_SECRET，不必开开放接口服务。"
+            "若 access_token_ok=false，请核对 Secret 是否与小程序后台一致、有无空格/引号，并确认云托管已重新发布最新版本。"
         ),
     }
 
 
 async def _prepare_upload_attempts(env: str, path: str) -> list[tuple[str, dict]]:
-    """构造多种申请上传凭证的方式。"""
+    """构造申请上传凭证的方式：优先 AppSecret（与常见后台做法一致，无需开放接口服务）。"""
     attempts: list[tuple[str, dict]] = []
-    # 1) 云托管开放接口服务：容器内 http 免 token（需开启开放接口服务 + 白名单）
-    attempts.append(
-        (
-            "openapi_http",
-            {"url": "http://api.weixin.qq.com/tcb/uploadfile", "json": {"env": env, "path": path}},
-        )
-    )
-    # 2) AppSecret 换 access_token（不依赖白名单）
+    body = {"env": env, "path": path}
+
+    # 1) 经典做法：AppSecret → access_token（不需要开开放接口服务 / 白名单）
     if wx_configured():
         try:
             token = await get_access_token()
@@ -142,13 +137,17 @@ async def _prepare_upload_attempts(env: str, path: str) -> list[tuple[str, dict]
                     "access_token",
                     {
                         "url": f"https://api.weixin.qq.com/tcb/uploadfile?access_token={token}",
-                        "json": {"env": env, "path": path},
+                        "json": body,
                     },
                 )
             )
         except HTTPException as exc:
-            logger.warning("skip access_token attempt: %s", exc.detail)
-    # 3) 容器挂载的云调用令牌（需白名单）
+            raise HTTPException(
+                status_code=500,
+                detail=f"获取 access_token 失败（请核对 WX_APPID / WX_SECRET）: {exc.detail}",
+            ) from exc
+
+    # 2) 容器挂载云调用令牌（可选；需控制台白名单 /tcb/uploadfile）
     cloud = _read_cloudbase_token()
     if cloud:
         attempts.append(
@@ -156,10 +155,18 @@ async def _prepare_upload_attempts(env: str, path: str) -> list[tuple[str, dict]
                 "cloudbase_access_token",
                 {
                     "url": f"https://api.weixin.qq.com/tcb/uploadfile?cloudbase_access_token={cloud}",
-                    "json": {"env": env, "path": path},
+                    "json": body,
                 },
             )
         )
+
+    # 3) 开放接口服务免 token（仅在云托管开了该能力时才有用，放最后）
+    attempts.append(
+        (
+            "openapi_http",
+            {"url": "http://api.weixin.qq.com/tcb/uploadfile", "json": body},
+        )
+    )
     return attempts
 
 
