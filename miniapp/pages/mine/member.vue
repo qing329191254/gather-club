@@ -5,12 +5,12 @@
 		<image class="page-bg" :src="current.pageBgImage" mode="aspectFill" />
 		<view class="page-shade" />
 
-		<view class="navbar" :style="{ paddingTop: statusBarHeight + 'px' }">
+		<view class="navbar" :style="navBarStyle">
 			<view class="navbar-inner" :style="{ height: navBarHeight + 'px' }">
 				<view class="back" @tap="goBack">
-					<view class="back-arrow" />
+					<view class="back-arrow" :style="navArrowStyle" />
 				</view>
-				<text class="nav-title">会员中心</text>
+				<text class="nav-title" :style="{ color: navFront }">会员中心</text>
 			</view>
 		</view>
 
@@ -27,7 +27,7 @@
 			</view>
 
 			<view class="level-rail">
-				<image class="rail-arc-img" src="/static/icons/member-rail-arc.png?v=4" mode="scaleToFill" />
+				<image class="rail-arc-img" :src="railArc" mode="scaleToFill" />
 				<view
 					v-for="(lv, i) in levels"
 					:key="lv.id"
@@ -170,7 +170,7 @@
 			:visible="groupVisible"
 			title="扫码入群"
 			tip="优惠活动提前知道"
-			qr-src="/static/common/group-qr.png"
+			:qr-src="groupQr"
 			:show-phone="false"
 			@close="closeGroup"
 		/>
@@ -182,7 +182,8 @@
 	import StewardDialog from '../../components/steward-dialog/steward-dialog.vue'
 	import { api } from '../../common/api.js'
 	import { isLoggedIn, silentLogin, getUser } from '../../common/auth.js'
-	import { stewardPropsFromSite } from '../../common/site.js'
+	import { stewardPropsFromSite, groupQrFromSite } from '../../common/site.js'
+	import { COS_CDN } from '../../common/config.js'
 
 	const PROFILE_KEY = 'gather_profile'
 	const COUPON_CLAIM_KEY = 'gather_member_month_coupon'
@@ -229,11 +230,14 @@
 				avatar: '',
 				statusBarHeight: 20,
 				navBarHeight: 44,
+				navScrolled: false,
 				coupon: { title: '', tip: '', tag: '' },
 				couponClaimed: false,
 				stewardVisible: false,
 				groupVisible: false,
-				stewardProps: stewardPropsFromSite()
+				groupQr: '',
+				stewardProps: stewardPropsFromSite(),
+				railArc: COS_CDN + '/brand/icons/member-rail-arc.png'
 			}
 		},
 		computed: {
@@ -254,6 +258,23 @@
 				return {
 					backgroundColor: cur.pageBg || '#0b1423',
 					paddingTop: this.statusBarHeight + this.navBarHeight + 'px'
+				}
+			},
+			navFront() {
+				return this.current.navFront || '#ffffff'
+			},
+			navBarStyle() {
+				const cur = this.current
+				return {
+					paddingTop: this.statusBarHeight + 'px',
+					background: this.navScrolled ? (cur.navBg || cur.pageBg || '#0b1423') : 'transparent'
+				}
+			},
+			navArrowStyle() {
+				const color = this.navFront
+				return {
+					borderLeftColor: color,
+					borderBottomColor: color
 				}
 			}
 		},
@@ -280,6 +301,10 @@
 			}
 			this.loadCouponClaim()
 			this.loadMember()
+		},
+		onPageScroll(e) {
+			const next = !!e && e.scrollTop > 12
+			if (next !== this.navScrolled) this.navScrolled = next
 		},
 		onShow() {
 			this.loadCouponClaim()
@@ -415,8 +440,28 @@
 				this.stewardVisible = true
 			},
 			openGroup() {
-				this.stewardVisible = false
-				this.groupVisible = true
+				this.tapGuard('group', async () => {
+					let site = null
+					try {
+						const app = getApp()
+						site = (app && app.globalData && app.globalData.site) || null
+					} catch (e) {}
+					if (!groupQrFromSite(site)) {
+						try {
+							site = await api.site()
+							const app = getApp()
+							if (app && app.globalData) app.globalData.site = site || {}
+						} catch (e) {}
+					}
+					const qr = groupQrFromSite(site)
+					if (!qr) {
+						uni.showToast({ title: '暂无入群二维码', icon: 'none' })
+						return
+					}
+					this.groupQr = qr
+					this.stewardVisible = false
+					this.groupVisible = true
+				})
 			},
 			closeSteward() {
 				this.stewardVisible = false
@@ -435,7 +480,6 @@
 		box-sizing: border-box;
 		color: #ffffff;
 		position: relative;
-		overflow: hidden;
 		transition: background-color 0.35s ease;
 	}
 
@@ -467,6 +511,7 @@
 		top: 0;
 		z-index: 20;
 		background: transparent;
+		transition: background 0.2s ease;
 	}
 
 	.navbar-inner {
@@ -714,8 +759,6 @@
 		align-items: center;
 		justify-content: center;
 		position: relative;
-		padding-right: 100rpx;
-		padding-left: 20rpx;
 		z-index: 1;
 	}
 

@@ -12,6 +12,7 @@
       <el-form-item label="管家标题"><el-input v-model="form.stewardTitle" /></el-form-item>
       <el-form-item label="管家提示"><el-input v-model="form.stewardTip" /></el-form-item>
       <el-form-item label="管家二维码"><ImageField v-model="form.stewardQr" folder="site" /></el-form-item>
+      <el-form-item label="入群二维码"><ImageField v-model="form.groupQr" folder="site" /></el-form-item>
       <el-form-item label="午市库存默认"><el-input-number v-model="form.roomCapacity.lunch" :min="0" /></el-form-item>
       <el-form-item label="晚市库存默认"><el-input-number v-model="form.roomCapacity.dinner" :min="0" /></el-form-item>
       <el-form-item label="专题开放起"><el-input v-model="form.nyeOpenStart" placeholder="宴会专题可预订开始日期" /></el-form-item>
@@ -48,7 +49,17 @@
       </el-form-item>
       <el-form-item label="包房单价">
         <el-input-number v-model="loyalty.roomPrice" :min="0" :precision="2" />
-        <span class="inline-tip">0 表示免费预约</span>
+        <span class="inline-tip">支付成功后才锁定包房，填 0 则不能预约</span>
+      </el-form-item>
+
+      <el-divider content-position="left">完善资料奖励</el-divider>
+      <el-form-item label="开启奖励">
+        <el-switch v-model="profileReward.enabled" />
+        <span class="inline-tip">资料未填完时，进入小程序会提示去完善</span>
+      </el-form-item>
+      <el-form-item label="奖励积分">
+        <el-input-number v-model="profileReward.points" :min="0" />
+        <span class="inline-tip">昵称、生日、手机号、兴趣都填完后发放一次</span>
       </el-form-item>
 
       <el-divider content-position="left">每日签到</el-divider>
@@ -95,11 +106,12 @@ import http from '../api/http'
 import ImageField from '../components/ImageField.vue'
 
 const defaults = () => ({
-  logo: '/static/icons/brand.png',
+  logo: '',
   hotline: '',
   stewardTitle: '',
   stewardTip: '',
   stewardQr: '',
+  groupQr: '',
   mallRules: [],
   roomCapacity: { lunch: 4, dinner: 8 },
   nyeOpenStart: '2027-02-05',
@@ -121,6 +133,10 @@ const checkinDefaults = () => ({
 const rulesText = ref('')
 const form = reactive(defaults())
 const checkin = reactive(checkinDefaults())
+const profileReward = reactive({
+  enabled: false,
+  points: 300
+})
 const loyalty = reactive({
   welcomePoints: 12,
   earnRateDefault: 0.5,
@@ -193,14 +209,14 @@ function applyCheckin(value = {}) {
 
 async function load() {
   ready.value = false
-  const [siteRes, checkinRes, loyaltyRes] = await Promise.all([
+  const [siteRes, checkinRes, loyaltyRes, rewardRes] = await Promise.all([
     http.get('/config/site'),
     http.get('/config/checkin'),
-    http.get('/config/loyalty')
+    http.get('/config/loyalty'),
+    http.get('/config/profile_reward')
   ])
   const value = siteRes.value || {}
   Object.assign(form, defaults(), value)
-  if (!form.logo) form.logo = '/static/icons/brand.png'
   if (!form.roomCapacity) form.roomCapacity = { lunch: 4, dinner: 8 }
   rulesText.value = (form.mallRules || []).join('\n')
   applyCheckin(checkinRes.value || {})
@@ -212,6 +228,9 @@ async function load() {
   loyalty.birthdayMultiplier = lv.birthdayMultiplier ?? 2
   loyalty.roomPrice = lv.roomPrice ?? 0
   loyalty.vipTables = Object.assign({ V1: 1, V2: 2, V3: 5 }, lv.vipTables || {})
+  const reward = rewardRes.value || {}
+  profileReward.enabled = !!reward.enabled
+  profileReward.points = reward.points ?? 300
   dirty.value = false
   ready.value = true
 }
@@ -223,7 +242,10 @@ async function onSave(showToast = true, which = 'auto') {
     await Promise.all([
       http.put('/config/site', { value: buildSiteValue() }),
       http.put('/config/checkin', { value: buildCheckinValue() }),
-      http.put('/config/loyalty', { value: { ...loyalty, vipTables: { ...loyalty.vipTables } } })
+      http.put('/config/loyalty', { value: { ...loyalty, vipTables: { ...loyalty.vipTables } } }),
+      http.put('/config/profile_reward', {
+        value: { enabled: !!profileReward.enabled, points: Number(profileReward.points) || 0 }
+      })
     ])
     dirty.value = false
     lastSavedAt.value = new Date().toLocaleTimeString()
@@ -260,6 +282,7 @@ watch(
     form.stewardTitle,
     form.stewardTip,
     form.stewardQr,
+    form.groupQr,
     form.roomCapacity?.lunch,
     form.roomCapacity?.dinner,
     form.nyeOpenStart,
@@ -276,7 +299,9 @@ watch(
     loyalty.firstOrderRate,
     loyalty.birthdayMultiplier,
     loyalty.roomPrice,
-    JSON.stringify(loyalty.vipTables)
+    JSON.stringify(loyalty.vipTables),
+    profileReward.enabled,
+    profileReward.points
   ],
   () => scheduleSave()
 )

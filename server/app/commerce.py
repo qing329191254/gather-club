@@ -200,10 +200,13 @@ def reverse_sold_on_refund(db: Session, order: Order) -> None:
 
 
 def release_room_if_needed(db: Session, order: Order) -> None:
+    """只释放已经占上的库存。未支付的新单 roomHeld 为 false，不能误减。"""
     if not (order.room_date and order.room_slot and order.store_id):
         return
     extra = loads(order.extra or "{}", {}) or {}
     if extra.get("roomReleased"):
+        return
+    if "roomHeld" in extra and not extra.get("roomHeld"):
         return
     slot = (
         db.query(RoomSlot)
@@ -216,6 +219,7 @@ def release_room_if_needed(db: Session, order: Order) -> None:
     )
     if slot and slot.booked > 0:
         slot.booked -= 1
+    extra["roomHeld"] = False
     extra["roomReleased"] = True
     order.extra = dumps(extra)
 

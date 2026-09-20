@@ -8,8 +8,9 @@
 		<view class="qr-dialog" @tap.stop @touchmove.stop.prevent="preventTouchMove">
 			<text class="qr-title">{{ title }}</text>
 			<image
+				v-if="displayQr"
 				class="qr-img"
-				:src="qrSrc"
+				:src="displayQr"
 				mode="aspectFit"
 				:show-menu-by-longpress="true"
 			/>
@@ -24,6 +25,9 @@
 </template>
 
 <script>
+	import { api } from '../../common/api.js'
+	import { getSiteConfig, stewardPropsFromSite } from '../../common/site.js'
+
 	export default {
 		props: {
 			visible: {
@@ -40,7 +44,7 @@
 			},
 			qrSrc: {
 				type: String,
-				default: '/static/common/steward-qr.png'
+				default: ''
 			},
 			showPhone: {
 				type: Boolean,
@@ -51,7 +55,40 @@
 				default: '4001919179'
 			}
 		},
+		data() {
+			return {
+				loadedQr: ''
+			}
+		},
+		computed: {
+			displayQr() {
+				return this.qrSrc || this.loadedQr
+			}
+		},
+		watch: {
+			visible: {
+				immediate: true,
+				handler(val) {
+					if (val) this.ensureQr()
+				}
+			}
+		},
 		methods: {
+			async ensureQr() {
+				if (this.qrSrc || !this.showPhone || this.loadedQr) return
+				let site = getSiteConfig()
+				if (!site || !site.stewardQr) {
+					try {
+						site = (await api.site()) || {}
+						const app = getApp()
+						if (app) {
+							app.globalData = app.globalData || {}
+							app.globalData.site = site
+						}
+					} catch (e) {}
+				}
+				this.loadedQr = stewardPropsFromSite(site).qrSrc
+			},
 			onClose() {
 				this.$emit('close')
 			},

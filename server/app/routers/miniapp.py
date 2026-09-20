@@ -292,8 +292,19 @@ def _slot_info(db: Session, store_id: str, date: str, slot: str) -> dict:
 
 
 def _release_room_slot(db: Session, order: Order) -> None:
+    release_room_if_needed(db, order)
+
+
+def _hold_room_slot(db: Session, order: Order) -> bool:
+    """支付前锁 1 间。同一门店的包房预约和带日期的下单共用这份库存。"""
     if not (order.room_date and order.room_slot and order.store_id):
-        return
+        return False
+    extra = loads(order.extra or "{}", {}) or {}
+    if extra.get("roomHeld"):
+        return False
+    info = _slot_info(db, order.store_id, order.room_date, order.room_slot)
+    if info["full"] or info["remain"] < 1:
+        raise HTTPException(status_code=400, detail="该时段包房已满，请换日期或时段")
     row = (
         db.query(RoomSlot)
         .filter(
@@ -301,10 +312,26 @@ def _release_room_slot(db: Session, order: Order) -> None:
             RoomSlot.date == order.room_date,
             RoomSlot.slot == order.room_slot,
         )
+        .with_for_update()
         .first()
     )
-    if row and row.booked > 0:
-        row.booked -= 1
+    if not row:
+        row = RoomSlot(
+            store_id=order.store_id,
+            date=order.room_date,
+            slot=order.room_slot,
+            capacity=info["capacity"],
+            booked=0,
+        )
+        db.add(row)
+        db.flush()
+    if row.booked >= row.capacity:
+        raise HTTPException(status_code=400, detail="该时段包房已满，请换日期或时段")
+    row.booked += 1
+    extra["roomHeld"] = True
+    extra["roomReleased"] = False
+    order.extra = dumps(extra)
+    return True
 
 
 def _release_stale_room_holds(db: Session) -> None:
@@ -339,7 +366,7 @@ def _resolve_order_price(db: Session, payload: OrderCreateIn) -> tuple[float, fl
         cover = payload.cover or ""
         spec = payload.spec or ""
         if unit <= 0:
-            return 0.0, 0.0, title, cover, spec
+            raise HTTPException(status_code=400, detail="包房预约需支付，请先在后台设置包房单价")
         return unit, round(unit * qty, 2), title, cover, spec
 
     if otype == "gather":
@@ -480,8 +507,6 @@ async def bind_phone(
 
     if getattr(user, "cancelled", False):
         raise HTTPException(status_code=400, detail="账号已注销")
-    if user.phone_edited and user.phone:
-        return {"openid": user.openid, "user": _user_out(user, db), "message": "手机号已绑定"}
 
     if payload.code:
         if not wx_configured():
@@ -494,11 +519,16 @@ async def bind_phone(
     else:
         raise HTTPException(status_code=400, detail="缺少手机号授权数据")
 
-    if user.phone and user.phone != phone and user.phone_edited:
+    if user.phone and user.phone == phone:
+        return {"openid": user.openid, "user": _user_out(user, db), "message": "手机号已绑定"}
+    # 登录时第一次写入不算「修改」；已有号码后再换，只允许一次
+    if user.phone and user.phone_edited:
         raise HTTPException(status_code=400, detail="手机号仅可修改一次")
 
+    had_phone = bool(user.phone)
     user.phone = phone
-    user.phone_edited = True
+    if had_phone:
+        user.phone_edited = True
     db.commit()
     db.refresh(user)
     return {"openid": user.openid, "user": _user_out(user, db), "message": "绑定成功"}
@@ -870,34 +900,14 @@ def create_order(
     qty = max(1, int(payload.quantity or 1))
     unit_price, amount, title, cover, spec = _resolve_order_price(db, payload)
 
+    extra = {}
     if payload.room_date and payload.room_slot and payload.store_id:
         _release_stale_room_holds(db)
         info = _slot_info(db, payload.store_id, payload.room_date, payload.room_slot)
         if info["full"] or info["remain"] < 1:
             raise HTTPException(status_code=400, detail="该时段包房已满，请换日期或时段")
-        row = (
-            db.query(RoomSlot)
-            .filter(
-                RoomSlot.store_id == payload.store_id,
-                RoomSlot.date == payload.room_date,
-                RoomSlot.slot == payload.room_slot,
-            )
-            .with_for_update()
-            .first()
-        )
-        if not row:
-            row = RoomSlot(
-                store_id=payload.store_id,
-                date=payload.room_date,
-                slot=payload.room_slot,
-                capacity=info["capacity"],
-                booked=0,
-            )
-            db.add(row)
-            db.flush()
-        if row.booked >= row.capacity:
-            raise HTTPException(status_code=400, detail="该时段包房已满，请换日期或时段")
-        row.booked += 1
+        # 先只校验，支付发起时才占库存，避免未付款就把同一家店的包房订走
+        extra["roomHeld"] = False
 
     order = Order(
         id=order_id,
@@ -920,7 +930,7 @@ def create_order(
         remark=payload.remark,
         room_date=payload.room_date,
         room_slot=payload.room_slot,
-        extra="{}",
+        extra=dumps(extra),
     )
     db.add(order)
     db.commit()
@@ -947,32 +957,38 @@ async def pay_order(
         raise HTTPException(status_code=400, detail="订单状态不可支付")
 
     amount = float(order.amount or order.price or 0)
-    # 仅包房预约允许 0 元直接确认；付费单必须走真实支付
     if amount <= 0:
-        if order.type != "room":
-            raise HTTPException(status_code=400, detail="订单金额异常，无法支付")
-        _mark_order_paid(db, order, {"mockPaid": True})
-        return {**_order_out(order), "needPay": False}
+        raise HTTPException(status_code=400, detail="需支付后才能预约" if order.type == "room" else "订单金额异常，无法支付")
 
-    if not pay_configured():
-        raise HTTPException(status_code=503, detail="支付暂未开通，请稍后重试")
+    just_held = False
+    try:
+        if order.room_date and order.room_slot and order.store_id:
+            just_held = _hold_room_slot(db, order)
+            db.commit()
+        if not pay_configured():
+            raise HTTPException(status_code=503, detail="支付暂未开通，请稍后重试")
 
-    total_fee = int(round(amount * 100))
-    client_ip = request.client.host if request.client else "127.0.0.1"
-    result = await unified_order(
-        openid=order.openid,
-        out_trade_no=order.id,
-        body=order.title or "天天俱乐部订单",
-        total_fee=total_fee,
-        client_ip=client_ip,
-    )
-    prepay_id = result["prepay_id"]
-    extra = loads(order.extra or "{}", {})
-    extra["prepay_id"] = prepay_id
-    order.extra = dumps(extra)
-    db.commit()
-    payment = build_jsapi_payment(prepay_id)
-    return {**_order_out(order), "needPay": True, "payment": payment}
+        total_fee = int(round(amount * 100))
+        client_ip = request.client.host if request.client else "127.0.0.1"
+        result = await unified_order(
+            openid=order.openid,
+            out_trade_no=order.id,
+            body=order.title or "天天俱乐部订单",
+            total_fee=total_fee,
+            client_ip=client_ip,
+        )
+        prepay_id = result["prepay_id"]
+        extra = loads(order.extra or "{}", {})
+        extra["prepay_id"] = prepay_id
+        order.extra = dumps(extra)
+        db.commit()
+        payment = build_jsapi_payment(prepay_id)
+        return {**_order_out(order), "needPay": True, "payment": payment}
+    except Exception:
+        if just_held:
+            _release_room_slot(db, order)
+            db.commit()
+        raise
 
 
 @router.post("/pay/notify")
@@ -1110,6 +1126,48 @@ def mall_redeem(
     }
 
 
+def _profile_reward_config(db: Session) -> dict:
+    raw = get_config(db, "profile_reward", {}) or {}
+    if not isinstance(raw, dict):
+        raw = {}
+    try:
+        points = int(raw.get("points") or 0)
+    except (TypeError, ValueError):
+        points = 0
+    return {"enabled": bool(raw.get("enabled")), "points": max(0, points)}
+
+
+def _profile_complete(user: AppUser) -> bool:
+    nick = (user.nickname or "").strip()
+    if not nick or nick == "微信用户":
+        return False
+    if not (user.birthday or "").strip():
+        return False
+    if not (user.phone or "").strip():
+        return False
+    if not (user.hobby or "").strip():
+        return False
+    return True
+
+
+def _grant_profile_reward(db: Session, user: AppUser) -> int:
+    if getattr(user, "profile_rewarded", False):
+        return 0
+    cfg = _profile_reward_config(db)
+    if not cfg["enabled"] or cfg["points"] <= 0 or not _profile_complete(user):
+        return 0
+    add_points(db, user, "完善个人资料", cfg["points"])
+    user.profile_rewarded = True
+    db.commit()
+    db.refresh(user)
+    return cfg["points"]
+
+
+@router.get("/profile-reward")
+def profile_reward_public(db: Session = Depends(get_db)):
+    return _profile_reward_config(db)
+
+
 @router.get("/user/profile")
 def user_profile(
     x_openid: str = Header(default="", alias="X-Openid"),
@@ -1134,6 +1192,7 @@ def _profile_out(user: AppUser, db: Optional[Session] = None) -> dict:
         "vipLevel": user.vip_level,
         "vip": f"{user.vip_level}会员",
         "cancelled": bool(getattr(user, "cancelled", False)),
+        "profileRewarded": bool(getattr(user, "profile_rewarded", False)),
         "tableCount": 0,
     }
     if db is not None:
@@ -1178,7 +1237,10 @@ def update_profile(
                 user.phone_edited = True
     db.commit()
     db.refresh(user)
-    return _profile_out(user, db)
+    granted = _grant_profile_reward(db, user)
+    out = _profile_out(user, db)
+    out["profileRewardGranted"] = granted
+    return out
 
 
 @router.post("/user/cancel")

@@ -69,6 +69,7 @@
 
 <script>
 	import { api } from '../../common/api.js'
+	import { openGatherTarget } from '../../common/open-gather.js'
 
 	export default {
 		data() {
@@ -176,13 +177,7 @@
 				this.regionVisible = false
 			},
 			onItem(item) {
-				if (item && item.detailId) {
-					uni.navigateTo({ url: '/pages/nye/detail?id=' + item.detailId })
-					return
-				}
-				if (item && item.id) {
-					uni.navigateTo({ url: '/pages/gather/detail?id=' + item.id })
-				}
+				openGatherTarget(item)
 			},
 			openSteward() {
 				this.stewardVisible = true

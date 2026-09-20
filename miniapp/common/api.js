@@ -40,6 +40,9 @@ export const api = {
 	loyaltyConfig() {
 		return request('/api/v1/loyalty/config')
 	},
+	profileReward() {
+		return request('/api/v1/profile-reward')
+	},
 	mallRecords(params) {
 		return request('/api/v1/mall/records', { data: params || {} })
 	},

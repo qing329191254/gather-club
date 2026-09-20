@@ -72,6 +72,13 @@
 			@confirm="onBirthdayConfirm"
 			@close="birthdayVisible = false"
 		/>
+		<profile-reward-dialog
+			:visible="rewardVisible"
+			mode="success"
+			:points="rewardPoints"
+			@more="onRewardMore"
+			@close="onRewardClose"
+		/>
 		<tip-dialog
 			:visible="phoneTipVisible"
 			phone-auth
@@ -90,7 +97,7 @@
 	import { getUser, saveLogin, getOpenid, refreshProfile, isLoggedIn, silentLogin, bindPhoneFromDetail } from '../../common/auth.js'
 	import { api } from '../../common/api.js'
 	import { uploadToCloud } from '../../common/cloud.js'
-	import { withLoading } from '../../common/loading.js'
+	import ProfileRewardDialog from '../../components/profile-reward-dialog/profile-reward-dialog.vue'
 
 	const PROFILE_KEY = 'gather_profile'
 	const PHONE_EDITED_KEY = 'gather_phone_edited'
@@ -98,15 +105,18 @@
 	export default {
 		components: {
 			DatePicker,
-			TipDialog
+			TipDialog,
+			ProfileRewardDialog
 		},
 		data() {
 			return {
 				today: '',
 				birthdayVisible: false,
 				phoneTipVisible: false,
+				rewardVisible: false,
+				rewardPoints: 0,
 				phoneTipMessage: '您仅有一次修改机会\n是否确认修改?',
-				phoneEditLabel: '修改手机号 >',
+				phoneEditLabel: '授权手机号 >',
 				form: {
 					avatar: '',
 					nickname: '微信用户',
@@ -146,7 +156,11 @@
 						if (!this.form.avatar && raw.avatar) this.form.avatar = raw.avatar
 					}
 				} catch (e) {}
-				this.phoneEditLabel = user.phoneEdited || uni.getStorageSync(PHONE_EDITED_KEY) ? '已绑定' : '修改手机号 >'
+				this.phoneEditLabel = !user.phone
+					? '授权手机号 >'
+					: user.phoneEdited
+						? '已绑定'
+						: '修改手机号 >'
 			},
 			saveLocal() {
 				uni.setStorageSync(PROFILE_KEY, this.form)
@@ -187,10 +201,14 @@
 				this.form.birthday = value
 			},
 			onPhone() {
-				if (getUser().phoneEdited || uni.getStorageSync(PHONE_EDITED_KEY)) {
+				const user = getUser()
+				if (user.phone && user.phoneEdited) {
 					uni.showToast({ title: '手机号仅可修改一次', icon: 'none' })
 					return
 				}
+				this.phoneTipMessage = user.phone
+					? '您仅有一次修改机会\n是否确认修改?'
+					: '授权后将显示您的微信手机号'
 				this.phoneTipVisible = true
 			},
 			onPhoneTipConfirm(detail) {
@@ -199,10 +217,14 @@
 					.then((auth) => {
 						const user = (auth && auth.user) || getUser()
 						this.form.phone = user.phone || this.form.phone
-						uni.setStorageSync(PHONE_EDITED_KEY, 1)
-						this.phoneEditLabel = '已绑定'
+						if (user.phoneEdited) uni.setStorageSync(PHONE_EDITED_KEY, 1)
+						this.phoneEditLabel = !user.phone
+							? '授权手机号 >'
+							: user.phoneEdited
+								? '已绑定'
+								: '修改手机号 >'
 						this.saveLocal()
-						uni.showToast({ title: '修改成功', icon: 'success' })
+						uni.showToast({ title: user.phoneEdited ? '修改成功' : '已获取手机号', icon: 'success' })
 					})
 					.catch((e) => {
 						uni.showToast({ title: (e && e.message) || '绑定失败', icon: 'none' })
@@ -210,6 +232,14 @@
 			},
 			onHobby() {
 				uni.navigateTo({ url: '/pages/mine/hobbies' })
+			},
+			onRewardMore() {
+				this.rewardVisible = false
+				uni.navigateTo({ url: '/pages/checkin/checkin' })
+			},
+			onRewardClose() {
+				this.rewardVisible = false
+				uni.navigateBack({ fail() {} })
 			},
 			async onSave() {
 				this.saveLocal()
@@ -233,10 +263,16 @@
 							phoneEdited: res.phoneEdited,
 							points: res.points,
 							vipLevel: res.vipLevel,
-							vip: res.vip
+							vip: res.vip,
+							profileRewarded: res.profileRewarded
 						}),
 						getOpenid()
 					)
+					if (res && res.profileRewardGranted) {
+						this.rewardPoints = res.profileRewardGranted
+						this.rewardVisible = true
+						return
+					}
 					uni.showToast({ title: '保存成功', icon: 'success' })
 					setTimeout(() => {
 						uni.navigateBack({ fail() {} })

@@ -11,7 +11,7 @@ export const vipLevels = [
 		id: 'V0',
 		name: 'V0',
 		label: 'V0会员',
-		icon: '/static/icons/vip-style-v0.png',
+		icon: '',
 		theme: {
 			pill: '#d4e0f2',
 			border: 'transparent',
@@ -22,7 +22,7 @@ export const vipLevels = [
 		id: 'V1',
 		name: 'V1',
 		label: 'V1会员',
-		icon: '/static/icons/vip-style-v1.png',
+		icon: '',
 		theme: {
 			pill: '#3b7de0',
 			border: 'transparent',
@@ -33,7 +33,7 @@ export const vipLevels = [
 		id: 'V2',
 		name: 'V2',
 		label: 'V2会员',
-		icon: '/static/icons/vip-style-v2.png',
+		icon: '',
 		theme: {
 			pill: '#5a2d96',
 			border: 'transparent',
@@ -44,7 +44,7 @@ export const vipLevels = [
 		id: 'V3',
 		name: 'V3',
 		label: 'V3会员',
-		icon: '/static/icons/vip-style-v3.png',
+		icon: '',
 		theme: {
 			pill: '#8c5a12',
 			border: 'transparent',
@@ -63,6 +63,7 @@ export function setVipLevelsFromServer(list) {
 		const idx = vipLevels.findIndex((row) => row.id === item.id)
 		if (idx >= 0) {
 			vipLevels[idx] = Object.assign({}, vipLevels[idx], item, {
+				icon: item.icon || item.crownIcon || vipLevels[idx].icon || '',
 				theme: Object.assign({}, vipLevels[idx].theme, item.theme || {})
 			})
 		} else {
@@ -92,7 +93,7 @@ export function resolveVip(user) {
 	return {
 		id: conf.id,
 		label: u.vipLabel || u.vip || conf.label,
-		icon: u.vipIcon || conf.icon,
+		icon: u.vipIcon || conf.icon || conf.crownIcon || '',
 		theme: conf.theme
 	}
 }

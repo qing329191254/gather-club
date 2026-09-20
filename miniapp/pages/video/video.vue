@@ -3,7 +3,7 @@
 	<view class="page">
 		<view class="header">
 			<view class="header-avatar-wrap">
-				<image class="header-avatar" :src="profile.avatar" mode="aspectFill" />
+				<image v-if="profile.avatar" class="header-avatar" :src="profile.avatar" mode="aspectFill" />
 				<view v-if="living" class="live-badge">直播中</view>
 			</view>
 			<text class="header-name">{{ profile.name }}</text>
@@ -11,11 +11,11 @@
 
 		<view class="channel-card">
 			<view class="cover-wrap">
-				<image class="cover" :src="profile.cover" mode="aspectFill" />
+				<image v-if="profile.cover" class="cover" :src="profile.cover" mode="aspectFill" />
 			</view>
 			<view class="channel">
 				<view class="channel-row">
-					<image class="channel-avatar" :src="profile.avatar" mode="aspectFill" />
+					<image v-if="profile.avatar" class="channel-avatar" :src="profile.avatar" mode="aspectFill" />
 					<text class="channel-name">{{ profile.name }}</text>
 					<view class="follow" :class="{ 'tap-busy': isTapBusy('follow') }" @tap.stop="onFollow">{{ followed ? '已关注' : '关注视频号' }}</view>
 				</view>
@@ -36,7 +36,7 @@
 					<text>直播中</text>
 				</view>
 				<view class="live-body">
-					<image class="live-avatar" :src="living.avatar || profile.avatar" mode="aspectFill" />
+					<image v-if="living.avatar || profile.avatar" class="live-avatar" :src="living.avatar || profile.avatar" mode="aspectFill" />
 					<view class="live-title">
 						<text>{{ living.line1 }}</text>
 						<text>{{ living.line2 }}</text>
@@ -63,7 +63,7 @@
 				</view>
 			</view>
 			<view class="live-body">
-				<image class="live-avatar" :src="item.avatar || profile.avatar" mode="aspectFill" />
+				<image v-if="item.avatar || profile.avatar" class="live-avatar" :src="item.avatar || profile.avatar" mode="aspectFill" />
 				<view class="live-title">
 					<text>{{ item.line1 }}</text>
 					<text>{{ item.line2 }}</text>
@@ -84,8 +84,8 @@
 			return {
 				profile: {
 					name: '天天俱乐部',
-					avatar: '/static/icons/brand.png',
-					cover: '/static/banners/video-cover.png',
+					avatar: '',
+					cover: '',
 					intro: '天天俱乐部！天天都有局！关注直播间，给您带来更多超高性价比的聚会餐，酒店直播！',
 					finderUserName: ''
 				},

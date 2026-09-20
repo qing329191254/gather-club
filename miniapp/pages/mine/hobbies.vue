@@ -18,12 +18,20 @@
 		<view class="footer">
 			<view class="done" :class="{ 'tap-busy': isTapBusy('done') }" @tap="onDone">完成</view>
 		</view>
+		<profile-reward-dialog
+			:visible="rewardVisible"
+			mode="success"
+			:points="rewardPoints"
+			@more="onRewardMore"
+			@close="onRewardClose"
+		/>
 	</view>
 </template>
 
 <script>
 	import { api } from '../../common/api.js'
 	import { getUser, isLoggedIn, saveLogin, silentLogin } from '../../common/auth.js'
+	import ProfileRewardDialog from '../../components/profile-reward-dialog/profile-reward-dialog.vue'
 
 	const PROFILE_KEY = 'gather_profile'
 	const HOBBY_KEY = 'gather_hobbies'
@@ -37,11 +45,16 @@
 	]
 
 	export default {
+		components: {
+			ProfileRewardDialog
+		},
 		data() {
 			return {
 				loading: false,
 				selected: [],
-				options: []
+				options: [],
+				rewardVisible: false,
+				rewardPoints: 0
 			}
 		},
 		onLoad() {
@@ -122,14 +135,29 @@
 					const res = await api.updateProfile({ hobby })
 					saveLogin(
 						Object.assign({}, getUser(), {
-							hobby: (res && res.hobby) || hobby
+							hobby: (res && res.hobby) || hobby,
+							points: res && res.points,
+							profileRewarded: res && res.profileRewarded
 						})
 					)
+					if (res && res.profileRewardGranted) {
+						this.rewardPoints = res.profileRewardGranted
+						this.rewardVisible = true
+						return
+					}
 					uni.navigateBack({ fail() {} })
 				} catch (e) {
 					uni.showToast({ title: (e && e.message) || '保存失败', icon: 'none' })
 				}
 				})
+			},
+			onRewardMore() {
+				this.rewardVisible = false
+				uni.navigateTo({ url: '/pages/checkin/checkin' })
+			},
+			onRewardClose() {
+				this.rewardVisible = false
+				uni.navigateBack({ fail() {} })
 			}
 		}
 	}

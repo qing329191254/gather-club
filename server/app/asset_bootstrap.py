@@ -133,8 +133,8 @@ async def bootstrap_brand_assets(db: Session, force: bool = False) -> dict:
     # site
     site = dict(get_config(db, "site") or {})
     site_defaults = {
-        "logo": "/static/icons/brand.png",
-        "stewardQr": "/static/common/steward-qr.png",
+        "logo": "",
+        "stewardQr": "",
         "hotline": site.get("hotline") or "4001919179",
         "stewardTitle": site.get("stewardTitle") or "添加管家企业微信",
         "stewardTip": site.get("stewardTip") or "长按二维码添加管家微信",
@@ -158,8 +158,8 @@ async def bootstrap_brand_assets(db: Session, force: bool = False) -> dict:
     video.setdefault("name", "天天俱乐部")
     video.setdefault("intro", "天天俱乐部！天天都有局！")
     for field, default in (
-        ("avatar", "/static/icons/brand.png"),
-        ("cover", "/static/banners/video-cover.png"),
+        ("avatar", ""),
+        ("cover", ""),
     ):
         cur = video.get(field) or default
         if force or _is_local_static(cur) or not cur:

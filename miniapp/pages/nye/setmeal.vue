@@ -431,7 +431,7 @@
 						store_name: storeName,
 						title: storeName + '-年夜饭',
 						spec: cur.name + (this.date ? ' · ' + this.date : ''),
-						cover: cur.cover || (this.detail && this.detail.cover) || '/static/orders/nye-xinzhuang.png',
+						cover: cur.cover || (this.detail && this.detail.cover) || '',
 						quantity: this.quantity,
 						price: amount,
 						amount,

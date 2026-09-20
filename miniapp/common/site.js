@@ -14,7 +14,12 @@ export function stewardPropsFromSite(site) {
 	return {
 		title: s.stewardTitle || '添加管家企业微信',
 		tip: s.stewardTip || '长按二维码添加管家微信',
-		qrSrc: s.stewardQr || '/static/common/steward-qr.png',
+		qrSrc: s.stewardQr || '',
 		phone: s.hotline || '4001919179'
 	}
+}
+
+export function groupQrFromSite(site) {
+	const s = site || getSiteConfig() || {}
+	return s.groupQr || ''
 }

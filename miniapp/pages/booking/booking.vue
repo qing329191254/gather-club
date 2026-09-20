@@ -83,15 +83,15 @@
 		</view>
 
 		<view class="tip">
-			<text>说明：小程序下单成功后会锁定 1 间包房库存；电话预订由后台人工锁定。库存与预约以服务端实时数据为准。</text>
+			<text>说明：和门店下单共用包房库存。支付成功后才会锁定 1 间；未支付不算预约。电话预订由后台人工锁定。</text>
 		</view>
 
 		<view class="bar">
 			<view class="bar-left">
-				<text class="bar-label">包房</text>
-				<text class="bar-val" :class="{ danger: !canSubmit }">{{ barStatus }}</text>
+				<text class="bar-label">需支付</text>
+				<text class="bar-val" :class="{ danger: !(roomPrice > 0) }">{{ roomPrice > 0 ? ('¥' + roomPrice) : '暂未开放' }}</text>
 			</view>
-			<view class="submit" :class="{ mute: !canSubmit, 'tap-busy': isTapBusy('submit') }" @tap="onSubmit">提交预约</view>
+			<view class="submit" :class="{ mute: !canSubmit, 'tap-busy': isTapBusy('submit') }" @tap="onSubmit">立即支付</view>
 		</view>
 
 		<view v-if="calendarVisible" class="cal-mask" @tap="closeCalendar">
@@ -128,7 +128,7 @@
 	import {
 		SLOTS,
 		formatDate
-	} from '../../common/room-inventory.js'
+	} from './room-inventory.js'
 	import { api } from '../../common/api.js'
 	import { isLoggedIn, silentLogin } from '../../common/auth.js'
 	import { settlePay } from '../../common/pay.js'
@@ -152,7 +152,8 @@
 				draftDate: '',
 				monthMap: {},
 				weeks: ['日', '一', '二', '三', '四', '五', '六'],
-				tick: 0
+				tick: 0,
+				roomPrice: 0
 			}
 		},
 		computed: {
@@ -166,7 +167,7 @@
 				return fromMonth || null
 			},
 			canSubmit() {
-				return !!(this.date && this.currentAvail && !this.currentAvail.full)
+				return !!(this.roomPrice > 0 && this.date && this.currentAvail && !this.currentAvail.full)
 			},
 			barStatus() {
 				if (!this.date) return '请先选日期'
@@ -225,6 +226,7 @@
 			this.viewYear = tomorrow.getFullYear()
 			this.viewMonth = tomorrow.getMonth() + 1
 			this.loadStores()
+			this.loadPrice()
 		},
 		onShow() {
 			this.loadRemoteMonth()
@@ -233,6 +235,14 @@
 		methods: {
 			pad2(n) {
 				return String(n).padStart(2, '0')
+			},
+			async loadPrice() {
+				try {
+					const cfg = await api.loyaltyConfig()
+					this.roomPrice = Number((cfg && cfg.roomPrice) || 0)
+				} catch (e) {
+					this.roomPrice = 0
+				}
 			},
 			async loadStores() {
 				try {
@@ -345,10 +355,21 @@
 					uni.showToast({ title: '请填写正确手机号', icon: 'none' })
 					return
 				}
+				if (!(this.roomPrice > 0)) {
+					uni.showToast({ title: '包房暂未开放线上预约', icon: 'none' })
+					return
+				}
 				return this.tapGuard('submit', async () => {
 				if (!isLoggedIn()) await silentLogin()
 
 				const slotMeta = SLOTS.find((s) => s.key === this.slot) || SLOTS[1]
+				const ok = await this.askModal({
+					title: '确认支付',
+					content: `需支付 ¥${this.roomPrice}，支付成功后才会锁定包房`,
+					confirmText: '立即支付',
+					confirmColor: '#e54148'
+				})
+				if (!ok) return
 				try {
 					const created = await api.createOrder({
 						type: 'room',
@@ -358,8 +379,8 @@
 						spec: `${this.date} ${slotMeta.name}（${slotMeta.time}）·${this.people}人`,
 						cover: this.store.cover,
 						quantity: 1,
-						price: 0,
-						amount: 0,
+						price: this.roomPrice,
+						amount: this.roomPrice,
 						contact_name: this.name,
 						contact_phone: phone,
 						people: this.people,

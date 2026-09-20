@@ -383,11 +383,12 @@ def seed_all(db: Session) -> None:
             db,
             "site",
             {
-                "logo": "/static/icons/brand.png",
+                "logo": "",
                 "hotline": "4001919179",
                 "stewardTitle": "添加管家企业微信",
                 "stewardTip": "长按二维码添加管家微信",
-                "stewardQr": "/static/common/steward-qr.png",
+                "stewardQr": "",
+                "groupQr": "",
                 "mallRules": [
                     "兑换成功后，可在「我的-积分商城-兑换记录」中查看已兑换商品及核销码。",
                     "适用门店：天天俱乐部上海共康店、亚新生活广场、上海莘庄店、上钢新邻里3楼。",
@@ -406,8 +407,8 @@ def seed_all(db: Session) -> None:
             "video",
             {
                 "name": "天天俱乐部",
-                "avatar": "/static/icons/brand.png",
-                "cover": "/static/banners/video-cover.png",
+                "avatar": "",
+                "cover": "",
                 "intro": "天天俱乐部！天天都有局！关注直播间，给您带来更多超高性价比的聚会餐，酒店直播！",
                 "finderUserName": "",
             },

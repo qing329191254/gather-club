@@ -28,7 +28,7 @@
 			</view>
 
 			<view class="order-body">
-				<image class="thumb" :src="order.cover" mode="aspectFill" />
+				<image v-if="order.cover" class="thumb" :src="order.cover" mode="aspectFill" />
 				<view class="info">
 					<view class="info-top">
 						<text class="title">{{ order.title }}</text>
@@ -119,7 +119,7 @@
 					storeName: row.storeName,
 					status: row.status,
 					statusText: row.statusText,
-					cover: row.cover || '/static/orders/nye-xinzhuang.png',
+					cover: row.cover || '',
 					title: row.title,
 					spec: row.spec,
 					quantity: row.quantity || 1,

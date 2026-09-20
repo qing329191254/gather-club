@@ -1,5 +1,5 @@
 <template>
-	<page-meta :page-style="'overflow:' + (stewardVisible ? 'hidden' : 'visible')"></page-meta>
+	<page-meta :page-style="'overflow:' + (stewardVisible || privacyVisible || phoneLoginVisible || profilePromptVisible ? 'hidden' : 'visible')"></page-meta>
 	<app-loading />
 	<view class="page">
 		<view
@@ -101,6 +101,20 @@
 			@agree="onPrivacyAgree"
 			@disagree="onPrivacyDisagree"
 		/>
+		<phone-login-dialog
+			ref="phoneLogin"
+			:visible="phoneLoginVisible"
+			@cancel="onPhoneLoginCancel"
+			@confirm="onPhoneLoginConfirm"
+		/>
+		<profile-reward-dialog
+			:visible="profilePromptVisible"
+			mode="prompt"
+			:points="profileRewardPoints"
+			@go="onProfileGo"
+			@later="onProfileLater"
+			@close="onProfileLater"
+		/>
 	</view>
 </template>
 
@@ -108,12 +122,23 @@
 	import {
 		needPrivacyPrompt,
 		setPrivacyStatus,
-		silentLogin
+		silentLogin,
+		isLoggedIn,
+		refreshProfile,
+		bindPhoneFromDetail
 	} from '../../common/auth.js'
+	import PhoneLoginDialog from '../../components/phone-login-dialog/phone-login-dialog.vue'
 	import { api } from '../../common/api.js'
 	import { stewardPropsFromSite } from '../../common/site.js'
+	import { isProfileComplete } from '../../common/profile.js'
+	import { openGatherTarget } from '../../common/open-gather.js'
+	import ProfileRewardDialog from '../../components/profile-reward-dialog/profile-reward-dialog.vue'
 
 	export default {
+		components: {
+			ProfileRewardDialog,
+			PhoneLoginDialog
+		},
 		data() {
 			return {
 				statusBarHeight: 20,
@@ -122,6 +147,9 @@
 				navSolid: false,
 				stewardVisible: false,
 				privacyVisible: false,
+				phoneLoginVisible: false,
+				profilePromptVisible: false,
+				profileRewardPoints: 0,
 				stewardProps: stewardPropsFromSite(),
 				banners: [],
 				primaryActions: [],
@@ -138,6 +166,7 @@
 		onShow() {
 			uni.hideTabBar({ fail() {} })
 			this.checkPrivacy()
+			this.afterPrivacy()
 		},
 		onPageScroll(e) {
 			this.navSolid = e.scrollTop > 40
@@ -146,14 +175,87 @@
 			checkPrivacy() {
 				this.privacyVisible = needPrivacyPrompt()
 			},
-			onPrivacyAgree() {
-				setPrivacyStatus('agreed')
-				silentLogin()
+			async maybeProfilePrompt() {
+				if (this.privacyVisible || this.phoneLoginVisible || this.profilePromptVisible) return
+				const app = getApp()
+				if (app && app.globalData && app.globalData.profilePromptSnooze) return
+				try {
+					const cfg = await api.profileReward()
+					const points = Number((cfg && cfg.points) || 0)
+					if (!cfg || !cfg.enabled || points <= 0) return
+					if (!isLoggedIn()) await silentLogin()
+					const profile = await api.profile({ loading: false })
+					if (!profile || profile.profileRewarded || isProfileComplete(profile)) return
+					this.profileRewardPoints = points
+					this.profilePromptVisible = true
+				} catch (e) {}
+			},
+			onProfileGo() {
+				this.profilePromptVisible = false
+				this.snoozeProfilePrompt()
+				uni.navigateTo({ url: '/pages/mine/profile' })
+			},
+			onProfileLater() {
+				this.profilePromptVisible = false
+				this.snoozeProfilePrompt()
+			},
+			snoozeProfilePrompt() {
+				const app = getApp()
+				if (app) {
+					app.globalData = app.globalData || {}
+					app.globalData.profilePromptSnooze = true
+				}
+			},
+			async afterPrivacy() {
+				if (this.privacyVisible || this.phoneLoginVisible || this.profilePromptVisible) return
+				if (needPrivacyPrompt()) return
+				const app = getApp()
+				const snooze = app && app.globalData && app.globalData.phonePromptSnooze
+				try {
+					if (!isLoggedIn()) await silentLogin({ quiet: true })
+					if (isLoggedIn()) {
+						const user = await refreshProfile()
+						if (user && !user.phone && !snooze) {
+							this.phoneLoginVisible = true
+							return
+						}
+					}
+				} catch (e) {}
+				this.maybeProfilePrompt()
+			},
+			onPhoneLoginCancel() {
+				this.phoneLoginVisible = false
+				const app = getApp()
+				if (app) {
+					app.globalData = app.globalData || {}
+					app.globalData.phonePromptSnooze = true
+				}
+				this.maybeProfilePrompt()
+			},
+			onPhoneLoginConfirm(detail) {
+				bindPhoneFromDetail(detail)
 					.then(() => {
-						this.privacyVisible = false
+						this.phoneLoginVisible = false
 						const app = getApp()
 						if (app.globalData) app.globalData.authVersion = Date.now()
-						uni.showToast({ title: '登录成功', icon: 'success' })
+						this.maybeProfilePrompt()
+					})
+					.catch((e) => {
+						uni.showToast({ title: (e && e.message) || '获取手机号失败', icon: 'none' })
+					})
+					.finally(() => {
+						const dlg = this.$refs.phoneLogin
+						if (dlg && dlg.resetBusy) dlg.resetBusy()
+					})
+			},
+			onPrivacyAgree() {
+				setPrivacyStatus('agreed')
+				this.privacyVisible = false
+				silentLogin()
+					.then(() => {
+						const app = getApp()
+						if (app.globalData) app.globalData.authVersion = Date.now()
+						return this.afterPrivacy()
 					})
 					.catch((e) => {
 						// 登录失败仍保留已同意状态，可继续浏览；下次可再试登录
@@ -253,9 +355,8 @@
 			},
 			bookStore(store) {
 				const id = (store && store.id) || ''
-				uni.navigateTo({
-					url: '/pages/booking/booking' + (id ? '?storeId=' + id : '')
-				})
+				if (!id) return
+				openGatherTarget({ detailId: id })
 			},
 			callStore(store) {
 				if (!store.phone) {

@@ -3,7 +3,7 @@
 	<app-loading />
 	<view class="page">
 		<view class="hero" :style="{ paddingTop: statusBarHeight + 'px' }">
-			<image class="hero-bg" src="/static/mine-header.png" mode="aspectFill" />
+			<image class="hero-bg" :src="heroBg" mode="aspectFill" />
 			<view class="hero-space" />
 		</view>
 
@@ -20,7 +20,7 @@
 				</view>
 			</view>
 			<view class="vip-badge" @tap.stop="onVip">
-				<image class="vip-icon" :src="vipInfo.icon" mode="aspectFit" />
+				<image v-if="vipInfo.icon" class="vip-icon" :src="vipInfo.icon" mode="aspectFit" />
 				<view
 					class="vip-pill"
 					:style="'background:' + vipInfo.theme.pill + ';'"
@@ -50,7 +50,14 @@
 			</view>
 		</view>
 		<app-tabbar :current="3" />
-		<steward-dialog :visible="stewardVisible" @close="closeSteward" />
+		<steward-dialog
+			:visible="stewardVisible"
+			:title="stewardProps.title"
+			:tip="stewardProps.tip"
+			:qr-src="stewardProps.qrSrc"
+			:phone="stewardProps.phone"
+			@close="closeSteward"
+		/>
 		<phone-login-dialog
 			ref="phoneLogin"
 			:visible="phoneLoginVisible"
@@ -70,15 +77,20 @@
 		refreshProfile,
 		bindPhoneFromDetail
 	} from '../../common/auth.js'
-	import { resolveVip } from '../../common/vip-levels.js'
+	import { resolveVip, setVipLevelsFromServer } from '../../common/vip-levels.js'
+	import { stewardPropsFromSite } from '../../common/site.js'
+	import { api } from '../../common/api.js'
+	import { COS_CDN } from '../../common/config.js'
 
 	export default {
 		data() {
 			return {
 				statusBarHeight: 20,
+				heroBg: COS_CDN + '/brand/mine-header.png',
 				stewardVisible: false,
 				phoneLoginVisible: false,
 				user: getUser(),
+				stewardProps: stewardPropsFromSite(),
 				menus: [
 					{ key: 'order', name: '我的订单', icon: '/static/icons/menu-order.png' },
 					{ key: 'coupon', name: '优惠券', icon: '/static/icons/menu-coupon.png' },
@@ -111,7 +123,14 @@
 		},
 		methods: {
 			refreshUser() {
+				this.stewardProps = stewardPropsFromSite()
 				this.user = getUser()
+				api.memberConfig()
+					.then((cfg) => {
+						if (cfg && Array.isArray(cfg.levels)) setVipLevelsFromServer(cfg.levels)
+						this.user = Object.assign({}, this.user)
+					})
+					.catch(() => {})
 				if (isLoggedIn()) {
 					refreshProfile().then((user) => {
 						this.user = user

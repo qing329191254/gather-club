@@ -46,168 +46,6 @@
 			}
 		},
 		{
-			"path": "pages/checkin/checkin",
-			"style": {
-				"navigationBarTitleText": "每日签到",
-				"navigationBarBackgroundColor": "#F94852",
-				"navigationBarTextStyle": "white",
-				"backgroundColor": "#FF565C"
-			}
-		},
-		{
-			"path": "pages/checkin/share",
-			"style": {
-				"navigationBarTitleText": "领取补签",
-				"navigationBarBackgroundColor": "#F94852",
-				"navigationBarTextStyle": "white",
-				"backgroundColor": "#FF565C"
-			}
-		},
-		{
-			"path": "pages/orders/orders",
-			"style": {
-				"navigationBarTitleText": "订单管理",
-				"navigationBarBackgroundColor": "#FFFFFF",
-				"navigationBarTextStyle": "black",
-				"backgroundColor": "#F5F5F5"
-			}
-		},
-		{
-			"path": "pages/booking/booking",
-			"style": {
-				"navigationBarTitleText": "包房预约",
-				"navigationBarBackgroundColor": "#FFFFFF",
-				"navigationBarTextStyle": "black",
-				"backgroundColor": "#F5F5F5"
-			}
-		},
-		{
-			"path": "pages/recommend/recommend",
-			"style": {
-				"navigationStyle": "custom",
-				"navigationBarTitleText": "订酒店",
-				"navigationBarTextStyle": "black",
-				"backgroundColor": "#F5F5F5"
-			}
-		},
-		{
-			"path": "pages/nye/nye",
-			"style": {
-				"navigationStyle": "custom",
-				"navigationBarTitleText": "年夜饭",
-				"navigationBarTextStyle": "white",
-				"backgroundColor": "#F5F5F5"
-			}
-		},
-		{
-			"path": "pages/nye/detail",
-			"style": {
-				"navigationStyle": "custom",
-				"navigationBarTitleText": "年夜饭详情",
-				"navigationBarTextStyle": "black",
-				"backgroundColor": "#F5F5F5"
-			}
-		},
-		{
-			"path": "pages/nye/setmeal",
-			"style": {
-				"navigationBarTitleText": "选择套餐",
-				"navigationBarBackgroundColor": "#FFFFFF",
-				"navigationBarTextStyle": "black",
-				"backgroundColor": "#FFFFFF"
-			}
-		},
-		{
-			"path": "pages/mall/mall",
-			"style": {
-				"navigationBarTitleText": "积分商城",
-				"navigationBarBackgroundColor": "#FF5A5F",
-				"navigationBarTextStyle": "white",
-				"backgroundColor": "#F5F5F5"
-			}
-		},
-		{
-			"path": "pages/mall/records",
-			"style": {
-				"navigationBarTitleText": "兑换列表",
-				"navigationBarBackgroundColor": "#FFFFFF",
-				"navigationBarTextStyle": "black",
-				"backgroundColor": "#F5F5F5"
-			}
-		},
-		{
-			"path": "pages/mall/detail",
-			"style": {
-				"navigationBarTitleText": "商品详情",
-				"navigationBarBackgroundColor": "#FFFFFF",
-				"navigationBarTextStyle": "black",
-				"backgroundColor": "#FFFFFF"
-			}
-		},
-		{
-			"path": "pages/mall/rules",
-			"style": {
-				"navigationBarTitleText": "积分规则",
-				"navigationBarBackgroundColor": "#FFFFFF",
-				"navigationBarTextStyle": "black",
-				"backgroundColor": "#F7F4EF"
-			}
-		},
-		{
-			"path": "pages/settings/settings",
-			"style": {
-				"navigationBarTitleText": "设置",
-				"navigationBarBackgroundColor": "#FFFFFF",
-				"navigationBarTextStyle": "black",
-				"backgroundColor": "#FFFFFF"
-			}
-		},
-		{
-			"path": "pages/settings/agreements",
-			"style": {
-				"navigationBarTitleText": "查询协议",
-				"navigationBarBackgroundColor": "#FFFFFF",
-				"navigationBarTextStyle": "black",
-				"backgroundColor": "#FFFFFF"
-			}
-		},
-		{
-			"path": "pages/settings/agreement-detail",
-			"style": {
-				"navigationBarTitleText": "协议",
-				"navigationBarBackgroundColor": "#FFFFFF",
-				"navigationBarTextStyle": "black",
-				"backgroundColor": "#FFFFFF"
-			}
-		},
-		{
-			"path": "pages/settings/cancel-account",
-			"style": {
-				"navigationBarTitleText": "注销账号",
-				"navigationBarBackgroundColor": "#FFFFFF",
-				"navigationBarTextStyle": "black",
-				"backgroundColor": "#F5F5F5"
-			}
-		},
-		{
-			"path": "pages/settings/collect-list",
-			"style": {
-				"navigationBarTitleText": "个人信息收集清单",
-				"navigationBarBackgroundColor": "#FFFFFF",
-				"navigationBarTextStyle": "black",
-				"backgroundColor": "#FFFFFF"
-			}
-		},
-		{
-			"path": "pages/settings/share-list",
-			"style": {
-				"navigationBarTitleText": "个人信息三方共享清单",
-				"navigationBarBackgroundColor": "#FFFFFF",
-				"navigationBarTextStyle": "black",
-				"backgroundColor": "#FFFFFF"
-			}
-		},
-		{
 			"path": "pages/mine/profile",
 			"style": {
 				"navigationBarTitleText": "个人资料",
@@ -278,6 +116,205 @@
 				"navigationBarTextStyle": "black",
 				"backgroundColor": "#F3E4D2"
 			}
+		}
+	],
+	"subPackages": [
+		{
+			"root": "pages/checkin",
+			"pages": [
+				{
+					"path": "checkin",
+					"style": {
+						"navigationBarTitleText": "每日签到",
+						"navigationBarBackgroundColor": "#F94852",
+						"navigationBarTextStyle": "white",
+						"backgroundColor": "#FF565C"
+					}
+				},
+				{
+					"path": "share",
+					"style": {
+						"navigationBarTitleText": "领取补签",
+						"navigationBarBackgroundColor": "#F94852",
+						"navigationBarTextStyle": "white",
+						"backgroundColor": "#FF565C"
+					}
+				}
+			]
+		},
+		{
+			"root": "pages/orders",
+			"pages": [
+				{
+					"path": "orders",
+					"style": {
+						"navigationBarTitleText": "订单管理",
+						"navigationBarBackgroundColor": "#FFFFFF",
+						"navigationBarTextStyle": "black",
+						"backgroundColor": "#F5F5F5"
+					}
+				}
+			]
+		},
+		{
+			"root": "pages/booking",
+			"pages": [
+				{
+					"path": "booking",
+					"style": {
+						"navigationBarTitleText": "包房预约",
+						"navigationBarBackgroundColor": "#FFFFFF",
+						"navigationBarTextStyle": "black",
+						"backgroundColor": "#F5F5F5"
+					}
+				}
+			]
+		},
+		{
+			"root": "pages/recommend",
+			"pages": [
+				{
+					"path": "recommend",
+					"style": {
+						"navigationStyle": "custom",
+						"navigationBarTitleText": "订酒店",
+						"navigationBarTextStyle": "black",
+						"backgroundColor": "#F5F5F5"
+					}
+				}
+			]
+		},
+		{
+			"root": "pages/nye",
+			"pages": [
+				{
+					"path": "nye",
+					"style": {
+						"navigationStyle": "custom",
+						"navigationBarTitleText": "年夜饭",
+						"navigationBarTextStyle": "white",
+						"backgroundColor": "#F5F5F5"
+					}
+				},
+				{
+					"path": "detail",
+					"style": {
+						"navigationStyle": "custom",
+						"navigationBarTitleText": "年夜饭详情",
+						"navigationBarTextStyle": "black",
+						"backgroundColor": "#F5F5F5"
+					}
+				},
+				{
+					"path": "setmeal",
+					"style": {
+						"navigationBarTitleText": "选择套餐",
+						"navigationBarBackgroundColor": "#FFFFFF",
+						"navigationBarTextStyle": "black",
+						"backgroundColor": "#FFFFFF"
+					}
+				}
+			]
+		},
+		{
+			"root": "pages/mall",
+			"pages": [
+				{
+					"path": "mall",
+					"style": {
+						"navigationBarTitleText": "积分商城",
+						"navigationBarBackgroundColor": "#FF5A5F",
+						"navigationBarTextStyle": "white",
+						"backgroundColor": "#F5F5F5"
+					}
+				},
+				{
+					"path": "records",
+					"style": {
+						"navigationBarTitleText": "兑换列表",
+						"navigationBarBackgroundColor": "#FFFFFF",
+						"navigationBarTextStyle": "black",
+						"backgroundColor": "#F5F5F5"
+					}
+				},
+				{
+					"path": "detail",
+					"style": {
+						"navigationBarTitleText": "商品详情",
+						"navigationBarBackgroundColor": "#FFFFFF",
+						"navigationBarTextStyle": "black",
+						"backgroundColor": "#FFFFFF"
+					}
+				},
+				{
+					"path": "rules",
+					"style": {
+						"navigationBarTitleText": "积分规则",
+						"navigationBarBackgroundColor": "#FFFFFF",
+						"navigationBarTextStyle": "black",
+						"backgroundColor": "#F7F4EF"
+					}
+				}
+			]
+		},
+		{
+			"root": "pages/settings",
+			"pages": [
+				{
+					"path": "settings",
+					"style": {
+						"navigationBarTitleText": "设置",
+						"navigationBarBackgroundColor": "#FFFFFF",
+						"navigationBarTextStyle": "black",
+						"backgroundColor": "#FFFFFF"
+					}
+				},
+				{
+					"path": "agreements",
+					"style": {
+						"navigationBarTitleText": "查询协议",
+						"navigationBarBackgroundColor": "#FFFFFF",
+						"navigationBarTextStyle": "black",
+						"backgroundColor": "#FFFFFF"
+					}
+				},
+				{
+					"path": "agreement-detail",
+					"style": {
+						"navigationBarTitleText": "协议",
+						"navigationBarBackgroundColor": "#FFFFFF",
+						"navigationBarTextStyle": "black",
+						"backgroundColor": "#FFFFFF"
+					}
+				},
+				{
+					"path": "cancel-account",
+					"style": {
+						"navigationBarTitleText": "注销账号",
+						"navigationBarBackgroundColor": "#FFFFFF",
+						"navigationBarTextStyle": "black",
+						"backgroundColor": "#F5F5F5"
+					}
+				},
+				{
+					"path": "collect-list",
+					"style": {
+						"navigationBarTitleText": "个人信息收集清单",
+						"navigationBarBackgroundColor": "#FFFFFF",
+						"navigationBarTextStyle": "black",
+						"backgroundColor": "#FFFFFF"
+					}
+				},
+				{
+					"path": "share-list",
+					"style": {
+						"navigationBarTitleText": "个人信息三方共享清单",
+						"navigationBarBackgroundColor": "#FFFFFF",
+						"navigationBarTextStyle": "black",
+						"backgroundColor": "#FFFFFF"
+					}
+				}
+			]
 		}
 	],
 	"easycom": {

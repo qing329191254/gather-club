@@ -10,6 +10,8 @@
 </template>
 
 <script>
+	import { COS_CDN } from '../../common/config.js'
+
 	export default {
 		onLoad() {
 			uni.showShareMenu({
@@ -21,7 +23,7 @@
 			return {
 				title: '送你一次补签机会，快来领取！',
 				path: '/pages/checkin/checkin?fromMakeup=1',
-				imageUrl: '/static/checkin/share-cover.png'
+				imageUrl: COS_CDN + '/brand/checkin/share-cover.png'
 			}
 		}
 	}
