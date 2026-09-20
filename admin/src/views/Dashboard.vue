@@ -52,7 +52,7 @@ onMounted(async () => {
 
 <style scoped>
 .dash {
-  max-width: 1100px;
+  width: 100%;
 }
 .stat {
   display: flex;
