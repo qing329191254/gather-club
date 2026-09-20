@@ -28,6 +28,7 @@ from ..models import (
     CheckinRecord,
     Coupon,
     GatherProduct,
+    GatherRegion,
     GatherTab,
     MallGoods,
     NyeStore,
@@ -130,6 +131,7 @@ def _product_out(row: GatherProduct) -> dict:
     return {
         "id": row.id,
         "tab": row.tab,
+        "region": getattr(row, "region", "") or "",
         "detailId": row.detail_id,
         "cover": row.cover,
         "title": row.title,
@@ -517,17 +519,27 @@ def gather(db: Session = Depends(get_db)):
         .order_by(GatherTab.sort.asc(), GatherTab.id.asc())
         .all()
     )
+    regions = (
+        db.query(GatherRegion)
+        .filter(GatherRegion.enabled.is_(True))
+        .order_by(GatherRegion.sort.asc(), GatherRegion.id.asc())
+        .all()
+    )
     products = (
         db.query(GatherProduct)
         .filter(GatherProduct.enabled.is_(True))
         .order_by(GatherProduct.sort.asc(), GatherProduct.id.asc())
         .all()
     )
+    region_list = [{"id": r.id, "name": r.name} for r in regions]
+    if not any(r["id"] == "all" for r in region_list):
+        region_list.insert(0, {"id": "all", "name": "全部"})
     return {
         "tabs": [
             {"key": t.key, "name": t.name, "showSold": t.show_sold}
             for t in tabs
         ],
+        "regions": region_list,
         "products": [_product_out(p) for p in products],
     }
 

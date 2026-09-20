@@ -18,6 +18,7 @@ from .models import (
     Banner,
     Coupon,
     GatherProduct,
+    GatherRegion,
     GatherTab,
     MallGoods,
     NyeStore,
@@ -100,26 +101,33 @@ GATHER_TABS = [
     {"key": "set", "name": "精品套餐", "show_sold": False, "sort": 4},
 ]
 
+GATHER_REGIONS = [
+    {"id": "all", "name": "全部", "sort": 0},
+    {"id": "jiangsu", "name": "江苏省", "sort": 1},
+    {"id": "shanghai", "name": "上海市", "sort": 2},
+    {"id": "ningbo", "name": "宁波市", "sort": 3},
+]
+
 GATHER_PRODUCTS = [
-    {"id": "d1", "tab": "day", "detail_id": "xinzhuang", "cover": demo_img("g-d1"), "title": "上海莘庄店-天天俱乐部-2027年夜饭", "tag": "年夜饭", "sold_text": "1人已购", "price": 2688, "origin_price": 3688, "sort": 1},
-    {"id": "d2", "tab": "day", "detail_id": "xinzhuang", "cover": demo_img("g-d2"), "title": "天天俱乐部-上海莘庄店（环球主题馆）", "sold_text": "1万+人已购", "price": 899, "origin_price": 1988, "sort": 2},
-    {"id": "d3", "tab": "day", "detail_id": "yaxin", "cover": demo_img("g-d3"), "title": "上海亚新店-天天俱乐部-2027年夜饭", "tag": "年夜饭", "sold_text": "1人已购", "price": 2688, "origin_price": 3488, "sort": 3},
-    {"id": "d4", "tab": "day", "detail_id": "yaxin", "cover": demo_img("g-d4"), "title": "天天俱乐部上海亚新店（时光主题馆）", "tags": ["地铁直", "沉浸体验", "全包房"], "sold_text": "1万+人已购", "price": 899, "origin_price": 1988, "sort": 4},
-    {"id": "d5", "tab": "day", "detail_id": "gongkang", "cover": demo_img("g-d5"), "title": "上海共康店-天天俱乐部-2027年夜饭", "tag": "年夜饭", "sold_text": "1人已购", "price": 2388, "origin_price": 3488, "sort": 5},
-    {"id": "d6", "tab": "day", "detail_id": "gongkang", "cover": demo_img("g-d6"), "title": "天天俱乐部上海共康店（老上海情怀型）", "tags": ["直营", "近地铁", "怀旧风"], "sold_text": "2万+人已购", "price": 799, "origin_price": 999, "sort": 6},
-    {"id": "d7", "tab": "day", "cover": demo_img("g-d7"), "title": "宁波天天俱乐部（天一店）", "tags": ["核心商圈", "地铁直达"], "sold_text": "4000+人已购", "price": 828, "origin_price": 1688, "sort": 7},
-    {"id": "m1", "tab": "meal", "detail_id": "xinzhuang", "cover": demo_img("g-m1"), "title": "莘庄店·帝王蟹海鲜盛宴（10人）", "tag": "海鲜", "sold_text": "328人已购", "price": 1888, "origin_price": 2588, "sort": 1},
-    {"id": "m2", "tab": "meal", "detail_id": "yaxin", "cover": demo_img("g-m2"), "title": "亚新店·羊蝎子火锅双人餐", "tags": ["招牌", "双人餐"], "sold_text": "1.2万+人已购", "price": 198, "origin_price": 298, "sort": 2},
-    {"id": "m3", "tab": "meal", "detail_id": "gongkang", "cover": demo_img("g-m3"), "title": "共康店·老上海本帮菜家宴", "tag": "本帮菜", "sold_text": "860人已购", "price": 688, "origin_price": 988, "sort": 3},
-    {"id": "m4", "tab": "meal", "detail_id": "shibo", "cover": demo_img("g-m4"), "title": "世博店·午市自助畅吃", "tags": ["自助", "午市"], "sold_text": "5200+人已购", "price": 168, "origin_price": 228, "sort": 4},
-    {"id": "c1", "tab": "dish", "detail_id": "xinzhuang", "cover": demo_img("g-c1", 600, 600), "title": "招牌手撕盐焗鸡（整只）", "tag": "招牌", "price": 128, "origin_price": 168, "sort": 1},
-    {"id": "c2", "tab": "dish", "detail_id": "yaxin", "cover": demo_img("g-c2", 600, 600), "title": "黄油香煎小牛排", "tags": ["人气", "西式"], "price": 88, "origin_price": 118, "sort": 2},
-    {"id": "c3", "tab": "dish", "detail_id": "gongkang", "cover": demo_img("g-c3", 600, 600), "title": "红烧肉配糯米饭", "tag": "本帮", "price": 68, "origin_price": 88, "sort": 3},
-    {"id": "c4", "tab": "dish", "detail_id": "shibo", "cover": demo_img("g-c4", 600, 600), "title": "蒜蓉粉丝蒸扇贝（6只）", "tags": ["海鲜", "热销"], "price": 98, "origin_price": 128, "sort": 4},
-    {"id": "s1", "tab": "set", "detail_id": "xinzhuang", "cover": demo_img("g-s1"), "title": "喜气羊羊宴（10-12人）", "tag": "套餐", "price": 2688, "origin_price": 3288, "sort": 1},
-    {"id": "s2", "tab": "set", "detail_id": "yaxin", "cover": demo_img("g-s2"), "title": "团圆家宴（8-10人）", "tags": ["包厢", "晚市"], "price": 1988, "origin_price": 2588, "sort": 2},
-    {"id": "s3", "tab": "set", "detail_id": "gongkang", "cover": demo_img("g-s3"), "title": "名羊四海宴（12-14人）", "tag": "套餐", "price": 3588, "origin_price": 4288, "sort": 3},
-    {"id": "s4", "tab": "set", "detail_id": "shibo", "cover": demo_img("g-s4"), "title": "商务午宴精选套餐（6人）", "tags": ["午市", "商务"], "price": 1288, "origin_price": 1688, "sort": 4},
+    {"id": "d1", "tab": "day", "region": "shanghai", "detail_id": "xinzhuang", "cover": demo_img("g-d1"), "title": "上海莘庄店-天天俱乐部-2027年夜饭", "tag": "年夜饭", "sold_text": "1人已购", "price": 2688, "origin_price": 3688, "sort": 1},
+    {"id": "d2", "tab": "day", "region": "shanghai", "detail_id": "xinzhuang", "cover": demo_img("g-d2"), "title": "天天俱乐部-上海莘庄店（环球主题馆）", "sold_text": "1万+人已购", "price": 899, "origin_price": 1988, "sort": 2},
+    {"id": "d3", "tab": "day", "region": "shanghai", "detail_id": "yaxin", "cover": demo_img("g-d3"), "title": "上海亚新店-天天俱乐部-2027年夜饭", "tag": "年夜饭", "sold_text": "1人已购", "price": 2688, "origin_price": 3488, "sort": 3},
+    {"id": "d4", "tab": "day", "region": "shanghai", "detail_id": "yaxin", "cover": demo_img("g-d4"), "title": "天天俱乐部上海亚新店（时光主题馆）", "tags": ["地铁直", "沉浸体验", "全包房"], "sold_text": "1万+人已购", "price": 899, "origin_price": 1988, "sort": 4},
+    {"id": "d5", "tab": "day", "region": "shanghai", "detail_id": "gongkang", "cover": demo_img("g-d5"), "title": "上海共康店-天天俱乐部-2027年夜饭", "tag": "年夜饭", "sold_text": "1人已购", "price": 2388, "origin_price": 3488, "sort": 5},
+    {"id": "d6", "tab": "day", "region": "shanghai", "detail_id": "gongkang", "cover": demo_img("g-d6"), "title": "天天俱乐部上海共康店（老上海情怀型）", "tags": ["直营", "近地铁", "怀旧风"], "sold_text": "2万+人已购", "price": 799, "origin_price": 999, "sort": 6},
+    {"id": "d7", "tab": "day", "region": "ningbo", "detail_id": "ningbo", "cover": demo_img("g-d7"), "title": "宁波天天俱乐部（天一店）", "tags": ["核心商圈", "地铁直达"], "sold_text": "4000+人已购", "price": 828, "origin_price": 1688, "sort": 7},
+    {"id": "m1", "tab": "meal", "region": "shanghai", "detail_id": "xinzhuang", "cover": demo_img("g-m1"), "title": "莘庄店·帝王蟹海鲜盛宴（10人）", "tag": "海鲜", "sold_text": "328人已购", "price": 1888, "origin_price": 2588, "sort": 1},
+    {"id": "m2", "tab": "meal", "region": "shanghai", "detail_id": "yaxin", "cover": demo_img("g-m2"), "title": "亚新店·羊蝎子火锅双人餐", "tags": ["招牌", "双人餐"], "sold_text": "1.2万+人已购", "price": 198, "origin_price": 298, "sort": 2},
+    {"id": "m3", "tab": "meal", "region": "shanghai", "detail_id": "gongkang", "cover": demo_img("g-m3"), "title": "共康店·老上海本帮菜家宴", "tag": "本帮菜", "sold_text": "860人已购", "price": 688, "origin_price": 988, "sort": 3},
+    {"id": "m4", "tab": "meal", "region": "shanghai", "detail_id": "shibo", "cover": demo_img("g-m4"), "title": "世博店·午市自助畅吃", "tags": ["自助", "午市"], "sold_text": "5200+人已购", "price": 168, "origin_price": 228, "sort": 4},
+    {"id": "c1", "tab": "dish", "region": "shanghai", "detail_id": "xinzhuang", "cover": demo_img("g-c1", 600, 600), "title": "招牌手撕盐焗鸡（整只）", "tag": "招牌", "price": 128, "origin_price": 168, "sort": 1},
+    {"id": "c2", "tab": "dish", "region": "shanghai", "detail_id": "yaxin", "cover": demo_img("g-c2", 600, 600), "title": "黄油香煎小牛排", "tags": ["人气", "西式"], "price": 88, "origin_price": 118, "sort": 2},
+    {"id": "c3", "tab": "dish", "region": "shanghai", "detail_id": "gongkang", "cover": demo_img("g-c3", 600, 600), "title": "红烧肉配糯米饭", "tag": "本帮", "price": 68, "origin_price": 88, "sort": 3},
+    {"id": "c4", "tab": "dish", "region": "shanghai", "detail_id": "shibo", "cover": demo_img("g-c4", 600, 600), "title": "蒜蓉粉丝蒸扇贝（6只）", "tags": ["海鲜", "热销"], "price": 98, "origin_price": 128, "sort": 4},
+    {"id": "s1", "tab": "set", "region": "shanghai", "detail_id": "xinzhuang", "cover": demo_img("g-s1"), "title": "喜气羊羊宴（10-12人）", "tag": "套餐", "price": 2688, "origin_price": 3288, "sort": 1},
+    {"id": "s2", "tab": "set", "region": "shanghai", "detail_id": "yaxin", "cover": demo_img("g-s2"), "title": "团圆家宴（8-10人）", "tags": ["包厢", "晚市"], "price": 1988, "origin_price": 2588, "sort": 2},
+    {"id": "s3", "tab": "set", "region": "shanghai", "detail_id": "gongkang", "cover": demo_img("g-s3"), "title": "名羊四海宴（12-14人）", "tag": "套餐", "price": 3588, "origin_price": 4288, "sort": 3},
+    {"id": "s4", "tab": "set", "region": "shanghai", "detail_id": "shibo", "cover": demo_img("g-s4"), "title": "商务午宴精选套餐（6人）", "tags": ["午市", "商务"], "price": 1288, "origin_price": 1688, "sort": 4},
 ]
 
 NYE_STORES = [
@@ -279,6 +287,11 @@ def seed_all(db: Session) -> None:
     if db.query(GatherTab).count() == 0:
         for item in GATHER_TABS:
             db.add(GatherTab(**item, enabled=True))
+        db.commit()
+
+    if db.query(GatherRegion).count() == 0:
+        for item in GATHER_REGIONS:
+            db.add(GatherRegion(**item, enabled=True))
         db.commit()
 
     if db.query(GatherProduct).count() == 0:

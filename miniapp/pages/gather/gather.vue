@@ -77,6 +77,7 @@
 				statusBarHeight: 20,
 				headHeight: 120,
 				city: '全部',
+				cityId: 'all',
 				regions: gatherRegions,
 				regionVisible: false,
 				currentTab: gatherTabs[0] ? gatherTabs[0].key : 'day',
@@ -87,7 +88,12 @@
 		},
 		computed: {
 			list() {
-				return this.products.filter((item) => item.tab === this.currentTab)
+				return this.products.filter((item) => {
+					if (item.tab !== this.currentTab) return false
+					if (!this.cityId || this.cityId === 'all') return true
+					const region = item.region || ''
+					return !region || region === 'all' || region === this.cityId
+				})
 			},
 			showSold() {
 				const tab = this.tabs.find((item) => item.key === this.currentTab)
@@ -133,6 +139,17 @@
 								this.currentTab = this.tabs[0].key
 							}
 						}
+						if (res.regions && res.regions.length) {
+							this.regions = res.regions
+							const hit = this.regions.find((r) => r.id === this.cityId || r.name === this.city)
+							if (hit) {
+								this.cityId = hit.id
+								this.city = hit.name
+							} else {
+								this.cityId = this.regions[0].id
+								this.city = this.regions[0].name
+							}
+						}
 						if (res.products && res.products.length) {
 							this.products = res.products
 						}
@@ -150,6 +167,8 @@
 			onRegionConfirm(item) {
 				if (item && item.name) {
 					this.city = item.name
+					this.cityId = item.id || 'all'
+					uni.pageScrollTo({ scrollTop: 0, duration: 0 })
 				}
 			},
 			closeRegion() {

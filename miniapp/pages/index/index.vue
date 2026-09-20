@@ -143,11 +143,10 @@
 		},
 		methods: {
 			checkPrivacy() {
-				if (needPrivacyPrompt()) {
-					this.privacyVisible = true
-				}
+				this.privacyVisible = needPrivacyPrompt()
 			},
 			onPrivacyAgree() {
+				setPrivacyStatus('agreed')
 				silentLogin()
 					.then(() => {
 						this.privacyVisible = false
@@ -156,12 +155,39 @@
 						uni.showToast({ title: '登录成功', icon: 'success' })
 					})
 					.catch((e) => {
+						// 登录失败仍保留已同意状态，可继续浏览；下次可再试登录
+						this.privacyVisible = false
 						uni.showToast({ title: (e && e.message) || '登录失败', icon: 'none' })
 					})
 			},
 			onPrivacyDisagree() {
 				setPrivacyStatus('declined')
-				this.privacyVisible = false
+				uni.showModal({
+					title: '无法继续使用',
+					content: '需同意《用户隐私保护协议》后才能使用天天俱乐部。若不同意，将退出小程序。',
+					confirmText: '重新考虑',
+					cancelText: '退出',
+					success: (res) => {
+						if (res.confirm) {
+							// 清空 declined，继续强制弹窗，形成闭环
+							setPrivacyStatus('')
+							this.privacyVisible = true
+							return
+						}
+						this.privacyVisible = true
+						// #ifdef MP-WEIXIN
+						if (typeof wx !== 'undefined' && wx.exitMiniProgram) {
+							wx.exitMiniProgram({ fail: () => {} })
+						} else {
+							uni.exitMiniProgram({ fail: () => {} })
+						}
+						// #endif
+						// #ifndef MP-WEIXIN
+						uni.showToast({ title: '请同意协议后使用', icon: 'none' })
+						setPrivacyStatus('')
+						// #endif
+					}
+				})
 			},
 			loadHome() {
 				this.primaryActions = [

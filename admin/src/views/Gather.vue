@@ -3,6 +3,33 @@
     <el-card class="mb">
       <template #header>
         <div class="head">
+          <span>地区（小程序顶部城市选择）</span>
+          <el-button type="primary" size="small" @click="openRegion()">新增地区</el-button>
+        </div>
+      </template>
+      <el-table :data="regions" size="small">
+        <el-table-column prop="id" label="地区 ID" width="120" />
+        <el-table-column prop="name" label="显示名称" min-width="140" />
+        <el-table-column prop="sort" label="排序" width="80" />
+        <el-table-column label="是否显示" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.enabled ? 'success' : 'info'" size="small">
+              {{ row.enabled ? '显示' : '隐藏' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="140">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="openRegion(row)">编辑</el-button>
+            <el-button link type="danger" :disabled="row.id === 'all'" @click="removeRegion(row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <el-card class="mb">
+      <template #header>
+        <div class="head">
           <span>分类（小程序顶部 Tab）</span>
           <el-button type="primary" size="small" @click="openTab()">新增分类</el-button>
         </div>
@@ -46,6 +73,9 @@
         <el-table-column label="所属分类" width="110">
           <template #default="{ row }">{{ tabName(row.tab) }}</template>
         </el-table-column>
+        <el-table-column label="所属地区" width="110">
+          <template #default="{ row }">{{ regionName(row.region) }}</template>
+        </el-table-column>
         <el-table-column prop="title" label="商品标题" min-width="220" show-overflow-tooltip />
         <el-table-column prop="price" label="现价" width="90" />
         <el-table-column prop="origin_price" label="原价" width="90" />
@@ -79,6 +109,32 @@
       </div>
     </el-card>
 
+    <el-dialog v-model="regionVisible" :title="regionEditing ? '编辑地区' : '新增地区'" width="440px">
+      <el-form label-width="110px">
+        <el-form-item label="地区 ID" required>
+          <el-input
+            v-model="regionForm.id"
+            :disabled="regionEditing"
+            placeholder="英文标识，如 shanghai"
+          />
+        </el-form-item>
+        <el-form-item label="显示名称" required>
+          <el-input v-model="regionForm.name" placeholder="例如：上海市" />
+        </el-form-item>
+        <el-form-item label="排序">
+          <el-input-number v-model="regionForm.sort" :min="0" />
+          <span class="hint">数字越小越靠前</span>
+        </el-form-item>
+        <el-form-item label="是否显示">
+          <el-switch v-model="regionForm.enabled" active-text="显示" inactive-text="隐藏" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="regionVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveRegion">保存</el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="tabVisible" :title="tabForm.id ? '编辑分类' : '新增分类'" width="440px">
       <el-form label-width="110px">
         <el-form-item label="分类名称" required>
@@ -107,6 +163,17 @@
           <el-select v-model="productForm.tab" placeholder="请选择分类" style="width: 100%">
             <el-option v-for="t in tabs" :key="t.key" :label="t.name" :value="t.key" />
           </el-select>
+        </el-form-item>
+        <el-form-item label="所属地区">
+          <el-select v-model="productForm.region" clearable placeholder="不限（全国可见）" style="width: 100%">
+            <el-option
+              v-for="r in regionOptions"
+              :key="r.id"
+              :label="r.name"
+              :value="r.id"
+            />
+          </el-select>
+          <div class="hint block">不选则全国可见；选中后仅「全部」与该地区展示</div>
         </el-form-item>
         <el-form-item label="商品标题" required>
           <el-input v-model="productForm.title" placeholder="小程序列表展示的标题" />
@@ -157,24 +224,29 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
 import ImageField from '../components/ImageField.vue'
 import { usePager } from '../composables/usePager'
 
 const tabs = ref([])
+const regions = ref([])
 const products = ref([])
 const stores = ref([])
 const tabVisible = ref(false)
+const regionVisible = ref(false)
+const regionEditing = ref(false)
 const productVisible = ref(false)
 const productEditing = ref(false)
 const tagsText = ref('')
 const { page, pageSize, total, applyPage, pageParams } = usePager()
 const tabForm = reactive({ id: null, key: '', name: '', show_sold: true, sort: 0, enabled: true })
+const regionForm = reactive({ id: '', name: '', sort: 0, enabled: true })
 const productForm = reactive({
   id: '',
   tab: '',
+  region: '',
   detail_id: '',
   cover: '',
   title: '',
@@ -187,8 +259,15 @@ const productForm = reactive({
   enabled: true
 })
 
+const regionOptions = computed(() => regions.value.filter((r) => r.id !== 'all'))
+
 function tabName(key) {
   return tabs.value.find((t) => t.key === key)?.name || key || '未分类'
+}
+
+function regionName(key) {
+  if (!key) return '全国'
+  return regions.value.find((r) => r.id === key)?.name || key
 }
 
 function genKey() {
@@ -205,13 +284,49 @@ async function loadProducts() {
 }
 
 async function load() {
-  const [tabList, storeList] = await Promise.all([
+  const [tabList, regionList, storeList] = await Promise.all([
     http.get('/gather/tabs'),
+    http.get('/gather/regions'),
     http.get('/stores')
   ])
   tabs.value = tabList
+  regions.value = regionList || []
   stores.value = storeList || []
   await loadProducts()
+}
+
+function openRegion(row) {
+  regionEditing.value = !!row
+  Object.assign(regionForm, { id: '', name: '', sort: 0, enabled: true }, row || {})
+  regionVisible.value = true
+}
+
+async function saveRegion() {
+  if (!regionForm.id?.trim()) {
+    ElMessage.warning('请填写地区 ID')
+    return
+  }
+  if (!regionForm.name?.trim()) {
+    ElMessage.warning('请填写显示名称')
+    return
+  }
+  const payload = {
+    id: regionForm.id.trim(),
+    name: regionForm.name.trim(),
+    sort: regionForm.sort,
+    enabled: regionForm.enabled
+  }
+  if (regionEditing.value) await http.put(`/gather/regions/${regionForm.id}`, payload)
+  else await http.post('/gather/regions', payload)
+  ElMessage.success('已保存')
+  regionVisible.value = false
+  load()
+}
+
+async function removeRegion(row) {
+  await ElMessageBox.confirm(`确认删除地区「${row.name}」？`, '提示')
+  await http.delete(`/gather/regions/${row.id}`)
+  load()
 }
 
 function openTab(row) {
@@ -250,6 +365,7 @@ function openProduct(row) {
   Object.assign(productForm, {
     id: '',
     tab: defaultTab,
+    region: '',
     detail_id: '',
     cover: '',
     title: '',
@@ -278,6 +394,7 @@ async function saveProduct() {
     ...productForm,
     id: productEditing.value ? productForm.id : (productForm.id || genProductId()),
     title: productForm.title.trim(),
+    region: productForm.region || '',
     detail_id: productForm.detail_id || '',
     tags: tagsText.value ? tagsText.value.split(/[,，]/).map((s) => s.trim()).filter(Boolean) : []
   }
@@ -301,6 +418,7 @@ onMounted(load)
 .mb { margin-bottom: 16px; }
 .head { display: flex; justify-content: space-between; align-items: center; }
 .hint { margin-left: 8px; color: #94a3b8; font-size: 12px; }
+.hint.block { margin: 6px 0 0; margin-left: 0; }
 .muted { color: #94a3b8; font-size: 12px; }
 .pager {
   margin-top: 16px;

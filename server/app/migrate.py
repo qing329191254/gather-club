@@ -33,6 +33,34 @@ def ensure_schema() -> None:
             cols = {c["name"] for c in inspector.get_columns("gather_products")}
             if "sold_count" not in cols:
                 conn.execute(text("ALTER TABLE gather_products ADD COLUMN sold_count INTEGER DEFAULT 0"))
+            if "region" not in cols:
+                conn.execute(text("ALTER TABLE gather_products ADD COLUMN region VARCHAR(32) DEFAULT ''"))
+                # 按门店/标题粗略回填，便于老数据立刻可筛
+                conn.execute(
+                    text(
+                        """
+                        UPDATE gather_products SET region = 'ningbo'
+                        WHERE COALESCE(region, '') = ''
+                          AND (detail_id = 'ningbo' OR title LIKE '%宁波%')
+                        """
+                    )
+                )
+                conn.execute(
+                    text(
+                        """
+                        UPDATE gather_products SET region = 'shanghai'
+                        WHERE COALESCE(region, '') = ''
+                          AND (
+                            detail_id IN ('xinzhuang', 'yaxin', 'gongkang', 'shibo')
+                            OR title LIKE '%上海%'
+                            OR title LIKE '%莘庄%'
+                            OR title LIKE '%亚新%'
+                            OR title LIKE '%共康%'
+                            OR title LIKE '%世博%'
+                          )
+                        """
+                    )
+                )
         if "orders" in tables:
             cols = {c["name"] for c in inspector.get_columns("orders")}
             if "extra" not in cols:

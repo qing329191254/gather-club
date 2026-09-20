@@ -36,6 +36,7 @@
 		methods: {
 			preventTouchMove() {},
 			openPrivacy() {
+				// 仅允许阅读协议正文，返回后若仍未同意会继续弹窗
 				uni.navigateTo({
 					url: '/pages/settings/agreement-detail?type=privacy'
 				})

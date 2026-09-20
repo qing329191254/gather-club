@@ -1,4 +1,5 @@
 import App from './App'
+import { privacyMixin } from './common/privacy-guard.js'
 
 function currentPageShare() {
 	const pages = getCurrentPages()
@@ -43,9 +44,10 @@ import Vue from 'vue'
 import './uni.promisify.adaptor'
 Vue.config.productionTip = false
 Vue.mixin(shareMixin)
+Vue.mixin(privacyMixin)
 App.mpType = 'app'
 const app = new Vue({
-  ...App
+	...App
 })
 app.$mount()
 // #endif
@@ -53,10 +55,11 @@ app.$mount()
 // #ifdef VUE3
 import { createSSRApp } from 'vue'
 export function createApp() {
-  const app = createSSRApp(App)
-  app.mixin(shareMixin)
-  return {
-    app
-  }
+	const app = createSSRApp(App)
+	app.mixin(shareMixin)
+	app.mixin(privacyMixin)
+	return {
+		app
+	}
 }
 // #endif

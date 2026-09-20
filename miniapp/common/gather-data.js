@@ -16,6 +16,7 @@ export const gatherProducts = [
 	{
 		id: 'd1',
 		tab: 'day',
+		region: 'shanghai',
 		detailId: 'xinzhuang',
 		cover: '/static/banners/nye.png',
 		title: '上海莘庄店-天天俱乐部-2027年夜饭',
@@ -27,6 +28,7 @@ export const gatherProducts = [
 	{
 		id: 'd2',
 		tab: 'day',
+		region: 'shanghai',
 		detailId: 'xinzhuang',
 		cover: '/static/stores/xinzhuang.png',
 		title: '天天俱乐部-上海莘庄店（环球主题馆）',
@@ -37,6 +39,7 @@ export const gatherProducts = [
 	{
 		id: 'd3',
 		tab: 'day',
+		region: 'shanghai',
 		detailId: 'yaxin',
 		cover: '/static/banners/nye.png',
 		title: '上海亚新店-天天俱乐部-2027年夜饭',
@@ -48,6 +51,7 @@ export const gatherProducts = [
 	{
 		id: 'd4',
 		tab: 'day',
+		region: 'shanghai',
 		detailId: 'yaxin',
 		cover: '/static/stores/yaxin.png',
 		title: '天天俱乐部上海亚新店（时光主题馆）',
@@ -59,6 +63,7 @@ export const gatherProducts = [
 	{
 		id: 'd5',
 		tab: 'day',
+		region: 'shanghai',
 		detailId: 'gongkang',
 		cover: '/static/banners/nye.png',
 		title: '上海共康店-天天俱乐部-2027年夜饭',
@@ -70,6 +75,7 @@ export const gatherProducts = [
 	{
 		id: 'd6',
 		tab: 'day',
+		region: 'shanghai',
 		detailId: 'gongkang',
 		cover: '/static/stores/gongkang.png',
 		title: '天天俱乐部上海共康店（老上海情怀型）',
@@ -81,6 +87,8 @@ export const gatherProducts = [
 	{
 		id: 'd7',
 		tab: 'day',
+		region: 'ningbo',
+		detailId: 'ningbo',
 		cover: '/static/stores/ningbo.png',
 		title: '宁波天天俱乐部（天一店）',
 		tags: ['核心商圈', '地铁直达'],
@@ -92,6 +100,7 @@ export const gatherProducts = [
 	{
 		id: 'm1',
 		tab: 'meal',
+		region: 'shanghai',
 		detailId: 'xinzhuang',
 		cover: '/static/nye/xinzhuang.jpg',
 		title: '莘庄店·帝王蟹海鲜盛宴（10人）',
@@ -103,6 +112,7 @@ export const gatherProducts = [
 	{
 		id: 'm2',
 		tab: 'meal',
+		region: 'shanghai',
 		detailId: 'yaxin',
 		cover: '/static/nye/yaxin.jpg',
 		title: '亚新店·羊蝎子火锅双人餐',
@@ -114,6 +124,7 @@ export const gatherProducts = [
 	{
 		id: 'm3',
 		tab: 'meal',
+		region: 'shanghai',
 		detailId: 'gongkang',
 		cover: '/static/nye/gongkang.jpg',
 		title: '共康店·老上海本帮菜家宴',
@@ -125,6 +136,7 @@ export const gatherProducts = [
 	{
 		id: 'm4',
 		tab: 'meal',
+		region: 'shanghai',
 		detailId: 'shibo',
 		cover: '/static/nye/shibo.jpg',
 		title: '世博店·午市自助畅吃',
@@ -137,6 +149,7 @@ export const gatherProducts = [
 	{
 		id: 'c1',
 		tab: 'dish',
+		region: 'shanghai',
 		detailId: 'xinzhuang',
 		cover: '/static/nye/detail/banner1.jpg',
 		title: '招牌手撕盐焗鸡（整只）',
@@ -147,6 +160,7 @@ export const gatherProducts = [
 	{
 		id: 'c2',
 		tab: 'dish',
+		region: 'shanghai',
 		detailId: 'yaxin',
 		cover: '/static/nye/detail/banner2.jpg',
 		title: '黄油香煎小牛排',
@@ -157,6 +171,7 @@ export const gatherProducts = [
 	{
 		id: 'c3',
 		tab: 'dish',
+		region: 'shanghai',
 		detailId: 'gongkang',
 		cover: '/static/nye/detail/banner3.jpg',
 		title: '红烧肉配糯米饭',
@@ -167,6 +182,7 @@ export const gatherProducts = [
 	{
 		id: 'c4',
 		tab: 'dish',
+		region: 'shanghai',
 		detailId: 'shibo',
 		cover: '/static/nye/detail/content1.jpg',
 		title: '蒜蓉粉丝蒸扇贝（6只）',
@@ -178,6 +194,7 @@ export const gatherProducts = [
 	{
 		id: 's1',
 		tab: 'set',
+		region: 'shanghai',
 		detailId: 'xinzhuang',
 		cover: '/static/nye/xinzhuang.jpg',
 		title: '喜气羊羊宴（10-12人）',
@@ -188,6 +205,7 @@ export const gatherProducts = [
 	{
 		id: 's2',
 		tab: 'set',
+		region: 'shanghai',
 		detailId: 'yaxin',
 		cover: '/static/nye/yaxin.jpg',
 		title: '团圆家宴（8-10人）',
@@ -198,6 +216,7 @@ export const gatherProducts = [
 	{
 		id: 's3',
 		tab: 'set',
+		region: 'shanghai',
 		detailId: 'gongkang',
 		cover: '/static/nye/gongkang.jpg',
 		title: '名羊四海宴（12-14人）',
@@ -208,6 +227,7 @@ export const gatherProducts = [
 	{
 		id: 's4',
 		tab: 'set',
+		region: 'shanghai',
 		detailId: 'shibo',
 		cover: '/static/nye/shibo.jpg',
 		title: '商务午宴精选套餐（6人）',

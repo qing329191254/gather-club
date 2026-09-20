@@ -32,6 +32,11 @@ export function isPrivacyAgreed() {
 	return getPrivacyStatus() === 'agreed'
 }
 
+export function isPrivacyBlocked() {
+	/** 未登录且未同意协议：需拦截使用 */
+	return !isLoggedIn() && !isPrivacyAgreed()
+}
+
 export function isLoggedIn() {
 	const auth = getAuth()
 	return !!(auth && auth.loggedIn)
@@ -97,8 +102,13 @@ function mapServerUser(raw, openid) {
 	}
 }
 
-/** 静默登录：wx.login 拿 code，换云托管用户 */
+/** 静默登录：wx.login 拿 code，换云托管用户（必须先同意隐私协议） */
 export function silentLogin(extra) {
+	if (!isPrivacyAgreed()) {
+		return Promise.reject(new Error('请先同意用户隐私保护协议'))
+	}
+	const cleanExtra = Object.assign({}, extra || {})
+	delete cleanExtra.__privacyJustAgreed
 	return new Promise((resolve, reject) => {
 		initCloud()
 		uni.login({
@@ -112,13 +122,13 @@ export function silentLogin(extra) {
 				api
 					.wxLogin({
 						code,
-						nickname: (extra && extra.nickname) || '',
-						avatar: (extra && extra.avatar) || '',
-						phone: (extra && extra.phone) || ''
+						nickname: cleanExtra.nickname || '',
+						avatar: cleanExtra.avatar || '',
+						phone: cleanExtra.phone || ''
 					})
 					.then((res) => {
 						const openid = res.openid || ''
-						const user = Object.assign({}, mapServerUser(res.user, openid), extra || {})
+						const user = Object.assign({}, mapServerUser(res.user, openid), cleanExtra)
 						resolve(saveLogin(user, openid))
 					})
 					.catch((err) => {
@@ -144,6 +154,9 @@ export function silentLogin(extra) {
 
 /** 绑定手机号：wx.login + getPhoneNumber 授权数据换号 */
 export function bindPhoneFromDetail(detail) {
+	if (!isPrivacyAgreed()) {
+		return Promise.reject(new Error('请先同意用户隐私保护协议'))
+	}
 	const d = detail || {}
 	const errMsg = String(d.errMsg || '')
 	if (errMsg && errMsg.indexOf(':ok') === -1 && errMsg.indexOf('ok') === -1) {
@@ -206,5 +219,30 @@ export function needPhoneLoginPrompt() {
 }
 
 export function needPrivacyPrompt() {
-	return !isLoggedIn() && !getPrivacyStatus()
+	// declined / 空 都算未同意，避免点「不同意」后永久绕过
+	return isPrivacyBlocked()
+}
+
+/** 允许在未同意时查看的协议/清单页（只读） */
+export function isPrivacyExemptRoute(route) {
+	const r = String(route || '')
+	return (
+		r.indexOf('pages/settings/agreement') >= 0 ||
+		r.indexOf('pages/settings/collect-list') >= 0 ||
+		r.indexOf('pages/settings/share-list') >= 0
+	)
+}
+
+/** 未同意协议时拉回首页弹窗；返回 true 表示已拦截 */
+export function enforcePrivacyGate() {
+	if (!needPrivacyPrompt()) return false
+	const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : []
+	const cur = pages[pages.length - 1]
+	const route = (cur && (cur.route || cur.$page && cur.$page.fullPath)) || ''
+	if (isPrivacyExemptRoute(route)) return false
+	if (route === 'pages/index/index' || route.indexOf('pages/index/index') === 0) {
+		return true
+	}
+	uni.reLaunch({ url: '/pages/index/index' })
+	return true
 }

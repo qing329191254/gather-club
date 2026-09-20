@@ -13,6 +13,7 @@ from ..models import (
     Banner,
     Coupon,
     GatherProduct,
+    GatherRegion,
     GatherTab,
     MallGoods,
     NyeStore,
@@ -27,6 +28,7 @@ from ..schemas import (
     BannerIn,
     CouponIn,
     GatherProductIn,
+    GatherRegionIn,
     GatherTabIn,
     LoginRequest,
     MallGoodsIn,
@@ -233,6 +235,50 @@ def delete_gather_tab(tab_id: int, db: Session = Depends(get_db), _: AdminUser =
     return OkResponse()
 
 
+# ---- gather regions ----
+@router.get("/gather/regions")
+def list_gather_regions(db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
+    return db.query(GatherRegion).order_by(GatherRegion.sort.asc(), GatherRegion.id.asc()).all()
+
+
+@router.post("/gather/regions")
+def create_gather_region(payload: GatherRegionIn, db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
+    rid = (payload.id or "").strip()
+    if not rid:
+        raise HTTPException(400, "请填写地区 ID")
+    if db.query(GatherRegion).filter(GatherRegion.id == rid).first():
+        raise HTTPException(400, "地区 ID 已存在")
+    row = GatherRegion(id=rid, name=payload.name.strip(), sort=payload.sort, enabled=payload.enabled)
+    db.add(row)
+    db.commit()
+    return payload
+
+
+@router.put("/gather/regions/{region_id}")
+def update_gather_region(
+    region_id: str, payload: GatherRegionIn, db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)
+):
+    row = db.query(GatherRegion).filter(GatherRegion.id == region_id).first()
+    if not row:
+        raise HTTPException(404, "不存在")
+    row.name = payload.name.strip()
+    row.sort = payload.sort
+    row.enabled = payload.enabled
+    db.commit()
+    return {"id": row.id, "name": row.name, "sort": row.sort, "enabled": row.enabled}
+
+
+@router.delete("/gather/regions/{region_id}")
+def delete_gather_region(region_id: str, db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
+    if region_id == "all":
+        raise HTTPException(400, "「全部」不可删除")
+    row = db.query(GatherRegion).filter(GatherRegion.id == region_id).first()
+    if row:
+        db.delete(row)
+        db.commit()
+    return OkResponse()
+
+
 @router.get("/gather/products")
 def list_gather_products(
     page: int = Query(1),
@@ -252,6 +298,7 @@ def list_gather_products(
             {
                 "id": r.id,
                 "tab": r.tab,
+                "region": getattr(r, "region", "") or "",
                 "detail_id": r.detail_id,
                 "cover": r.cover,
                 "title": r.title,

@@ -66,9 +66,21 @@ class GatherTabOut(GatherTabIn, ORMModel):
     id: int
 
 
+class GatherRegionIn(BaseModel):
+    id: str
+    name: str
+    sort: int = 0
+    enabled: bool = True
+
+
+class GatherRegionOut(GatherRegionIn, ORMModel):
+    pass
+
+
 class GatherProductIn(BaseModel):
     id: str
     tab: str
+    region: str = ""
     detail_id: str = ""
     cover: str = ""
     title: str

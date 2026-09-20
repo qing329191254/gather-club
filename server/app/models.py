@@ -74,11 +74,21 @@ class GatherTab(Base):
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
+class GatherRegion(Base):
+    __tablename__ = "gather_regions"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)  # all / shanghai / ningbo ...
+    name: Mapped[str] = mapped_column(String(64))
+    sort: Mapped[int] = mapped_column(Integer, default=0)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
 class GatherProduct(Base):
     __tablename__ = "gather_products"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     tab: Mapped[str] = mapped_column(String(32), index=True)
+    region: Mapped[str] = mapped_column(String(32), default="", index=True)  # 空=全国，匹配 gather_regions.id
     detail_id: Mapped[str] = mapped_column(String(64), default="")
     cover: Mapped[str] = mapped_column(String(512), default="")
     title: Mapped[str] = mapped_column(String(255))

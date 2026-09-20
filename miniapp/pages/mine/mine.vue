@@ -63,6 +63,7 @@
 		getUser,
 		isLoggedIn,
 		needPhoneLoginPrompt,
+		needPrivacyPrompt,
 		silentLogin,
 		refreshProfile,
 		bindPhoneFromDetail
@@ -116,6 +117,11 @@
 				}
 			},
 			checkPhoneLogin() {
+				// 未同意隐私协议时由首页弹窗处理，不抢先弹手机号
+				if (needPrivacyPrompt()) {
+					this.phoneLoginVisible = false
+					return
+				}
 				if (needPhoneLoginPrompt()) {
 					this.phoneLoginVisible = true
 				} else {
@@ -142,6 +148,10 @@
 					})
 			},
 			ensureLogin() {
+				if (needPrivacyPrompt()) {
+					uni.reLaunch({ url: '/pages/index/index' })
+					return false
+				}
 				if (isLoggedIn()) return true
 				this.phoneLoginVisible = true
 				return false
