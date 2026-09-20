@@ -87,7 +87,14 @@
 			</view>
 		</view>
 		<app-tabbar :current="0" />
-		<steward-dialog :visible="stewardVisible" @close="closeSteward" />
+		<steward-dialog
+			:visible="stewardVisible"
+			:title="stewardProps.title"
+			:tip="stewardProps.tip"
+			:qr-src="stewardProps.qrSrc"
+			:phone="stewardProps.phone"
+			@close="closeSteward"
+		/>
 		<privacy-dialog
 			:visible="privacyVisible"
 			@agree="onPrivacyAgree"
@@ -103,6 +110,7 @@
 		silentLogin
 	} from '../../common/auth.js'
 	import { api } from '../../common/api.js'
+	import { stewardPropsFromSite } from '../../common/site.js'
 
 	export default {
 		data() {
@@ -113,6 +121,7 @@
 				navSolid: false,
 				stewardVisible: false,
 				privacyVisible: false,
+				stewardProps: stewardPropsFromSite(),
 				banners: [],
 				primaryActions: [],
 				secondaryActions: [],
@@ -170,6 +179,7 @@
 						this.stores = res.stores || []
 						const app = getApp()
 						if (app.globalData) app.globalData.site = res.site || null
+						this.stewardProps = stewardPropsFromSite(res.site)
 					})
 					.catch(() => {
 						this.banners = [
@@ -191,6 +201,7 @@
 			},
 			onAction(item) {
 				if (item.key === 'steward') {
+					this.stewardProps = stewardPropsFromSite()
 					this.stewardVisible = true
 					return
 				}

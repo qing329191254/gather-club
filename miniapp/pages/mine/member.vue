@@ -157,7 +157,14 @@
 			</view>
 		</view>
 
-		<steward-dialog :visible="stewardVisible" @close="closeSteward" />
+		<steward-dialog
+			:visible="stewardVisible"
+			:title="stewardProps.title"
+			:tip="stewardProps.tip"
+			:qr-src="stewardProps.qrSrc"
+			:phone="stewardProps.phone"
+			@close="closeSteward"
+		/>
 		<steward-dialog
 			:visible="groupVisible"
 			title="扫码入群"
@@ -172,6 +179,9 @@
 <script>
 	import { memberLevels, monthCoupon } from '../../common/member-levels.js'
 	import StewardDialog from '../../components/steward-dialog/steward-dialog.vue'
+	import { api } from '../../common/api.js'
+	import { isLoggedIn, silentLogin, getUser } from '../../common/auth.js'
+	import { stewardPropsFromSite } from '../../common/site.js'
 
 	const PROFILE_KEY = 'gather_profile'
 	const COUPON_CLAIM_KEY = 'gather_member_month_coupon'
@@ -199,7 +209,8 @@
 				coupon: monthCoupon,
 				couponClaimed: false,
 				stewardVisible: false,
-				groupVisible: false
+				groupVisible: false,
+				stewardProps: stewardPropsFromSite()
 			}
 		},
 		computed: {
@@ -236,8 +247,19 @@
 				const raw = uni.getStorageSync(PROFILE_KEY)
 				if (raw && raw.avatar) this.avatar = raw.avatar
 			} catch (e) {}
+			const user = getUser()
+			if (user.avatar) this.avatar = user.avatar
+			const vip = String(user.vipLevel || 'V0').toUpperCase()
+			const idx = this.levels.findIndex((row) => row.id === vip)
+			if (idx >= 0) {
+				this.userLevelIndex = idx
+				this.activeIndex = idx
+			}
 			this.loadCouponClaim()
 			this.preloadThemeImages()
+		},
+		onShow() {
+			this.loadCouponClaim()
 		},
 		methods: {
 			goBack() {
@@ -283,30 +305,54 @@
 				const i = e && e.detail && e.detail.current
 				if (typeof i === 'number') this.activeIndex = i
 			},
-			loadCouponClaim() {
+			async loadCouponClaim() {
 				try {
-					const raw = uni.getStorageSync(COUPON_CLAIM_KEY)
-					this.couponClaimed = !!(raw && raw.month === currentMonthKey() && raw.claimed)
+					if (!isLoggedIn()) await silentLogin()
+					const res = await api.coupons()
+					const month = currentMonthKey()
+					const unused = res.unused || []
+					this.couponClaimed = unused.some((c) => String(c.expire) === month)
+					if (!this.couponClaimed) {
+						const raw = uni.getStorageSync(COUPON_CLAIM_KEY)
+						this.couponClaimed = !!(raw && raw.month === month && raw.claimed)
+					}
 				} catch (e) {
-					this.couponClaimed = false
+					try {
+						const raw = uni.getStorageSync(COUPON_CLAIM_KEY)
+						this.couponClaimed = !!(raw && raw.month === currentMonthKey() && raw.claimed)
+					} catch (err) {
+						this.couponClaimed = false
+					}
 				}
 			},
 			onRules() {
 				uni.navigateTo({ url: '/pages/mine/member-rules' })
 			},
-			onCouponAction() {
+			async onCouponAction() {
 				if (!this.couponClaimed) {
-					this.couponClaimed = true
-					uni.setStorageSync(COUPON_CLAIM_KEY, {
-						month: currentMonthKey(),
-						claimed: true
-					})
-					uni.showToast({ title: '领取成功', icon: 'success' })
+					try {
+						if (!isLoggedIn()) await silentLogin()
+						const res = await api.claimCoupon({ month: currentMonthKey() })
+						if (res && res.ok === false) {
+							this.couponClaimed = true
+							uni.showToast({ title: res.message || '本月已领取', icon: 'none' })
+							return
+						}
+						this.couponClaimed = true
+						uni.setStorageSync(COUPON_CLAIM_KEY, {
+							month: currentMonthKey(),
+							claimed: true
+						})
+						uni.showToast({ title: '领取成功', icon: 'success' })
+					} catch (e) {
+						uni.showToast({ title: (e && e.message) || '领取失败', icon: 'none' })
+					}
 					return
 				}
-				uni.navigateTo({ url: '/pages/mall/records' })
+				uni.navigateTo({ url: '/pages/mine/coupons' })
 			},
 			openSteward() {
+				this.stewardProps = stewardPropsFromSite()
 				this.groupVisible = false
 				this.stewardVisible = true
 			},

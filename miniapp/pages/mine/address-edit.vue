@@ -72,11 +72,13 @@
 </template>
 
 <script>
-	const ADDR_KEY = 'gather_addresses'
+	import { api } from '../../common/api.js'
+	import { isLoggedIn, silentLogin } from '../../common/auth.js'
 
 	export default {
 		data() {
 			return {
+				editId: '',
 				pasteText: '',
 				regionValue: [],
 				form: {
@@ -97,10 +99,31 @@
 				return [province, city, district].filter(Boolean).join(' ')
 			}
 		},
-		onLoad() {
+		onLoad(query) {
+			this.editId = (query && query.id) || ''
 			this.readClipboard()
+			if (this.editId) this.loadEdit()
 		},
 		methods: {
+			async loadEdit() {
+				if (!isLoggedIn()) await silentLogin()
+				try {
+					const res = await api.addresses()
+					const item = (res.list || []).find((row) => String(row.id) === String(this.editId))
+					if (!item) return
+					this.form = {
+						name: item.name || '',
+						phone: item.phone || '',
+						province: item.province || '',
+						city: item.city || '',
+						district: item.district || '',
+						detail: item.detail || '',
+						isDefault: !!item.isDefault
+					}
+					this.regionValue = [this.form.province, this.form.city, this.form.district].filter(Boolean)
+					uni.setNavigationBarTitle({ title: '编辑地址' })
+				} catch (e) {}
+			},
 			readClipboard() {
 				uni.getClipboardData({
 					success: (res) => {
@@ -142,7 +165,7 @@
 				if (parsed.detail) this.form.detail = parsed.detail
 				uni.showToast({ title: '已识别', icon: 'success' })
 			},
-			onSave() {
+			async onSave() {
 				const name = (this.form.name || '').trim()
 				const phone = (this.form.phone || '').trim()
 				const detail = (this.form.detail || '').trim()
@@ -162,28 +185,27 @@
 					uni.showToast({ title: '请填写详细地址', icon: 'none' })
 					return
 				}
-				let list = []
-				try {
-					const raw = uni.getStorageSync(ADDR_KEY)
-					list = Array.isArray(raw) ? raw : []
-				} catch (e) {}
-				const isDefault = this.form.isDefault || list.length === 0
-				if (isDefault) {
-					list = list.map((row) => Object.assign({}, row, { isDefault: false }))
-				}
-				list.unshift({
-					id: 'a' + Date.now(),
+				if (!isLoggedIn()) await silentLogin()
+				const payload = {
 					name,
 					phone,
+					province: this.form.province,
+					city: this.form.city,
+					district: this.form.district,
 					region: [this.form.province, this.form.city, this.form.district].filter(Boolean).join(''),
 					detail,
-					isDefault
-				})
-				uni.setStorageSync(ADDR_KEY, list)
-				uni.showToast({ title: '保存成功', icon: 'success' })
-				setTimeout(() => {
-					uni.navigateBack({ fail() {} })
-				}, 400)
+					isDefault: this.form.isDefault
+				}
+				try {
+					if (this.editId) await api.updateAddress(this.editId, payload)
+					else await api.createAddress(payload)
+					uni.showToast({ title: '保存成功', icon: 'success' })
+					setTimeout(() => {
+						uni.navigateBack({ fail() {} })
+					}, 400)
+				} catch (e) {
+					uni.showToast({ title: (e && e.message) || '保存失败', icon: 'none' })
+				}
 			}
 		}
 	}

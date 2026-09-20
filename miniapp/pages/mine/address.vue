@@ -32,7 +32,8 @@
 </template>
 
 <script>
-	const ADDR_KEY = 'gather_addresses'
+	import { api } from '../../common/api.js'
+	import { isLoggedIn, silentLogin } from '../../common/auth.js'
 
 	export default {
 		data() {
@@ -44,16 +45,14 @@
 			this.loadList()
 		},
 		methods: {
-			loadList() {
+			async loadList() {
+				if (!isLoggedIn()) await silentLogin()
 				try {
-					const raw = uni.getStorageSync(ADDR_KEY)
-					this.list = Array.isArray(raw) ? raw : []
+					const res = await api.addresses()
+					this.list = res.list || []
 				} catch (e) {
 					this.list = []
 				}
-			},
-			saveList() {
-				uni.setStorageSync(ADDR_KEY, this.list)
 			},
 			onImport() {
 				if (typeof uni.chooseAddress !== 'function') {
@@ -61,22 +60,27 @@
 					return
 				}
 				uni.chooseAddress({
-					success: (res) => {
-						const item = {
-							id: 'a' + Date.now(),
-							name: res.userName || '',
-							phone: res.telNumber || '',
-							region:
-								(res.provinceName || '') +
-								(res.cityName || '') +
-								(res.countyName || '') +
-								(res.streetName || ''),
-							detail: res.detailInfoNew || res.detailInfo || '',
-							isDefault: this.list.length === 0
+					success: async (res) => {
+						try {
+							await api.createAddress({
+								name: res.userName || '',
+								phone: res.telNumber || '',
+								province: res.provinceName || '',
+								city: res.cityName || '',
+								district: res.countyName || '',
+								region:
+									(res.provinceName || '') +
+									(res.cityName || '') +
+									(res.countyName || '') +
+									(res.streetName || ''),
+								detail: res.detailInfoNew || res.detailInfo || '',
+								isDefault: this.list.length === 0
+							})
+							uni.showToast({ title: '导入成功', icon: 'success' })
+							this.loadList()
+						} catch (e) {
+							uni.showToast({ title: (e && e.message) || '导入失败', icon: 'none' })
 						}
-						this.list.unshift(item)
-						this.saveList()
-						uni.showToast({ title: '导入成功', icon: 'success' })
 					},
 					fail: (err) => {
 						const msg = (err && err.errMsg) || ''
@@ -90,18 +94,28 @@
 			},
 			onEdit(item) {
 				uni.showActionSheet({
-					itemList: ['设为默认', '删除地址'],
-					success: (res) => {
+					itemList: ['设为默认', '编辑地址', '删除地址'],
+					success: async (res) => {
 						if (res.tapIndex === 0) {
-							this.list = this.list.map((row) =>
-								Object.assign({}, row, { isDefault: row.id === item.id })
-							)
-							this.saveList()
-							uni.showToast({ title: '已设为默认', icon: 'success' })
+							try {
+								await api.setDefaultAddress(item.id)
+								uni.showToast({ title: '已设为默认', icon: 'success' })
+								this.loadList()
+							} catch (e) {
+								uni.showToast({ title: (e && e.message) || '操作失败', icon: 'none' })
+							}
 						} else if (res.tapIndex === 1) {
-							this.list = this.list.filter((row) => row.id !== item.id)
-							this.saveList()
-							uni.showToast({ title: '已删除', icon: 'none' })
+							uni.navigateTo({
+								url: '/pages/mine/address-edit?id=' + item.id
+							})
+						} else if (res.tapIndex === 2) {
+							try {
+								await api.deleteAddress(item.id)
+								uni.showToast({ title: '已删除', icon: 'none' })
+								this.loadList()
+							} catch (e) {
+								uni.showToast({ title: (e && e.message) || '删除失败', icon: 'none' })
+							}
 						}
 					}
 				})

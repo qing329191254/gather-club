@@ -6,9 +6,11 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import (
+    Address,
     AppUser,
     Banner,
     CheckinRecord,
+    Coupon,
     GatherProduct,
     GatherTab,
     MallGoods,
@@ -156,6 +158,9 @@ def wx_login(payload: WxLoginIn, db: Session = Depends(get_db)):
             "nickname": user.nickname,
             "avatar": user.avatar,
             "phone": user.phone,
+            "birthday": getattr(user, "birthday", "") or "",
+            "hobby": getattr(user, "hobby", "") or "",
+            "phoneEdited": bool(getattr(user, "phone_edited", False)),
             "points": user.points,
             "vipLevel": user.vip_level,
             "vip": f"{user.vip_level}会员",
@@ -444,7 +449,7 @@ def pay_order(order_id: str, db: Session = Depends(get_db)):
     if order.status != "pending":
         raise HTTPException(status_code=400, detail="订单状态不可支付")
     order.status = "paid"
-    order.status_text = STATUS_TEXT["paid"]
+    order.status_text = "待核销"
     db.commit()
     return _order_out(order)
 
@@ -530,15 +535,295 @@ def user_profile(
     if not oid:
         raise HTTPException(status_code=400, detail="缺少 openid")
     user = _ensure_user(db, oid)
+    return _profile_out(user)
+
+
+def _profile_out(user: AppUser) -> dict:
     return {
         "id": user.id,
         "nickname": user.nickname,
         "avatar": user.avatar,
         "phone": user.phone,
+        "birthday": getattr(user, "birthday", "") or "",
+        "hobby": getattr(user, "hobby", "") or "",
+        "phoneEdited": bool(getattr(user, "phone_edited", False)),
         "points": user.points,
         "vipLevel": user.vip_level,
         "vip": f"{user.vip_level}会员",
+        "cancelled": bool(getattr(user, "cancelled", False)),
     }
+
+
+@router.put("/user/profile")
+def update_profile(
+    payload: dict = Body(default={}),
+    x_openid: str = Header(default="", alias="X-Openid"),
+    openid: str = Query(default=""),
+    db: Session = Depends(get_db),
+):
+    oid = x_openid or openid
+    if not oid:
+        raise HTTPException(status_code=400, detail="缺少 openid")
+    user = _ensure_user(db, oid)
+    if getattr(user, "cancelled", False):
+        raise HTTPException(status_code=400, detail="账号已注销")
+    if "nickname" in payload and payload["nickname"] is not None:
+        user.nickname = str(payload["nickname"]).strip() or user.nickname
+    if "avatar" in payload and payload["avatar"] is not None:
+        user.avatar = str(payload["avatar"])
+    if "birthday" in payload and payload["birthday"] is not None:
+        user.birthday = str(payload["birthday"])
+    if "hobby" in payload and payload["hobby"] is not None:
+        user.hobby = str(payload["hobby"])
+    if "phone" in payload and payload["phone"]:
+        phone = str(payload["phone"]).strip()
+        if user.phone_edited and phone != user.phone:
+            raise HTTPException(status_code=400, detail="手机号仅可修改一次")
+        if phone != user.phone:
+            user.phone = phone
+            user.phone_edited = True
+    db.commit()
+    db.refresh(user)
+    return _profile_out(user)
+
+
+@router.post("/user/cancel")
+def cancel_account(
+    x_openid: str = Header(default="", alias="X-Openid"),
+    openid: str = Query(default=""),
+    db: Session = Depends(get_db),
+):
+    oid = x_openid or openid
+    if not oid:
+        raise HTTPException(status_code=400, detail="缺少 openid")
+    user = _ensure_user(db, oid)
+    user.cancelled = True
+    user.nickname = "已注销用户"
+    user.avatar = ""
+    user.phone = ""
+    db.commit()
+    return OkResponse(message="账号已注销")
+
+
+@router.get("/user/addresses")
+def list_addresses(
+    x_openid: str = Header(default="", alias="X-Openid"),
+    openid: str = Query(default=""),
+    db: Session = Depends(get_db),
+):
+    user = _ensure_user(db, x_openid or openid or "anonymous")
+    rows = (
+        db.query(Address)
+        .filter(Address.user_id == user.id)
+        .order_by(Address.is_default.desc(), Address.id.desc())
+        .all()
+    )
+    return {"list": [_address_out(r) for r in rows]}
+
+
+def _address_out(row: Address) -> dict:
+    return {
+        "id": row.id,
+        "name": row.name,
+        "phone": row.phone,
+        "region": row.region,
+        "province": row.province,
+        "city": row.city,
+        "district": row.district,
+        "detail": row.detail,
+        "isDefault": row.is_default,
+    }
+
+
+@router.post("/user/addresses")
+def create_address(
+    payload: dict = Body(default={}),
+    x_openid: str = Header(default="", alias="X-Openid"),
+    openid: str = Query(default=""),
+    db: Session = Depends(get_db),
+):
+    user = _ensure_user(db, x_openid or openid or "anonymous")
+    is_default = bool(payload.get("isDefault") or payload.get("is_default"))
+    if is_default:
+        db.query(Address).filter(Address.user_id == user.id).update({"is_default": False})
+    elif db.query(Address).filter(Address.user_id == user.id).count() == 0:
+        is_default = True
+    row = Address(
+        user_id=user.id,
+        name=str(payload.get("name") or ""),
+        phone=str(payload.get("phone") or ""),
+        region=str(payload.get("region") or ""),
+        province=str(payload.get("province") or ""),
+        city=str(payload.get("city") or ""),
+        district=str(payload.get("district") or ""),
+        detail=str(payload.get("detail") or ""),
+        is_default=is_default,
+    )
+    if not row.region:
+        row.region = "".join([row.province, row.city, row.district])
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return _address_out(row)
+
+
+@router.put("/user/addresses/{address_id}")
+def update_address(
+    address_id: int,
+    payload: dict = Body(default={}),
+    x_openid: str = Header(default="", alias="X-Openid"),
+    openid: str = Query(default=""),
+    db: Session = Depends(get_db),
+):
+    user = _ensure_user(db, x_openid or openid or "anonymous")
+    row = db.query(Address).filter(Address.id == address_id, Address.user_id == user.id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="地址不存在")
+    is_default = payload.get("isDefault", payload.get("is_default", row.is_default))
+    if is_default:
+        db.query(Address).filter(Address.user_id == user.id).update({"is_default": False})
+    row.name = str(payload.get("name", row.name) or "")
+    row.phone = str(payload.get("phone", row.phone) or "")
+    row.province = str(payload.get("province", row.province) or "")
+    row.city = str(payload.get("city", row.city) or "")
+    row.district = str(payload.get("district", row.district) or "")
+    row.detail = str(payload.get("detail", row.detail) or "")
+    row.region = str(payload.get("region") or "".join([row.province, row.city, row.district]))
+    row.is_default = bool(is_default)
+    db.commit()
+    db.refresh(row)
+    return _address_out(row)
+
+
+@router.delete("/user/addresses/{address_id}")
+def delete_address(
+    address_id: int,
+    x_openid: str = Header(default="", alias="X-Openid"),
+    openid: str = Query(default=""),
+    db: Session = Depends(get_db),
+):
+    user = _ensure_user(db, x_openid or openid or "anonymous")
+    row = db.query(Address).filter(Address.id == address_id, Address.user_id == user.id).first()
+    if row:
+        db.delete(row)
+        db.commit()
+    return OkResponse()
+
+
+@router.post("/user/addresses/{address_id}/default")
+def set_default_address(
+    address_id: int,
+    x_openid: str = Header(default="", alias="X-Openid"),
+    openid: str = Query(default=""),
+    db: Session = Depends(get_db),
+):
+    user = _ensure_user(db, x_openid or openid or "anonymous")
+    row = db.query(Address).filter(Address.id == address_id, Address.user_id == user.id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="地址不存在")
+    db.query(Address).filter(Address.user_id == user.id).update({"is_default": False})
+    row.is_default = True
+    db.commit()
+    return _address_out(row)
+
+
+@router.post("/user/coupons/claim")
+def claim_coupon(
+    payload: dict = Body(default={}),
+    x_openid: str = Header(default="", alias="X-Openid"),
+    openid: str = Query(default=""),
+    db: Session = Depends(get_db),
+):
+    user = _ensure_user(db, x_openid or openid or "anonymous")
+    coupon_id = payload.get("couponId") or payload.get("coupon_id")
+    month_key = payload.get("month") or datetime.utcnow().strftime("%Y-%m")
+    # 会员月券：默认领第一张启用优惠券，每月一次
+    if coupon_id:
+        coupon = db.query(Coupon).filter(Coupon.id == int(coupon_id), Coupon.enabled.is_(True)).first()
+    else:
+        coupon = db.query(Coupon).filter(Coupon.enabled.is_(True)).order_by(Coupon.id.asc()).first()
+    if not coupon:
+        raise HTTPException(status_code=404, detail="暂无可领优惠券")
+    exists = (
+        db.query(UserCoupon)
+        .filter(
+            UserCoupon.user_id == user.id,
+            UserCoupon.coupon_id == coupon.id,
+            UserCoupon.expire == month_key,
+        )
+        .first()
+    )
+    if exists:
+        return OkResponse(ok=False, message="本月已领取", data={"claimed": True})
+    if coupon.total and coupon.claimed >= coupon.total:
+        raise HTTPException(status_code=400, detail="优惠券已领完")
+    row = UserCoupon(
+        user_id=user.id,
+        coupon_id=coupon.id,
+        name=coupon.name,
+        amount=coupon.amount,
+        condition=coupon.condition,
+        expire=month_key,
+        status="unused",
+    )
+    coupon.claimed += 1
+    db.add(row)
+    db.commit()
+    return OkResponse(
+        message="领取成功",
+        data={"id": row.id, "name": row.name, "amount": row.amount, "month": month_key},
+    )
+
+
+@router.get("/mall/records")
+def mall_records(
+    x_openid: str = Header(default="", alias="X-Openid"),
+    openid: str = Query(default=""),
+    db: Session = Depends(get_db),
+):
+    user = _ensure_user(db, x_openid or openid or "anonymous")
+    rows = (
+        db.query(Order)
+        .filter(Order.user_id == user.id, Order.type == "mall")
+        .order_by(Order.created_at.desc())
+        .limit(100)
+        .all()
+    )
+    return {
+        "list": [
+            {
+                "id": r.id,
+                "name": r.title,
+                "cover": r.cover,
+                "cost": int("".join(ch for ch in (r.spec or "") if ch.isdigit()) or 0),
+                "time": r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else "",
+                "status": r.status,
+                "statusText": r.status_text,
+            }
+            for r in rows
+        ]
+    }
+
+
+@router.get("/orders/{order_id}")
+def order_detail(
+    order_id: str,
+    x_openid: str = Header(default="", alias="X-Openid"),
+    openid: str = Query(default=""),
+    db: Session = Depends(get_db),
+):
+    oid = x_openid or openid
+    row = db.query(Order).filter(Order.id == order_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    if oid and row.openid and row.openid != oid:
+        raise HTTPException(status_code=403, detail="无权查看")
+    return _order_out(row)
+
+
+@router.get("/site")
+def public_site(db: Session = Depends(get_db)):
+    return get_config(db, "site", {}) or {}
 
 
 @router.get("/user/points")

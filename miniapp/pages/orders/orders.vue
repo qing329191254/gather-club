@@ -99,7 +99,26 @@
 					this.onPay(order)
 					return
 				}
-				uni.showToast({ title: '订单详情即将开放', icon: 'none' })
+				api
+					.orderDetail(order.id)
+					.then((detail) => {
+						const lines = [
+							detail.storeName || '',
+							detail.title || '',
+							detail.spec || '',
+							detail.statusText || '',
+							detail.roomDate ? `用餐：${detail.roomDate} ${detail.roomSlot || ''}` : '',
+							detail.contactPhone ? `联系人：${detail.contactName || ''} ${detail.contactPhone}` : ''
+						].filter(Boolean)
+						uni.showModal({
+							title: '订单详情',
+							content: lines.join('\n'),
+							showCancel: false
+						})
+					})
+					.catch(() => {
+						uni.showToast({ title: '订单详情加载失败', icon: 'none' })
+					})
 			},
 			onCancel(order) {
 				uni.showModal({

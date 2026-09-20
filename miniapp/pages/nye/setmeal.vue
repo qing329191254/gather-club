@@ -334,17 +334,26 @@
 				}
 				this.continuePay()
 			},
-			continuePay() {
+			async continuePay() {
 				const storeId = (this.detail && this.detail.id) || 'gongkang'
 				const storeName = (this.detail && this.detail.name) || '天天俱乐部'
 				const cur = this.current
 				if (!cur) return
 
+				// 已选日期时校验并锁定包房；稍后选日期则仅生成订单不锁库存
 				if (this.date) {
-					const avail = getAvailability(storeId, this.date, this.roomSlot)
-					if (avail.full) {
-						uni.showToast({ title: '该日期包房已满，请换一天', icon: 'none' })
-						return
+					try {
+						const avail = await api.roomAvailability(storeId, this.date, this.roomSlot)
+						if (avail && avail.full) {
+							uni.showToast({ title: '该日期包房已满，请换一天', icon: 'none' })
+							return
+						}
+					} catch (e) {
+						const avail = getAvailability(storeId, this.date, this.roomSlot)
+						if (avail.full) {
+							uni.showToast({ title: '该日期包房已满，请换一天', icon: 'none' })
+							return
+						}
 					}
 				}
 

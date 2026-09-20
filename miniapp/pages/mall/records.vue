@@ -18,10 +18,27 @@
 </template>
 
 <script>
+	import { api } from '../../common/api.js'
+	import { isLoggedIn, silentLogin } from '../../common/auth.js'
+
 	export default {
 		data() {
 			return {
 				list: []
+			}
+		},
+		onShow() {
+			this.loadRecords()
+		},
+		methods: {
+			async loadRecords() {
+				if (!isLoggedIn()) await silentLogin()
+				try {
+					const res = await api.mallRecords()
+					this.list = res.list || []
+				} catch (e) {
+					this.list = []
+				}
 			}
 		}
 	}

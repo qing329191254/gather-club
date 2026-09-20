@@ -10,6 +10,9 @@ export const api = {
 	home() {
 		return request('/api/v1/home')
 	},
+	site() {
+		return request('/api/v1/site')
+	},
 	gather() {
 		return request('/api/v1/gather')
 	},
@@ -28,6 +31,9 @@ export const api = {
 	mallRedeem(goodsId) {
 		return request('/api/v1/mall/redeem', { method: 'POST', data: { goodsId } })
 	},
+	mallRecords() {
+		return request('/api/v1/mall/records')
+	},
 	roomAvailability(storeId, date, slot) {
 		return request('/api/v1/rooms/availability', {
 			data: { store_id: storeId, date, slot }
@@ -41,6 +47,9 @@ export const api = {
 	orders() {
 		return request('/api/v1/orders')
 	},
+	orderDetail(id) {
+		return request('/api/v1/orders/' + id)
+	},
 	createOrder(payload) {
 		return request('/api/v1/orders', { method: 'POST', data: payload })
 	},
@@ -53,11 +62,35 @@ export const api = {
 	profile() {
 		return request('/api/v1/user/profile')
 	},
+	updateProfile(payload) {
+		return request('/api/v1/user/profile', { method: 'PUT', data: payload || {} })
+	},
+	cancelAccount() {
+		return request('/api/v1/user/cancel', { method: 'POST' })
+	},
 	points() {
 		return request('/api/v1/user/points')
 	},
 	coupons() {
 		return request('/api/v1/user/coupons')
+	},
+	claimCoupon(payload) {
+		return request('/api/v1/user/coupons/claim', { method: 'POST', data: payload || {} })
+	},
+	addresses() {
+		return request('/api/v1/user/addresses')
+	},
+	createAddress(payload) {
+		return request('/api/v1/user/addresses', { method: 'POST', data: payload || {} })
+	},
+	updateAddress(id, payload) {
+		return request('/api/v1/user/addresses/' + id, { method: 'PUT', data: payload || {} })
+	},
+	deleteAddress(id) {
+		return request('/api/v1/user/addresses/' + id, { method: 'DELETE' })
+	},
+	setDefaultAddress(id) {
+		return request('/api/v1/user/addresses/' + id + '/default', { method: 'POST' })
 	},
 	checkin(makeup) {
 		const q = makeup ? '?makeup=true' : ''

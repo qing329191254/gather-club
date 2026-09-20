@@ -137,10 +137,30 @@ class AppUser(Base):
     nickname: Mapped[str] = mapped_column(String(64), default="微信用户")
     avatar: Mapped[str] = mapped_column(String(512), default="")
     phone: Mapped[str] = mapped_column(String(32), default="")
+    birthday: Mapped[str] = mapped_column(String(16), default="")
+    hobby: Mapped[str] = mapped_column(String(128), default="")
+    phone_edited: Mapped[bool] = mapped_column(Boolean, default=False)
     points: Mapped[int] = mapped_column(Integer, default=0)
     vip_level: Mapped[str] = mapped_column(String(16), default="V0")
+    cancelled: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=now, onupdate=now)
+
+
+class Address(Base):
+    __tablename__ = "addresses"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, index=True)
+    name: Mapped[str] = mapped_column(String(64), default="")
+    phone: Mapped[str] = mapped_column(String(32), default="")
+    region: Mapped[str] = mapped_column(String(255), default="")
+    province: Mapped[str] = mapped_column(String(64), default="")
+    city: Mapped[str] = mapped_column(String(64), default="")
+    district: Mapped[str] = mapped_column(String(64), default="")
+    detail: Mapped[str] = mapped_column(String(255), default="")
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
 
 
 class Order(Base):

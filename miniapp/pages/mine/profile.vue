@@ -105,7 +105,8 @@
 <script>
 	import DatePicker from '../../components/date-picker/date-picker.vue'
 	import TipDialog from '../../components/tip-dialog/tip-dialog.vue'
-	import { getUser, saveLogin } from '../../common/auth.js'
+	import { getUser, saveLogin, getOpenid, refreshProfile, isLoggedIn, silentLogin } from '../../common/auth.js'
+	import { api } from '../../common/api.js'
 
 	const PROFILE_KEY = 'gather_profile'
 	const PHONE_EDITED_KEY = 'gather_phone_edited'
@@ -128,7 +129,7 @@
 					avatar: '',
 					nickname: '微信用户',
 					birthday: '',
-					phone: '13881794601',
+					phone: '',
 					hobby: ''
 				}
 			}
@@ -145,19 +146,26 @@
 		},
 		methods: {
 			preventTouchMove() {},
-			loadProfile() {
+			async loadProfile() {
+				if (!isLoggedIn()) await silentLogin()
+				else await refreshProfile()
+				const user = getUser()
+				this.form = Object.assign({}, this.form, {
+					avatar: user.avatar || this.form.avatar || '',
+					nickname: user.nickname || this.form.nickname || '微信用户',
+					birthday: user.birthday || '',
+					phone: user.phone || '',
+					hobby: user.hobby || ''
+				})
 				try {
 					const raw = uni.getStorageSync(PROFILE_KEY)
 					if (raw && typeof raw === 'object') {
-						this.form = Object.assign({}, this.form, raw)
+						if (!this.form.birthday && raw.birthday) this.form.birthday = raw.birthday
+						if (!this.form.hobby && raw.hobby) this.form.hobby = raw.hobby
+						if (!this.form.avatar && raw.avatar) this.form.avatar = raw.avatar
 					}
-					const user = getUser()
-					if (!this.form.avatar && user.avatar) this.form.avatar = user.avatar
-					if ((!this.form.nickname || this.form.nickname === '微信用户') && user.nickname) {
-						this.form.nickname = user.nickname
-					}
-					if (!this.form.phone && user.phone) this.form.phone = user.phone
 				} catch (e) {}
+				this.phoneEditLabel = user.phoneEdited || uni.getStorageSync(PHONE_EDITED_KEY) ? '已绑定' : '修改手机号 >'
 			},
 			saveLocal() {
 				uni.setStorageSync(PROFILE_KEY, this.form)
@@ -221,7 +229,7 @@
 				this.form.birthday = value
 			},
 			onPhone() {
-				if (uni.getStorageSync(PHONE_EDITED_KEY)) {
+				if (getUser().phoneEdited || uni.getStorageSync(PHONE_EDITED_KEY)) {
 					uni.showToast({ title: '手机号仅可修改一次', icon: 'none' })
 					return
 				}
@@ -245,20 +253,41 @@
 			onHobby() {
 				uni.navigateTo({ url: '/pages/mine/hobbies' })
 			},
-			onSave() {
+			async onSave() {
 				this.saveLocal()
-				const user = getUser()
-				saveLogin(
-					Object.assign({}, user, {
-						avatar: this.form.avatar || user.avatar,
-						nickname: this.form.nickname || user.nickname,
-						phone: this.form.phone || user.phone
+				uni.showLoading({ title: '保存中', mask: true })
+				try {
+					if (!isLoggedIn()) await silentLogin()
+					const res = await api.updateProfile({
+						nickname: this.form.nickname,
+						avatar: this.form.avatar,
+						birthday: this.form.birthday,
+						hobby: this.form.hobby,
+						phone: this.form.phone
 					})
-				)
-				uni.showToast({ title: '保存成功', icon: 'success' })
-				setTimeout(() => {
-					uni.navigateBack({ fail() {} })
-				}, 500)
+					saveLogin(
+						Object.assign({}, getUser(), {
+							avatar: res.avatar,
+							nickname: res.nickname,
+							phone: res.phone,
+							birthday: res.birthday,
+							hobby: res.hobby,
+							phoneEdited: res.phoneEdited,
+							points: res.points,
+							vipLevel: res.vipLevel,
+							vip: res.vip
+						}),
+						getOpenid()
+					)
+					uni.hideLoading()
+					uni.showToast({ title: '保存成功', icon: 'success' })
+					setTimeout(() => {
+						uni.navigateBack({ fail() {} })
+					}, 500)
+				} catch (e) {
+					uni.hideLoading()
+					uni.showToast({ title: (e && e.message) || '保存失败', icon: 'none' })
+				}
 			}
 		}
 	}

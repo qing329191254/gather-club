@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import get_settings
 from .database import Base, SessionLocal, engine
+from .migrate import ensure_schema
 from .routers import admin_api, miniapp
 from .seed import seed_all
 
@@ -32,6 +33,7 @@ app.include_router(admin_api.router)
 @app.on_event("startup")
 def on_startup() -> None:
     Base.metadata.create_all(bind=engine)
+    ensure_schema()
     db = SessionLocal()
     try:
         seed_all(db)
