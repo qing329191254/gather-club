@@ -12,6 +12,11 @@
       </el-table-column>
       <el-table-column prop="name" label="名称" min-width="220" show-overflow-tooltip />
       <el-table-column prop="price" label="价格" width="90" />
+      <el-table-column label="套餐数" width="90">
+        <template #default="{ row }">
+          {{ (row.packages || []).length }}
+        </template>
+      </el-table-column>
       <el-table-column prop="address" label="地址" min-width="180" show-overflow-tooltip />
       <el-table-column prop="open_start" label="开放起" width="110" />
       <el-table-column prop="open_end" label="开放止" width="110" />
@@ -22,15 +27,17 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="140" fixed="right">
+      <el-table-column label="操作" width="220" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
+          <el-button link type="warning" @click="openPackages(row)">套餐</el-button>
           <el-button link type="danger" @click="onRemove(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="visible" :title="editing ? '编辑专题门店' : '新增专题门店'" width="820px" top="5vh">
+    <!-- 门店基础信息（不含套餐） -->
+    <el-dialog v-model="visible" :title="editing ? '编辑专题门店' : '新增专题门店'" width="720px" top="6vh">
       <el-form label-width="100px">
         <el-form-item label="名称" required>
           <el-input v-model="form.name" placeholder="例如：上海莘庄店·春节家宴 / 商务午宴" />
@@ -39,10 +46,10 @@
           <ImageField v-model="form.cover" folder="nye" />
         </el-form-item>
         <el-form-item label="现价">
-          <el-input-number v-model="form.price" :min="0" :precision="0" />
+          <el-input-number v-model="form.price" :min="0" :precision="0" controls-position="right" class="num" />
         </el-form-item>
         <el-form-item label="原价">
-          <el-input-number v-model="form.origin_price" :min="0" :precision="0" />
+          <el-input-number v-model="form.origin_price" :min="0" :precision="0" controls-position="right" class="num" />
         </el-form-item>
         <el-form-item label="角标文案">
           <el-input v-model="form.tag" placeholder="例如：家宴、商务宴，可自定义" />
@@ -64,17 +71,46 @@
           <ImageListField v-model="detailImages" folder="nye" />
         </el-form-item>
 
-        <el-divider content-position="left">套餐列表</el-divider>
-        <div class="pkg-head">
-          <span class="pkg-tip">用户选规格时看到的套餐，可逐条添加</span>
-          <el-button type="primary" size="small" @click="addPackage">新增套餐</el-button>
+        <el-divider />
+        <el-form-item label="开放起">
+          <el-input v-model="form.open_start" placeholder="YYYY-MM-DD" />
+        </el-form-item>
+        <el-form-item label="开放止">
+          <el-input v-model="form.open_end" placeholder="YYYY-MM-DD" />
+        </el-form-item>
+        <el-form-item label="排序">
+          <el-input-number v-model="form.sort" :min="0" controls-position="right" class="num" />
+          <span class="hint">数字越小越靠前</span>
+        </el-form-item>
+        <el-form-item label="是否上架">
+          <el-switch v-model="form.enabled" active-text="上架" inactive-text="下架" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="visible = false">取消</el-button>
+        <el-button type="primary" @click="onSave">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 独立套餐管理 -->
+    <el-dialog
+      v-model="pkgVisible"
+      :title="pkgStoreName ? `套餐管理 · ${pkgStoreName}` : '套餐管理'"
+      width="860px"
+      top="4vh"
+      destroy-on-close
+    >
+      <div class="pkg-head">
+        <span class="pkg-tip">用户下单时选择的规格套餐，与门店信息分开维护</span>
+        <el-button type="primary" size="small" @click="addPackage">新增套餐</el-button>
+      </div>
+      <div v-if="!packages.length" class="pkg-empty">暂无套餐，点击右上角新增</div>
+      <div v-for="(pkg, idx) in packages" :key="pkg._key" class="pkg-card">
+        <div class="pkg-card-head">
+          <strong>套餐 {{ idx + 1 }}</strong>
+          <el-button link type="danger" @click="removePackage(idx)">删除</el-button>
         </div>
-        <div v-if="!packages.length" class="pkg-empty">暂无套餐，点击右上角新增</div>
-        <div v-for="(pkg, idx) in packages" :key="pkg._key" class="pkg-card">
-          <div class="pkg-card-head">
-            <strong>套餐 {{ idx + 1 }}</strong>
-            <el-button link type="danger" @click="removePackage(idx)">删除</el-button>
-          </div>
+        <el-form label-width="90px">
           <el-row :gutter="12">
             <el-col :span="12">
               <el-form-item label="展示名称">
@@ -124,26 +160,11 @@
               </el-form-item>
             </el-col>
           </el-row>
-        </div>
-
-        <el-divider />
-        <el-form-item label="开放起">
-          <el-input v-model="form.open_start" placeholder="YYYY-MM-DD" />
-        </el-form-item>
-        <el-form-item label="开放止">
-          <el-input v-model="form.open_end" placeholder="YYYY-MM-DD" />
-        </el-form-item>
-        <el-form-item label="排序">
-          <el-input-number v-model="form.sort" :min="0" />
-          <span class="hint">数字越小越靠前</span>
-        </el-form-item>
-        <el-form-item label="是否上架">
-          <el-switch v-model="form.enabled" active-text="上架" inactive-text="下架" />
-        </el-form-item>
-      </el-form>
+        </el-form>
+      </div>
       <template #footer>
-        <el-button @click="visible = false">取消</el-button>
-        <el-button type="primary" @click="onSave">保存</el-button>
+        <el-button @click="pkgVisible = false">取消</el-button>
+        <el-button type="primary" :loading="pkgSaving" @click="onSavePackages">保存套餐</el-button>
       </template>
     </el-dialog>
   </el-card>
@@ -161,6 +182,13 @@ const visible = ref(false)
 const editing = ref(false)
 const banners = ref([])
 const detailImages = ref([])
+
+const pkgVisible = ref(false)
+const pkgSaving = ref(false)
+const pkgStoreId = ref('')
+const pkgStoreName = ref('')
+const pkgBasePrice = ref(0)
+const pkgBaseCover = ref('')
 const packages = ref([])
 let pkgSeq = 1
 
@@ -204,6 +232,19 @@ function toPackageForm(p = {}) {
   }
 }
 
+function serializePackages(rows) {
+  return rows.map((p, i) => ({
+    id: p.id || i + 1,
+    name: (p.name || '').trim(),
+    meal: (p.meal || '').trim(),
+    time: (p.time || '').trim(),
+    price: Number(p.price) || 0,
+    people: Number(p.people) || 0,
+    cover: p.cover || '',
+    disabled: !p.bookable
+  }))
+}
+
 function addPackage() {
   packages.value.push(
     toPackageForm({
@@ -211,9 +252,9 @@ function addPackage() {
       name: '',
       meal: '',
       time: '10:00-14:00',
-      price: form.price || 0,
+      price: pkgBasePrice.value || 0,
       people: 10,
-      cover: form.cover || '',
+      cover: pkgBaseCover.value || '',
       disabled: false
     })
   )
@@ -232,8 +273,20 @@ function openEdit(row) {
   Object.assign(form, empty(), row || {})
   banners.value = [...(form.banners || [])]
   detailImages.value = [...(form.detail_images || [])]
-  packages.value = (form.packages || []).map((p) => toPackageForm(p))
   visible.value = true
+}
+
+function openPackages(row) {
+  if (!row?.id) {
+    ElMessage.warning('请先保存门店后再配置套餐')
+    return
+  }
+  pkgStoreId.value = row.id
+  pkgStoreName.value = row.name || ''
+  pkgBasePrice.value = Number(row.price) || 0
+  pkgBaseCover.value = row.cover || ''
+  packages.value = (row.packages || []).map((p) => toPackageForm(p))
+  pkgVisible.value = true
 }
 
 async function onSave() {
@@ -241,28 +294,42 @@ async function onSave() {
     ElMessage.warning('请填写名称')
     return
   }
+  const existing = editing.value ? list.value.find((r) => r.id === form.id) : null
   const payload = {
     ...form,
     id: editing.value ? form.id : form.id || genId(),
     name: form.name.trim(),
     banners: banners.value.filter(Boolean),
     detail_images: detailImages.value.filter(Boolean),
-    packages: packages.value.map((p, i) => ({
-      id: p.id || i + 1,
-      name: (p.name || '').trim(),
-      meal: (p.meal || '').trim(),
-      time: (p.time || '').trim(),
-      price: Number(p.price) || 0,
-      people: Number(p.people) || 0,
-      cover: p.cover || '',
-      disabled: !p.bookable
-    }))
+    // 编辑门店时保留原套餐，避免被清空
+    packages: existing?.packages || form.packages || []
   }
   if (editing.value) await http.put(`/nye/${form.id}`, payload)
   else await http.post('/nye', payload)
   ElMessage.success('已保存')
   visible.value = false
   load()
+}
+
+async function onSavePackages() {
+  const row = list.value.find((r) => r.id === pkgStoreId.value)
+  if (!row) {
+    ElMessage.error('门店不存在或已删除')
+    return
+  }
+  pkgSaving.value = true
+  try {
+    const payload = {
+      ...row,
+      packages: serializePackages(packages.value)
+    }
+    await http.put(`/nye/${row.id}`, payload)
+    ElMessage.success('套餐已保存')
+    pkgVisible.value = false
+    load()
+  } finally {
+    pkgSaving.value = false
+  }
 }
 
 async function onRemove(row) {
@@ -278,6 +345,7 @@ onMounted(load)
 .toolbar { margin-bottom: 12px; }
 .hint { margin-left: 8px; color: #94a3b8; font-size: 12px; }
 .muted { color: #94a3b8; font-size: 12px; }
+.num { width: 168px; }
 .pkg-head {
   display: flex;
   justify-content: space-between;
