@@ -69,7 +69,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="标题"><el-input v-model="productForm.title" /></el-form-item>
-        <el-form-item label="封面"><el-input v-model="productForm.cover" /></el-form-item>
+        <el-form-item label="封面"><ImageField v-model="productForm.cover" folder="gather" /></el-form-item>
         <el-form-item label="详情门店"><el-input v-model="productForm.detail_id" placeholder="关联详情门店 ID，可选" /></el-form-item>
         <el-form-item label="标签"><el-input v-model="productForm.tag" /></el-form-item>
         <el-form-item label="多标签"><el-input v-model="tagsText" placeholder="逗号分隔" /></el-form-item>
@@ -91,6 +91,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
+import ImageField from '../components/ImageField.vue'
 
 const tabs = ref([])
 const products = ref([])

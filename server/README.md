@@ -40,11 +40,16 @@ JWT_SECRET=请换成长随机串
 ADMIN_PASSWORD=请改掉默认密码
 WX_APPID=wxc85b8624dd75e61c
 WX_SECRET=你的小程序AppSecret
+WX_CLOUD_ENV=prod-d7gemg7fe0004adc9
+COS_BUCKET=7072-prod-d7gemg7fe0004adc9-1492244999
+COS_REGION=ap-shanghai
+COS_CDN_DOMAIN=https://7072-prod-d7gemg7fe0004adc9-1492244999.tcb.qcloud.la
 ```
 
-4. 小程序调用：`wx.cloud.callContainer`，路径如 `/api/v1/home`
+后台图片上传走云托管对象存储开放接口（依赖 `WX_APPID` / `WX_SECRET`），无需再单独配腾讯云 SecretId。
 
-未配置 `WX_APPID` / `WX_SECRET` 时，登录走本地演示 openid；配置后会调用微信 `code2session`，手机号走 `getPhoneNumber` 服务端换号。
+小程序端请把 CDN 域名加入「下载合法域名」：
+`7072-prod-d7gemg7fe0004adc9-1492244999.tcb.qcloud.la`
 
 ## 目录说明
 

@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     wx_mch_id: str = ""
     wx_mch_key: str = ""
     wx_notify_url: str = ""
+    # 微信云托管对象存储
+    wx_cloud_env: str = "prod-d7gemg7fe0004adc9"
+    cos_bucket: str = "7072-prod-d7gemg7fe0004adc9-1492244999"
+    cos_region: str = "ap-shanghai"
+    cos_cdn_domain: str = "https://7072-prod-d7gemg7fe0004adc9-1492244999.tcb.qcloud.la"
     port: int = 80
 
 

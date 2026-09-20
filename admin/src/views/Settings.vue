@@ -4,7 +4,7 @@
       <el-form-item label="客服热线"><el-input v-model="form.hotline" /></el-form-item>
       <el-form-item label="管家标题"><el-input v-model="form.stewardTitle" /></el-form-item>
       <el-form-item label="管家提示"><el-input v-model="form.stewardTip" /></el-form-item>
-      <el-form-item label="管家二维码"><el-input v-model="form.stewardQr" /></el-form-item>
+      <el-form-item label="管家二维码"><ImageField v-model="form.stewardQr" folder="site" /></el-form-item>
       <el-form-item label="午市库存默认"><el-input-number v-model="form.roomCapacity.lunch" :min="0" /></el-form-item>
       <el-form-item label="晚市库存默认"><el-input-number v-model="form.roomCapacity.dinner" :min="0" /></el-form-item>
       <el-form-item label="年夜饭开放起"><el-input v-model="form.nyeOpenStart" /></el-form-item>
@@ -23,6 +23,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '../api/http'
+import ImageField from '../components/ImageField.vue'
 
 const rulesText = ref('')
 const form = reactive({

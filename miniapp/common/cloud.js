@@ -1,4 +1,4 @@
-import { CLOUD_ENV, CLOUD_SERVICE, PUBLIC_BASE } from './config.js'
+import { CLOUD_ENV, CLOUD_SERVICE, PUBLIC_BASE, COS_CDN } from './config.js'
 
 let cloudReady = false
 
@@ -16,6 +16,40 @@ export function initCloud() {
 		cloudReady = false
 	}
 	return cloudReady
+}
+
+/** 小程序端上传到云托管对象存储，返回 { fileID, url } */
+export function uploadToCloud(filePath, cloudPath) {
+	return new Promise((resolve, reject) => {
+		const wxApi = typeof wx !== 'undefined' ? wx : null
+		if (!wxApi || !wxApi.cloud || !wxApi.cloud.uploadFile) {
+			reject(new Error('当前环境不支持云存储上传'))
+			return
+		}
+		initCloud()
+		const path =
+			cloudPath ||
+			'uploads/' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + '.jpg'
+		wxApi.cloud.uploadFile({
+			cloudPath: path,
+			filePath,
+			success: (res) => {
+				const fileID = (res && res.fileID) || ''
+				const url = cloudFileToUrl(fileID) || ''
+				resolve({ fileID, url, path })
+			},
+			fail: (err) => reject(err || new Error('上传失败'))
+		})
+	})
+}
+
+/** cloud://fileID 转 CDN https 地址（需存储权限为所有用户可读） */
+export function cloudFileToUrl(fileID) {
+	if (!fileID) return ''
+	if (/^https?:\/\//i.test(fileID)) return fileID
+	const m = String(fileID).match(/^cloud:\/\/[^/]+\/(.+)$/)
+	if (m) return COS_CDN.replace(/\/$/, '') + '/' + m[1]
+	return ''
 }
 
 function getOpenid() {

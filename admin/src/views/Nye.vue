@@ -22,7 +22,7 @@
       <el-form label-width="100px">
         <el-form-item label="ID"><el-input v-model="form.id" :disabled="editing" /></el-form-item>
         <el-form-item label="名称"><el-input v-model="form.name" /></el-form-item>
-        <el-form-item label="封面"><el-input v-model="form.cover" /></el-form-item>
+        <el-form-item label="封面"><ImageField v-model="form.cover" folder="nye" /></el-form-item>
         <el-form-item label="价格"><el-input-number v-model="form.price" :min="0" /></el-form-item>
         <el-form-item label="原价"><el-input-number v-model="form.origin_price" :min="0" /></el-form-item>
         <el-form-item label="标签"><el-input v-model="form.tag" /></el-form-item>
@@ -48,6 +48,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
+import ImageField from '../components/ImageField.vue'
 
 const list = ref([])
 const visible = ref(false)

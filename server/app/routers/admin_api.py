@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -38,6 +38,7 @@ from ..schemas import (
     StoreIn,
     TokenResponse,
 )
+from ..storage import storage_configured, upload_file
 from ..utils import STATUS_TEXT, dumps, get_config, loads, set_config
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -49,6 +50,20 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=400, detail="用户名或密码错误")
     return TokenResponse(access_token=create_access_token(user.username), username=user.username)
+
+
+@router.post("/upload")
+async def admin_upload(
+    file: UploadFile = File(...),
+    folder: str = Form(default="uploads"),
+    _: AdminUser = Depends(get_current_admin),
+):
+    if not storage_configured():
+        raise HTTPException(
+            status_code=500,
+            detail="未配置对象存储：请设置 WX_APPID、WX_SECRET、WX_CLOUD_ENV",
+        )
+    return await upload_file(file, folder=folder or "uploads")
 
 
 @router.get("/me")

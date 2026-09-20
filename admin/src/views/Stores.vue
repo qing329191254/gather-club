@@ -26,7 +26,7 @@
       <el-form label-width="90px">
         <el-form-item label="门店ID"><el-input v-model="form.id" :disabled="editing" placeholder="门店唯一标识" /></el-form-item>
         <el-form-item label="名称"><el-input v-model="form.name" /></el-form-item>
-        <el-form-item label="封面"><el-input v-model="form.cover" /></el-form-item>
+        <el-form-item label="封面"><ImageField v-model="form.cover" folder="stores" /></el-form-item>
         <el-form-item label="地址"><el-input v-model="form.address" /></el-form-item>
         <el-form-item label="路线"><el-input v-model="form.route" type="textarea" :rows="3" /></el-form-item>
         <el-form-item label="电话"><el-input v-model="form.phone" /></el-form-item>
@@ -47,6 +47,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
+import ImageField from '../components/ImageField.vue'
 
 const list = ref([])
 const visible = ref(false)

@@ -4,8 +4,8 @@
       <template #header>视频号资料</template>
       <el-form label-width="120px" style="max-width: 720px">
         <el-form-item label="名称"><el-input v-model="profile.name" /></el-form-item>
-        <el-form-item label="头像"><el-input v-model="profile.avatar" /></el-form-item>
-        <el-form-item label="封面"><el-input v-model="profile.cover" /></el-form-item>
+        <el-form-item label="头像"><ImageField v-model="profile.avatar" folder="video" /></el-form-item>
+        <el-form-item label="封面"><ImageField v-model="profile.cover" folder="video" /></el-form-item>
         <el-form-item label="简介"><el-input v-model="profile.intro" type="textarea" :rows="3" /></el-form-item>
         <el-form-item label="视频号 ID">
           <el-input v-model="profile.finderUserName" placeholder="视频号 ID" />
@@ -55,7 +55,7 @@
         <el-form-item label="标题"><el-input v-model="form.line1" /></el-form-item>
         <el-form-item label="副标题"><el-input v-model="form.line2" /></el-form-item>
         <el-form-item label="预约积分"><el-input-number v-model="form.points" :min="0" /></el-form-item>
-        <el-form-item label="头像"><el-input v-model="form.avatar" placeholder="可选，留空使用视频号头像" /></el-form-item>
+        <el-form-item label="头像"><ImageField v-model="form.avatar" folder="video" placeholder="可选，留空使用视频号头像" /></el-form-item>
         <el-form-item label="预告 ID"><el-input v-model="form.notice_id" placeholder="直播预告 ID" /></el-form-item>
         <el-form-item label="排序"><el-input-number v-model="form.sort" :min="0" /></el-form-item>
         <el-form-item label="启用"><el-switch v-model="form.enabled" /></el-form-item>
@@ -72,6 +72,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
+import ImageField from '../components/ImageField.vue'
 
 const profile = reactive({
   name: '',
