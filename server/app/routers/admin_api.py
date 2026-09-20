@@ -38,7 +38,7 @@ from ..schemas import (
     StoreIn,
     TokenResponse,
 )
-from ..storage import storage_configured, upload_file
+from ..storage import diagnose_storage, storage_configured, upload_file
 from ..utils import STATUS_TEXT, dumps, get_config, loads, normalize_page, page_payload, set_config
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -52,6 +52,12 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     return TokenResponse(access_token=create_access_token(user.username), username=user.username)
 
 
+@router.get("/storage/status")
+async def storage_status(_: AdminUser = Depends(get_current_admin)):
+    """上传能力自检（不含密钥明文）。"""
+    return await diagnose_storage()
+
+
 @router.post("/upload")
 async def admin_upload(
     file: UploadFile = File(...),
@@ -61,9 +67,14 @@ async def admin_upload(
     if not storage_configured():
         raise HTTPException(
             status_code=500,
-            detail="对象存储未就绪：请配置 WX_APPID、WX_SECRET、WX_CLOUD_ENV 后重新发布",
+            detail="未配置 WX_CLOUD_ENV。请到云托管环境变量补齐后重新发布",
         )
-    return await upload_file(file, folder=folder or "uploads")
+    try:
+        return await upload_file(file, folder=folder or "uploads")
+    except HTTPException:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"上传失败: {exc}") from exc
 
 
 @router.get("/me")

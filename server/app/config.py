@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,6 +24,27 @@ class Settings(BaseSettings):
     cos_region: str = "ap-shanghai"
     cos_cdn_domain: str = "https://7072-prod-d7gemg7fe0004adc9-1492244999.tcb.qcloud.la"
     port: int = 80
+
+    @field_validator(
+        "wx_appid",
+        "wx_secret",
+        "wx_mch_id",
+        "wx_mch_key",
+        "wx_notify_url",
+        "wx_cloud_env",
+        "cos_bucket",
+        "cos_region",
+        "cos_cdn_domain",
+        mode="before",
+    )
+    @classmethod
+    def strip_str(cls, v):
+        if v is None:
+            return ""
+        s = str(v).strip()
+        if (s.startswith('"') and s.endswith('"')) or (s.startswith("'") and s.endswith("'")):
+            s = s[1:-1].strip()
+        return s
 
 
 @lru_cache
