@@ -298,18 +298,18 @@ def _resolve_order_price(db: Session, payload: OrderCreateIn) -> tuple[float, fl
         try:
             rid = int(payload.store_id)
         except (TypeError, ValueError):
-            raise HTTPException(status_code=400, detail="推荐商品无效")
+            raise HTTPException(status_code=400, detail="酒店无效")
         row = (
             db.query(RecommendItem)
             .filter(RecommendItem.id == rid, RecommendItem.enabled.is_(True))
             .first()
         )
         if not row:
-            raise HTTPException(status_code=404, detail="推荐商品不存在")
+            raise HTTPException(status_code=404, detail="酒店不存在")
         unit = float(row.price or 0)
         if unit <= 0:
-            raise HTTPException(status_code=400, detail="商品价格异常")
-        return unit, round(unit * qty, 2), row.name, row.cover or "", payload.spec or "推荐位"
+            raise HTTPException(status_code=400, detail="酒店价格异常")
+        return unit, round(unit * qty, 2), row.name, row.cover or "", payload.spec or "顶酒店"
 
     if otype == "nye":
         store = (

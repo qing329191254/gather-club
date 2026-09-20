@@ -85,7 +85,7 @@
 			"path": "pages/recommend/recommend",
 			"style": {
 				"navigationStyle": "custom",
-				"navigationBarTitleText": "推荐位集合",
+				"navigationBarTitleText": "顶酒店",
 				"navigationBarTextStyle": "black",
 				"backgroundColor": "#F5F5F5"
 			}

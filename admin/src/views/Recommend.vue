@@ -1,7 +1,7 @@
 <template>
   <el-card>
     <div class="toolbar">
-      <el-button type="primary" @click="openEdit()">新增精选</el-button>
+      <el-button type="primary" @click="openEdit()">新增酒店</el-button>
       <el-button @click="openBanners">顶部轮播</el-button>
     </div>
     <el-table :data="list" stripe>
@@ -29,10 +29,10 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="visible" :title="form.id ? '编辑精选' : '新增精选'" width="560px">
+    <el-dialog v-model="visible" :title="form.id ? '编辑酒店' : '新增酒店'" width="560px">
       <el-form label-width="90px">
         <el-form-item label="名称" required>
-          <el-input v-model="form.name" placeholder="酒店 / 门店 / 合作方名称" />
+          <el-input v-model="form.name" placeholder="酒店名称" />
         </el-form-item>
         <el-form-item label="封面">
           <ImageField v-model="form.cover" folder="recommend" />
@@ -54,7 +54,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="bannerVisible" title="精选页顶部轮播" width="640px">
+    <el-dialog v-model="bannerVisible" title="顶酒店页顶部轮播" width="640px">
       <ImageListField v-model="banners" folder="recommend" />
       <template #footer>
         <el-button @click="bannerVisible = false">取消</el-button>

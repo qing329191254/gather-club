@@ -46,7 +46,7 @@ const menus = [
   { path: '/gather', title: '去哪聚', icon: 'Grid' },
   { path: '/nye', title: '宴会专题', icon: 'Food' },
   { path: '/mall', title: '积分商城', icon: 'Goods' },
-  { path: '/recommend', title: '精选推荐', icon: 'Star' },
+  { path: '/recommend', title: '顶酒店', icon: 'OfficeBuilding' },
   { path: '/content', title: '内容配置', icon: 'Document' },
   { path: '/orders', title: '订单管理', icon: 'List' },
   { path: '/rooms', title: '包房库存', icon: 'Calendar' },
