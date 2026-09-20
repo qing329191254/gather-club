@@ -24,9 +24,12 @@ def ensure_schema() -> None:
         if "nye_stores" in tables:
             cols = {c["name"] for c in inspector.get_columns("nye_stores")}
             if "packages" not in cols:
-                conn.execute(text("ALTER TABLE nye_stores ADD COLUMN packages TEXT DEFAULT '[]'"))
+                # MySQL: TEXT/JSON/BLOB cannot have DEFAULT
+                conn.execute(text("ALTER TABLE nye_stores ADD COLUMN packages TEXT NULL"))
+                conn.execute(text("UPDATE nye_stores SET packages = '[]' WHERE packages IS NULL"))
         if "orders" in tables:
             cols = {c["name"] for c in inspector.get_columns("orders")}
             if "extra" not in cols:
-                conn.execute(text("ALTER TABLE orders ADD COLUMN extra TEXT DEFAULT '{}'"))
+                conn.execute(text("ALTER TABLE orders ADD COLUMN extra TEXT NULL"))
+                conn.execute(text("UPDATE orders SET extra = '{}' WHERE extra IS NULL"))
         # recommend_items / addresses created by create_all
