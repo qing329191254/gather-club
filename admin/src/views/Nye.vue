@@ -4,12 +4,24 @@
       <el-button type="primary" @click="openEdit()">新增年夜饭门店</el-button>
     </div>
     <el-table :data="list" stripe>
-      <el-table-column prop="id" label="ID" width="110" />
+      <el-table-column label="封面" width="100">
+        <template #default="{ row }">
+          <el-image v-if="row.cover" :src="row.cover" style="width: 72px; height: 48px" fit="cover" />
+          <span v-else class="muted">暂无</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="name" label="名称" min-width="220" show-overflow-tooltip />
       <el-table-column prop="price" label="价格" width="90" />
       <el-table-column prop="address" label="地址" min-width="180" show-overflow-tooltip />
       <el-table-column prop="open_start" label="开放起" width="110" />
       <el-table-column prop="open_end" label="开放止" width="110" />
+      <el-table-column label="是否上架" width="100">
+        <template #default="{ row }">
+          <el-tag :type="row.enabled ? 'success' : 'info'" size="small">
+            {{ row.enabled ? '上架' : '下架' }}
+          </el-tag>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" width="140" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
@@ -18,23 +30,51 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="visible" :title="editing ? '编辑' : '新增'" width="720px">
+    <el-dialog v-model="visible" :title="editing ? '编辑年夜饭门店' : '新增年夜饭门店'" width="720px">
       <el-form label-width="100px">
-        <el-form-item label="ID"><el-input v-model="form.id" :disabled="editing" /></el-form-item>
-        <el-form-item label="名称"><el-input v-model="form.name" /></el-form-item>
-        <el-form-item label="封面"><ImageField v-model="form.cover" folder="nye" /></el-form-item>
-        <el-form-item label="价格"><el-input-number v-model="form.price" :min="0" /></el-form-item>
-        <el-form-item label="原价"><el-input-number v-model="form.origin_price" :min="0" /></el-form-item>
-        <el-form-item label="标签"><el-input v-model="form.tag" /></el-form-item>
-        <el-form-item label="地址"><el-input v-model="form.address" /></el-form-item>
-        <el-form-item label="路线"><el-input v-model="form.route" type="textarea" :rows="2" /></el-form-item>
-        <el-form-item label="轮播图"><el-input v-model="bannersText" type="textarea" :rows="2" placeholder="每行一个图片地址" /></el-form-item>
-        <el-form-item label="详情长图"><el-input v-model="detailText" type="textarea" :rows="2" placeholder="每行一个图片地址" /></el-form-item>
-        <el-form-item label="套餐 JSON"><el-input v-model="packagesText" type="textarea" :rows="8" placeholder="套餐列表 JSON" /></el-form-item>
-        <el-form-item label="开放起"><el-input v-model="form.open_start" placeholder="YYYY-MM-DD" /></el-form-item>
-        <el-form-item label="开放止"><el-input v-model="form.open_end" placeholder="YYYY-MM-DD" /></el-form-item>
-        <el-form-item label="排序"><el-input-number v-model="form.sort" :min="0" /></el-form-item>
-        <el-form-item label="启用"><el-switch v-model="form.enabled" /></el-form-item>
+        <el-form-item label="名称" required>
+          <el-input v-model="form.name" placeholder="例如：上海莘庄店-天天俱乐部-2027年夜饭" />
+        </el-form-item>
+        <el-form-item label="封面">
+          <ImageField v-model="form.cover" folder="nye" />
+        </el-form-item>
+        <el-form-item label="现价">
+          <el-input-number v-model="form.price" :min="0" :precision="0" />
+        </el-form-item>
+        <el-form-item label="原价">
+          <el-input-number v-model="form.origin_price" :min="0" :precision="0" />
+        </el-form-item>
+        <el-form-item label="角标文案">
+          <el-input v-model="form.tag" placeholder="例如：年夜饭" />
+        </el-form-item>
+        <el-form-item label="地址">
+          <el-input v-model="form.address" placeholder="门店详细地址" />
+        </el-form-item>
+        <el-form-item label="路线说明">
+          <el-input v-model="form.route" type="textarea" :rows="2" placeholder="怎么走、地铁公交等，可选" />
+        </el-form-item>
+        <el-form-item label="轮播图">
+          <el-input v-model="bannersText" type="textarea" :rows="2" placeholder="每行一个图片链接" />
+        </el-form-item>
+        <el-form-item label="详情长图">
+          <el-input v-model="detailText" type="textarea" :rows="2" placeholder="每行一个图片链接" />
+        </el-form-item>
+        <el-form-item label="套餐配置">
+          <el-input v-model="packagesText" type="textarea" :rows="8" placeholder="套餐列表（技术配置，一般不用改）" />
+        </el-form-item>
+        <el-form-item label="开放起">
+          <el-input v-model="form.open_start" placeholder="YYYY-MM-DD" />
+        </el-form-item>
+        <el-form-item label="开放止">
+          <el-input v-model="form.open_end" placeholder="YYYY-MM-DD" />
+        </el-form-item>
+        <el-form-item label="排序">
+          <el-input-number v-model="form.sort" :min="0" />
+          <span class="hint">数字越小越靠前</span>
+        </el-form-item>
+        <el-form-item label="是否上架">
+          <el-switch v-model="form.enabled" active-text="上架" inactive-text="下架" />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="visible = false">取消</el-button>
@@ -63,6 +103,10 @@ const empty = () => ({
 })
 const form = reactive(empty())
 
+function genId() {
+  return `nye${Date.now().toString(36)}`
+}
+
 async function load() {
   list.value = await http.get('/nye')
 }
@@ -77,18 +121,24 @@ function openEdit(row) {
 }
 
 async function onSave() {
+  if (!form.name?.trim()) {
+    ElMessage.warning('请填写名称')
+    return
+  }
   let packages = []
   if (packagesText.value.trim()) {
     try {
       packages = JSON.parse(packagesText.value)
       if (!Array.isArray(packages)) throw new Error('not array')
     } catch (e) {
-      ElMessage.error('套餐 JSON 格式不正确')
+      ElMessage.error('套餐配置格式不正确，请联系技术处理')
       return
     }
   }
   const payload = {
     ...form,
+    id: editing.value ? form.id : (form.id || genId()),
+    name: form.name.trim(),
     banners: bannersText.value.split(/\n/).map((s) => s.trim()).filter(Boolean),
     detail_images: detailText.value.split(/\n/).map((s) => s.trim()).filter(Boolean),
     packages
@@ -101,7 +151,7 @@ async function onSave() {
 }
 
 async function onRemove(row) {
-  await ElMessageBox.confirm('确认删除？', '提示')
+  await ElMessageBox.confirm(`确认删除「${row.name}」？`, '提示')
   await http.delete(`/nye/${row.id}`)
   load()
 }
@@ -111,4 +161,6 @@ onMounted(load)
 
 <style scoped>
 .toolbar { margin-bottom: 12px; }
+.hint { margin-left: 8px; color: #94a3b8; font-size: 12px; }
+.muted { color: #94a3b8; font-size: 12px; }
 </style>
