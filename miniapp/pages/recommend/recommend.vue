@@ -1,4 +1,5 @@
 <template>
+	<app-loading />
 	<view class="page">
 		<view
 			class="navbar"
@@ -45,7 +46,7 @@
 							<text class="num">{{ item.price }}</text>
 							<text class="suffix">/人起</text>
 						</view>
-						<view class="buy" @tap.stop="onBuy(item)">
+						<view class="buy" :class="{ 'tap-busy': isTapBusy('buy-' + item.id) }" @tap.stop="onBuy(item)">
 							<text class="buy-text">去购买</text>
 						</view>
 					</view>
@@ -105,40 +106,38 @@
 			},
 			async onBuy(item) {
 				if (!item) return
-				if (!isLoggedIn()) await silentLogin()
-				uni.showModal({
-					title: '确认支付',
-					content: `需支付 ¥${item.price}`,
-					confirmText: '立即支付',
-					confirmColor: '#e54148',
-					success: async (res) => {
-						if (!res.confirm) return
-						uni.showLoading({ title: '支付中', mask: true })
-						try {
-							const created = await api.createOrder({
-								type: 'recommend',
-								store_id: String(item.id),
-								store_name: item.name,
-								title: item.name,
-								spec: '订酒店',
-								cover: item.cover,
-								quantity: 1,
-								price: item.price,
-								amount: item.price
-							})
-							if (created && created.id) {
-								const payRes = await api.payOrder(created.id)
-								await settlePay(payRes)
-							}
-							uni.hideLoading()
-							uni.showToast({ title: '支付成功', icon: 'success' })
-							setTimeout(() => {
-								uni.navigateTo({ url: '/pages/orders/orders' })
-							}, 600)
-						} catch (e) {
-							uni.hideLoading()
-							uni.showToast({ title: (e && e.message) || '支付失败', icon: 'none' })
+				const key = 'buy-' + item.id
+				return this.tapGuard(key, async () => {
+					if (!isLoggedIn()) await silentLogin()
+					const ok = await this.askModal({
+						title: '确认支付',
+						content: `需支付 ¥${item.price}`,
+						confirmText: '立即支付',
+						confirmColor: '#e54148'
+					})
+					if (!ok) return
+					try {
+						const created = await api.createOrder({
+							type: 'recommend',
+							store_id: String(item.id),
+							store_name: item.name,
+							title: item.name,
+							spec: '订酒店',
+							cover: item.cover,
+							quantity: 1,
+							price: item.price,
+							amount: item.price
+						})
+						if (created && created.id) {
+							const payRes = await api.payOrder(created.id)
+							await settlePay(payRes)
 						}
+						uni.showToast({ title: '支付成功', icon: 'success' })
+						setTimeout(() => {
+							uni.navigateTo({ url: '/pages/orders/orders' })
+						}, 600)
+					} catch (e) {
+						uni.showToast({ title: (e && e.message) || '支付失败', icon: 'none' })
 					}
 				})
 			}

@@ -1,4 +1,5 @@
 <template>
+	<app-loading />
 	<view class="page">
 		<view
 			v-for="item in menus"

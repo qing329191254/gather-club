@@ -1,5 +1,6 @@
 <template>
 	<page-meta :page-style="'overflow:' + (calendarVisible ? 'hidden' : 'visible')"></page-meta>
+	<app-loading />
 	<view class="page">
 		<view class="sec">
 			<view class="sec-title">
@@ -90,7 +91,7 @@
 				<text class="bar-label">包房</text>
 				<text class="bar-val" :class="{ danger: !canSubmit }">{{ barStatus }}</text>
 			</view>
-			<view class="submit" :class="{ mute: !canSubmit }" @tap="onSubmit">提交预约</view>
+			<view class="submit" :class="{ mute: !canSubmit, 'tap-busy': isTapBusy('submit') }" @tap="onSubmit">提交预约</view>
 		</view>
 
 		<view v-if="calendarVisible" class="cal-mask" @tap="closeCalendar">
@@ -344,11 +345,10 @@
 					uni.showToast({ title: '请填写正确手机号', icon: 'none' })
 					return
 				}
-
+				return this.tapGuard('submit', async () => {
 				if (!isLoggedIn()) await silentLogin()
 
 				const slotMeta = SLOTS.find((s) => s.key === this.slot) || SLOTS[1]
-				uni.showLoading({ title: '提交中', mask: true })
 				try {
 					const created = await api.createOrder({
 						type: 'room',
@@ -371,7 +371,6 @@
 						const payRes = await api.payOrder(created.id)
 						await settlePay(payRes)
 					}
-					uni.hideLoading()
 					this.tick++
 					this.loadRemoteMonth()
 					uni.showToast({ title: '预约成功', icon: 'success' })
@@ -379,11 +378,11 @@
 						uni.navigateTo({ url: '/pages/orders/orders' })
 					}, 600)
 				} catch (e) {
-					uni.hideLoading()
 					uni.showToast({ title: (e && e.message) || '预约失败', icon: 'none' })
 					this.tick++
 					this.loadRemoteMonth()
 				}
+				})
 			}
 		}
 	}

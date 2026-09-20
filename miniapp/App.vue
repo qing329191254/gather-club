@@ -12,7 +12,7 @@
 			uni.hideTabBar({ fail() {} })
 			initCloud()
 			if (isLoggedIn()) {
-				silentLogin()
+				silentLogin({ quiet: true })
 					.then(() => {
 						this.globalData.authVersion = Date.now()
 					})
@@ -30,5 +30,10 @@
 	page {
 		background-color: #F6F3EF;
 		font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Helvetica, "Microsoft YaHei", sans-serif;
+	}
+
+	/* 只作用在加了这个类的那一个按钮上 */
+	.tap-busy {
+		opacity: 0.45;
 	}
 </style>

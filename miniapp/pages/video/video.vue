@@ -1,4 +1,5 @@
 <template>
+	<app-loading />
 	<view class="page">
 		<view class="header">
 			<view class="header-avatar-wrap">
@@ -16,14 +17,14 @@
 				<view class="channel-row">
 					<image class="channel-avatar" :src="profile.avatar" mode="aspectFill" />
 					<text class="channel-name">{{ profile.name }}</text>
-					<view class="follow" @tap.stop="onFollow">{{ followed ? '已关注' : '关注视频号' }}</view>
+					<view class="follow" :class="{ 'tap-busy': isTapBusy('follow') }" @tap.stop="onFollow">{{ followed ? '已关注' : '关注视频号' }}</view>
 				</view>
 				<text class="intro">{{ profile.intro }}</text>
 			</view>
 		</view>
 
 		<!-- 直播中 -->
-		<view v-if="living" class="live-onair" @tap="onWatch(living)">
+		<view v-if="living" class="live-onair" :class="{ 'tap-busy': isTapBusy('watch-' + living.id) }" @tap="onWatch(living)">
 			<view class="live-onair-glow"></view>
 			<view class="live-onair-inner">
 				<view class="onair-badge">
@@ -49,7 +50,7 @@
 		</view>
 
 		<!-- 预约列表 -->
-		<view v-for="item in lives" :key="item.id" class="live" @tap="onReserve(item)">
+		<view v-for="item in lives" :key="item.id" class="live" :class="{ 'tap-busy': isTapBusy('reserve-' + item.id) }" @tap="onReserve(item)">
 			<view class="points-flare"></view>
 			<view class="live-head">
 				<view class="live-schedule">
@@ -114,6 +115,7 @@
 				}
 			},
 			async onFollow() {
+				return this.tapGuard('follow', async () => {
 				try {
 					const res = await api.videoFollow()
 					this.followed = true
@@ -127,8 +129,11 @@
 				} catch (e) {
 					uni.showToast({ title: (e && e.message) || '关注失败', icon: 'none' })
 				}
+				})
 			},
 			async onWatch(item) {
+				const key = 'watch-' + ((item && item.id) || 'live')
+				return this.tapGuard(key, async () => {
 				try {
 					const res = await api.videoWatch(item && item.id)
 					const finder = (res && res.finderUserName) || ''
@@ -141,9 +146,11 @@
 				} catch (e) {
 					uni.showToast({ title: (e && e.message) || '打开失败', icon: 'none' })
 				}
+				})
 			},
 			async onReserve(item) {
 				if (!item || !item.id) return
+				return this.tapGuard('reserve-' + item.id, async () => {
 				try {
 					const res = await api.videoReserve(item.id)
 					const data = (res && res.data) || {}
@@ -162,6 +169,7 @@
 				} catch (e) {
 					uni.showToast({ title: (e && e.message) || '预约失败', icon: 'none' })
 				}
+				})
 			},
 			openChannel(name, extra) {
 				const finder = this.profile.finderUserName || ''

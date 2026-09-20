@@ -1,5 +1,6 @@
 <template>
 	<page-meta :page-style="'overflow:' + (stewardVisible || regionVisible ? 'hidden' : 'visible')"></page-meta>
+	<app-loading />
 	<view class="page">
 		<view class="fixed-head" :style="{ paddingTop: statusBarHeight + 'px' }">
 			<view class="nav">

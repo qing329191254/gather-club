@@ -11,6 +11,7 @@
 				<view class="btn ghost" @tap="onCancel">取消</view>
 				<button
 					class="btn solid phone-btn"
+					:class="{ 'tap-busy': busy }"
 					open-type="getPhoneNumber"
 					@getphonenumber="onGetPhoneNumber"
 				>
@@ -29,13 +30,21 @@
 				default: false
 			}
 		},
+		data() {
+			return { busy: false }
+		},
 		methods: {
 			preventTouchMove() {},
 			onCancel() {
 				this.$emit('cancel')
 			},
 			onGetPhoneNumber(e) {
+				if (this.busy) return
+				this.busy = true
 				this.$emit('confirm', (e && e.detail) || {})
+			},
+			resetBusy() {
+				this.busy = false
 			}
 		}
 	}

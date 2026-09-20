@@ -1,7 +1,7 @@
 <template>
   <el-card>
     <div class="toolbar">
-      <el-button type="primary" :loading="saving" @click="onSave">保存配置</el-button>
+      <el-button type="primary" :loading="savingWhich === 'top'" @click="onSave(true, 'top')">保存配置</el-button>
       <span class="hint">{{ statusText }}</span>
     </div>
     <el-form label-width="120px" style="max-width: 780px">
@@ -81,8 +81,8 @@
       </el-form-item>
 
       <el-form-item>
-        <el-button type="primary" :loading="saving" @click="onSave">保存配置</el-button>
-        <el-button :loading="saving" @click="restoreCheckin">恢复签到默认</el-button>
+        <el-button type="primary" :loading="savingWhich === 'bottom'" @click="onSave(true, 'bottom')">保存配置</el-button>
+        <el-button :loading="restoring" @click="restoreCheckin">恢复签到默认</el-button>
       </el-form-item>
     </el-form>
   </el-card>
@@ -131,7 +131,9 @@ const loyalty = reactive({
   roomPrice: 0
 })
 const ready = ref(false)
-const saving = ref(false)
+const savingWhich = ref('')
+const restoring = ref(false)
+const saving = computed(() => !!savingWhich.value)
 const dirty = ref(false)
 const lastSavedAt = ref('')
 let saveTimer = null
@@ -214,9 +216,9 @@ async function load() {
   ready.value = true
 }
 
-async function onSave(showToast = true) {
-  if (saving.value) return
-  saving.value = true
+async function onSave(showToast = true, which = 'auto') {
+  if (savingWhich.value || restoring.value) return
+  savingWhich.value = which
   try {
     await Promise.all([
       http.put('/config/site', { value: buildSiteValue() }),
@@ -227,19 +229,20 @@ async function onSave(showToast = true) {
     lastSavedAt.value = new Date().toLocaleTimeString()
     if (showToast) ElMessage.success('已保存')
   } finally {
-    saving.value = false
+    savingWhich.value = ''
   }
 }
 
 async function restoreCheckin() {
-  saving.value = true
+  if (savingWhich.value || restoring.value) return
+  restoring.value = true
   try {
     const res = await http.post('/config/checkin/restore')
     applyCheckin(res.value || {})
     dirty.value = false
     ElMessage.success('已恢复签到默认配置')
   } finally {
-    saving.value = false
+    restoring.value = false
   }
 }
 

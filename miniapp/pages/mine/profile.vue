@@ -1,4 +1,5 @@
 <template>
+	<app-loading />
 	<view class="page">
 		<view class="hero">
 			<text class="subtitle">让大家更好认识你~</text>
@@ -61,7 +62,7 @@
 		</view>
 
 		<view class="save-wrap">
-			<view class="save-btn" @tap="onSave">保存</view>
+			<view class="save-btn" :class="{ 'tap-busy': isTapBusy('save') }" @tap="onSave">保存</view>
 		</view>
 
 		<date-picker
@@ -89,6 +90,7 @@
 	import { getUser, saveLogin, getOpenid, refreshProfile, isLoggedIn, silentLogin, bindPhoneFromDetail } from '../../common/auth.js'
 	import { api } from '../../common/api.js'
 	import { uploadToCloud } from '../../common/cloud.js'
+	import { withLoading } from '../../common/loading.js'
 
 	const PROFILE_KEY = 'gather_profile'
 	const PHONE_EDITED_KEY = 'gather_phone_edited'
@@ -152,18 +154,20 @@
 			async onChooseAvatar(e) {
 				const url = e && e.detail && e.detail.avatarUrl
 				if (!url) return
-				uni.showLoading({ title: '上传中', mask: true })
+				return this.tapGuard('avatar', async () => {
 				try {
-					const up = await uploadToCloud(url, 'avatars/' + Date.now() + '.jpg')
+					const up = await withLoading(
+						() => uploadToCloud(url, 'avatars/' + Date.now() + '.jpg'),
+						'上传中'
+					)
 					this.form.avatar = (up && (up.url || up.fileID)) || url
 					this.saveLocal()
 				} catch (err) {
 					// 上传失败时暂存临时地址，保存资料时仍会提交（可能过期）
 					this.form.avatar = url
 					uni.showToast({ title: '头像上传失败，请重试', icon: 'none' })
-				} finally {
-					uni.hideLoading()
 				}
+				})
 			},
 			onNickChange(e) {
 				const name = String((e && e.detail && e.detail.value) || '').trim()
@@ -191,10 +195,8 @@
 			},
 			onPhoneTipConfirm(detail) {
 				this.phoneTipVisible = false
-				uni.showLoading({ title: '绑定中', mask: true })
 				bindPhoneFromDetail(detail)
 					.then((auth) => {
-						uni.hideLoading()
 						const user = (auth && auth.user) || getUser()
 						this.form.phone = user.phone || this.form.phone
 						uni.setStorageSync(PHONE_EDITED_KEY, 1)
@@ -203,7 +205,6 @@
 						uni.showToast({ title: '修改成功', icon: 'success' })
 					})
 					.catch((e) => {
-						uni.hideLoading()
 						uni.showToast({ title: (e && e.message) || '绑定失败', icon: 'none' })
 					})
 			},
@@ -212,7 +213,7 @@
 			},
 			async onSave() {
 				this.saveLocal()
-				uni.showLoading({ title: '保存中', mask: true })
+				return this.tapGuard('save', async () => {
 				try {
 					if (!isLoggedIn()) await silentLogin()
 					const res = await api.updateProfile({
@@ -236,15 +237,14 @@
 						}),
 						getOpenid()
 					)
-					uni.hideLoading()
 					uni.showToast({ title: '保存成功', icon: 'success' })
 					setTimeout(() => {
 						uni.navigateBack({ fail() {} })
 					}, 500)
 				} catch (e) {
-					uni.hideLoading()
 					uni.showToast({ title: (e && e.message) || '保存失败', icon: 'none' })
 				}
+				})
 			}
 		}
 	}

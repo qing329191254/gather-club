@@ -1,4 +1,5 @@
 <template>
+	<app-loading />
 	<view class="page">
 		<view class="card">
 			<text class="doc-title">天天俱乐部会员章程</text>

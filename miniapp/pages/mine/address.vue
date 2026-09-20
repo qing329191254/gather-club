@@ -1,4 +1,5 @@
 <template>
+	<app-loading />
 	<view class="page">
 		<view v-if="!list.length" class="empty">
 			<view class="empty-illust">
@@ -14,7 +15,7 @@
 		</view>
 
 		<view v-else class="list">
-			<view v-for="item in list" :key="item.id" class="card" @tap="onEdit(item)">
+			<view v-for="item in list" :key="item.id" class="card" :class="{ 'tap-busy': isTapBusy('addr-' + item.id) }" @tap="onEdit(item)">
 				<view class="card-top">
 					<text class="name">{{ item.name }}</text>
 					<text class="phone">{{ item.phone }}</text>
@@ -25,7 +26,7 @@
 		</view>
 
 		<view class="footer">
-			<view class="btn ghost" @tap="onImport">微信导入</view>
+			<view class="btn ghost" :class="{ 'tap-busy': isTapBusy('import') }" @tap="onImport">微信导入</view>
 			<view class="btn solid" @tap="onAdd">新增收货地址</view>
 		</view>
 	</view>
@@ -59,6 +60,7 @@
 					uni.showToast({ title: '请在微信小程序中使用', icon: 'none' })
 					return
 				}
+				if (!this.holdTap('import')) return
 				uni.chooseAddress({
 					success: async (res) => {
 						try {
@@ -80,9 +82,12 @@
 							this.loadList()
 						} catch (e) {
 							uni.showToast({ title: (e && e.message) || '导入失败', icon: 'none' })
+						} finally {
+							this.releaseTap('import')
 						}
 					},
 					fail: (err) => {
+						this.releaseTap('import')
 						const msg = (err && err.errMsg) || ''
 						if (msg.indexOf('cancel') !== -1) return
 						uni.showToast({ title: '导入失败', icon: 'none' })
@@ -93,31 +98,32 @@
 				uni.navigateTo({ url: '/pages/mine/address-edit' })
 			},
 			onEdit(item) {
+				const key = 'addr-' + item.id
+				if (!this.holdTap(key)) return
 				uni.showActionSheet({
 					itemList: ['设为默认', '编辑地址', '删除地址'],
-					success: async (res) => {
-						if (res.tapIndex === 0) {
-							try {
-								await api.setDefaultAddress(item.id)
-								uni.showToast({ title: '已设为默认', icon: 'success' })
-								this.loadList()
-							} catch (e) {
-								uni.showToast({ title: (e && e.message) || '操作失败', icon: 'none' })
-							}
-						} else if (res.tapIndex === 1) {
+					success: (res) => {
+						if (res.tapIndex === 1) {
+							this.releaseTap(key)
 							uni.navigateTo({
 								url: '/pages/mine/address-edit?id=' + item.id
 							})
-						} else if (res.tapIndex === 2) {
-							try {
-								await api.deleteAddress(item.id)
-								uni.showToast({ title: '已删除', icon: 'none' })
-								this.loadList()
-							} catch (e) {
-								uni.showToast({ title: (e && e.message) || '删除失败', icon: 'none' })
-							}
+							return
 						}
-					}
+						const task = res.tapIndex === 0
+							? api.setDefaultAddress(item.id).then(() => {
+								uni.showToast({ title: '已设为默认', icon: 'success' })
+								this.loadList()
+							})
+							: api.deleteAddress(item.id).then(() => {
+								uni.showToast({ title: '已删除', icon: 'success' })
+								this.loadList()
+							})
+						Promise.resolve(task).catch((e) => {
+							uni.showToast({ title: (e && e.message) || '操作失败', icon: 'none' })
+						}).finally(() => this.releaseTap(key))
+					},
+					fail: () => this.releaseTap(key)
 				})
 			}
 		}

@@ -60,6 +60,7 @@ async function onSearch() {
     ElMessage.warning('请输入手机号或核销码')
     return
   }
+  if (loading.value) return
   loading.value = true
   searched.value = true
   try {
@@ -71,13 +72,17 @@ async function onSearch() {
 }
 
 async function onVerify(item) {
-  const label = item.kind === 'order' ? '订单' : '优惠券'
-  await ElMessageBox.confirm(`确认核销这张${label}？`, '核销', { type: 'warning' })
-  actingId.value = item.kind + item.id
+  const id = item.kind + item.id
+  if (actingId.value) return
+  actingId.value = id
   try {
+    const label = item.kind === 'order' ? '订单' : '优惠券'
+    await ElMessageBox.confirm(`确认核销这张${label}？`, '核销', { type: 'warning' })
     const res = await http.post('/verify', { kind: item.kind, id: item.id })
     ElMessage.success(res.message || '已核销')
     await onSearch()
+  } catch {
+    /* 取消确认 */
   } finally {
     actingId.value = ''
   }

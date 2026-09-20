@@ -1,4 +1,5 @@
 <template>
+	<app-loading />
 	<view class="page">
 		<view class="article">
 			<text class="title">{{ doc.title }}</text>

@@ -14,7 +14,7 @@
       <el-table-column label="操作" width="140">
         <template #default="{ row }">
           <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
-          <el-button link type="danger" @click="onRemove(row)">删除</el-button>
+          <el-button link type="danger" :loading="busy('remove-' + row.id)" @click="onRemove(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -42,7 +42,7 @@
       </el-form>
       <template #footer>
         <el-button @click="visible = false">取消</el-button>
-        <el-button type="primary" @click="onSave">保存</el-button>
+        <el-button type="primary" :loading="busy('save')" @click="onSave">保存</el-button>
       </template>
     </el-dialog>
   </el-card>
@@ -53,11 +53,13 @@ import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
 import { usePager } from '../composables/usePager'
+import { useLock } from '../composables/useLock'
 
 const list = ref([])
 const visible = ref(false)
 const form = reactive({ id: null, name: '', amount: 0, condition: '无门槛', expire: '', total: 0, enabled: true })
 const { page, pageSize, total, applyPage, pageParams } = usePager()
+const { busy, run } = useLock()
 
 async function load() {
   const res = await http.get('/coupons', { params: pageParams() })
@@ -70,6 +72,7 @@ function openEdit(row) {
 }
 
 async function onSave() {
+  return run('save', async () => {
   const payload = {
     name: form.name,
     amount: form.amount,
@@ -83,12 +86,15 @@ async function onSave() {
   ElMessage.success('已保存')
   visible.value = false
   load()
+  })
 }
 
 async function onRemove(row) {
+  return run('remove-' + row.id, async () => {
   await ElMessageBox.confirm('确认删除？', '提示')
   await http.delete(`/coupons/${row.id}`)
   load()
+  })
 }
 
 onMounted(load)

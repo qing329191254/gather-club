@@ -1,4 +1,5 @@
 <template>
+	<app-loading />
 	<view class="page">
 		<view class="tabs">
 			<view
@@ -43,15 +44,13 @@
 				</view>
 			</view>
 
-			<view v-if="order.status === 'paid' && order.verifyCode" class="verify-box" @tap.stop="onShowCode(order)">
-				<text class="verify-label">到店核销码</text>
-				<text class="verify-code">{{ order.verifyCode }}</text>
-				<text class="verify-tip">向前台出示此码</text>
+			<view v-if="order.status === 'paid' && order.verifyCode" class="order-actions" @tap.stop>
+				<view class="btn solid" @tap="onShowCode(order)">去核销</view>
 			</view>
 
 			<view v-if="order.status === 'pending'" class="order-actions" @tap.stop>
-				<view class="btn ghost" @tap="onCancel(order)">取消订单</view>
-				<view class="btn solid" @tap="onPay(order)">立即支付</view>
+				<view class="btn ghost" :class="{ 'tap-busy': isTapBusy('cancel-' + order.id) }" @tap="onCancel(order)">取消订单</view>
+				<view class="btn solid" :class="{ 'tap-busy': isTapBusy('pay-' + order.id) }" @tap="onPay(order)">立即支付</view>
 			</view>
 		</view>
 
@@ -62,6 +61,14 @@
 			<text class="end-text">{{ loading ? '加载中…' : (hasMore ? '上拉加载更多' : '没有更多了') }}</text>
 			<view class="end-rule" />
 		</view>
+		<verify-code-modal
+			:visible="verifyVisible"
+			:code="verifyCode"
+			:expire="verifyExpire"
+			place-label="适用门店："
+			:places="verifyPlaces"
+			@close="verifyVisible = false"
+		/>
 	</view>
 </template>
 
@@ -85,7 +92,11 @@
 				page: 1,
 				pageSize: 20,
 				hasMore: true,
-				loading: false
+				loading: false,
+				verifyVisible: false,
+				verifyCode: '',
+				verifyExpire: '',
+				verifyPlaces: []
 			}
 		},
 		onShow() {
@@ -161,8 +172,7 @@
 							detail.title || '',
 							detail.spec || '',
 							detail.statusText || '',
-							detail.verifyCode && detail.status === 'paid' ? `核销码：${detail.verifyCode}` : '',
-							detail.roomDate ? `用餐：${detail.roomDate} ${detail.roomSlot || ''}` : '',
+							detail.roomDate ? `用餐：${detail.roomDate} ${this.slotName(detail.roomSlot)}` : '',
 							detail.contactPhone ? `联系人：${detail.contactName || ''} ${detail.contactPhone}` : ''
 						].filter(Boolean)
 						uni.showModal({
@@ -175,31 +185,49 @@
 						uni.showToast({ title: '订单详情加载失败', icon: 'none' })
 					})
 			},
+			slotName(slot) {
+				if (slot === 'lunch') return '午市'
+				if (slot === 'dinner') return '晚市'
+				return slot || ''
+			},
 			onShowCode(order) {
-				uni.showModal({
-					title: '到店核销码',
-					content: order.verifyCode + '\n请向前台出示，由工作人员在后台核销',
-					showCancel: false
-				})
+				if (!order.verifyCode) return
+				const slot = this.slotName(order.roomSlot)
+				this.verifyCode = order.verifyCode
+				this.verifyExpire = order.roomDate ? `用餐时间：${order.roomDate}${slot ? ' ' + slot : ''}` : ''
+				this.verifyPlaces = order.storeName
+					? [{ id: order.storeId || order.storeName, name: order.storeName }]
+					: []
+				this.verifyVisible = true
 			},
 			onCancel(order) {
+				const key = 'cancel-' + order.id
+				if (!this.holdTap(key)) return
 				uni.showModal({
 					title: '取消订单',
 					content: '确定取消该订单吗？取消后不可恢复',
 					confirmColor: '#e54148',
 					success: async (res) => {
-						if (!res.confirm) return
+						if (!res.confirm) {
+							this.releaseTap(key)
+							return
+						}
 						try {
 							await api.cancelOrder(order.id)
 							uni.showToast({ title: '订单已取消', icon: 'none' })
 							this.loadOrders()
 						} catch (e) {
 							uni.showToast({ title: (e && e.message) || '取消失败', icon: 'none' })
+						} finally {
+							this.releaseTap(key)
 						}
-					}
+					},
+					fail: () => this.releaseTap(key)
 				})
 			},
 			onPay(order) {
+				const key = 'pay-' + order.id
+				if (!this.holdTap(key)) return
 				const amount = order.amount || order.price || 0
 				uni.showModal({
 					title: '确认支付',
@@ -207,19 +235,22 @@
 					confirmText: '立即支付',
 					confirmColor: '#e54148',
 					success: async (res) => {
-						if (!res.confirm) return
-						uni.showLoading({ title: '支付中', mask: true })
+						if (!res.confirm) {
+							this.releaseTap(key)
+							return
+						}
 						try {
 							const payRes = await api.payOrder(order.id)
 							await settlePay(payRes)
-							uni.hideLoading()
 							uni.showToast({ title: '支付成功', icon: 'success' })
 							this.loadOrders()
 						} catch (e) {
-							uni.hideLoading()
 							uni.showToast({ title: (e && e.message) || '支付失败', icon: 'none' })
+						} finally {
+							this.releaseTap(key)
 						}
-					}
+					},
+					fail: () => this.releaseTap(key)
 				})
 			}
 		}
@@ -403,35 +434,6 @@
 		font-size: 32rpx;
 		color: #222;
 		font-weight: 600;
-	}
-
-	.verify-box {
-		margin-top: 20rpx;
-		padding: 20rpx 24rpx;
-		border-radius: 12rpx;
-		background: #fff6f5;
-		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-	}
-
-	.verify-label {
-		font-size: 22rpx;
-		color: #e85a4a;
-	}
-
-	.verify-code {
-		margin-top: 6rpx;
-		font-size: 44rpx;
-		font-weight: 700;
-		letter-spacing: 6rpx;
-		color: #222222;
-	}
-
-	.verify-tip {
-		margin-top: 4rpx;
-		font-size: 22rpx;
-		color: #999999;
 	}
 
 	.order-actions {

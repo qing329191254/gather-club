@@ -19,7 +19,7 @@
 			</view>
 			<view class="actions">
 				<view class="btn ghost" @tap="onDisagree">不同意</view>
-				<view class="btn solid" @tap="onAgree">同意并使用</view>
+				<view class="btn solid" :class="{ 'tap-busy': busy }" @tap="onAgree">同意并使用</view>
 			</view>
 		</view>
 	</view>
@@ -31,6 +31,14 @@
 			visible: {
 				type: Boolean,
 				default: false
+			}
+		},
+		data() {
+			return { busy: false }
+		},
+		watch: {
+			visible(value) {
+				if (!value) this.busy = false
 			}
 		},
 		methods: {
@@ -45,6 +53,8 @@
 				this.$emit('disagree')
 			},
 			onAgree() {
+				if (this.busy) return
+				this.busy = true
 				this.$emit('agree')
 			}
 		}

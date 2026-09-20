@@ -1,5 +1,6 @@
 <template>
 	<page-meta :page-style="'overflow:' + (stewardVisible ? 'hidden' : 'visible')"></page-meta>
+	<app-loading />
 	<view class="page">
 		<view
 			class="navbar"

@@ -1,4 +1,5 @@
 <template>
+	<app-loading />
 	<view class="page">
 		<text class="intro">{{ intro }}</text>
 

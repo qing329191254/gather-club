@@ -1,5 +1,6 @@
 <template>
 	<page-meta :page-style="'overflow:' + (stewardVisible ? 'hidden' : 'visible')"></page-meta>
+	<app-loading />
 	<view class="page" :style="pageStyle">
 		<image class="page-bg" :src="current.pageBgImage" mode="aspectFill" />
 		<view class="page-shade" />
@@ -140,7 +141,7 @@
 					<text class="c-title">{{ coupon.title }}</text>
 					<text class="c-tip">{{ coupon.tip }}</text>
 				</view>
-				<view class="use-btn" @tap="onCouponAction">
+				<view class="use-btn" :class="{ 'tap-busy': isTapBusy('claim') }" @tap="onCouponAction">
 					{{ couponClaimed ? '去使用' : '领取' }}
 				</view>
 			</view>
@@ -384,27 +385,29 @@
 				uni.navigateTo({ url: '/pages/mine/member-rules' })
 			},
 			async onCouponAction() {
-				if (!this.couponClaimed) {
-					try {
-						if (!isLoggedIn()) await silentLogin()
-						const res = await api.claimCoupon({ month: currentMonthKey() })
-						if (res && res.ok === false) {
-							this.couponClaimed = true
-							uni.showToast({ title: res.message || '本月已领取', icon: 'none' })
-							return
-						}
-						this.couponClaimed = true
-						uni.setStorageSync(COUPON_CLAIM_KEY, {
-							month: currentMonthKey(),
-							claimed: true
-						})
-						uni.showToast({ title: '领取成功', icon: 'success' })
-					} catch (e) {
-						uni.showToast({ title: (e && e.message) || '领取失败', icon: 'none' })
-					}
+				if (this.couponClaimed) {
+					uni.navigateTo({ url: '/pages/mine/coupons' })
 					return
 				}
-				uni.navigateTo({ url: '/pages/mine/coupons' })
+				return this.tapGuard('claim', async () => {
+				try {
+					if (!isLoggedIn()) await silentLogin()
+					const res = await api.claimCoupon({ month: currentMonthKey() })
+					if (res && res.ok === false) {
+						this.couponClaimed = true
+						uni.showToast({ title: res.message || '本月已领取', icon: 'none' })
+						return
+					}
+					this.couponClaimed = true
+					uni.setStorageSync(COUPON_CLAIM_KEY, {
+						month: currentMonthKey(),
+						claimed: true
+					})
+					uni.showToast({ title: '领取成功', icon: 'success' })
+				} catch (e) {
+					uni.showToast({ title: (e && e.message) || '领取失败', icon: 'none' })
+				}
+				})
 			},
 			openSteward() {
 				this.stewardProps = stewardPropsFromSite()

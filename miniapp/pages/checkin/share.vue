@@ -1,4 +1,5 @@
 <template>
+	<app-loading />
 	<view class="page">
 		<image class="hero" src="/static/checkin/more-gift.png" mode="aspectFit" />
 		<text class="title">转发好友领取补签机会</text>

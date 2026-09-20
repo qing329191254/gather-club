@@ -1,5 +1,6 @@
 import App from './App'
 import { privacyMixin } from './common/privacy-guard.js'
+import { tapGuardMixin } from './common/tap-guard.js'
 
 function currentPageShare() {
 	const pages = getCurrentPages()
@@ -45,6 +46,7 @@ import './uni.promisify.adaptor'
 Vue.config.productionTip = false
 Vue.mixin(shareMixin)
 Vue.mixin(privacyMixin)
+Vue.mixin(tapGuardMixin)
 App.mpType = 'app'
 const app = new Vue({
 	...App
@@ -58,6 +60,7 @@ export function createApp() {
 	const app = createSSRApp(App)
 	app.mixin(shareMixin)
 	app.mixin(privacyMixin)
+	app.mixin(tapGuardMixin)
 	return {
 		app
 	}

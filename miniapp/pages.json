@@ -290,7 +290,9 @@
 			"^phone-login-dialog$": "@/components/phone-login-dialog/phone-login-dialog.vue",
 			"^region-picker$": "@/components/region-picker/region-picker.vue",
 			"^date-picker$": "@/components/date-picker/date-picker.vue",
-			"^tip-dialog$": "@/components/tip-dialog/tip-dialog.vue"
+			"^tip-dialog$": "@/components/tip-dialog/tip-dialog.vue",
+			"^verify-code-modal$": "@/components/verify-code-modal/verify-code-modal.vue",
+			"^app-loading$": "@/components/app-loading/app-loading.vue"
 		}
 	},
 	"globalStyle": {

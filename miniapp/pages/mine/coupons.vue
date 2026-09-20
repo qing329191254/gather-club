@@ -1,4 +1,5 @@
 <template>
+	<app-loading />
 	<view class="page">
 		<view class="tabs">
 			<view
@@ -28,11 +29,17 @@
 				</view>
 				<view class="coupon-right">
 					<text class="name">{{ item.name }}</text>
-					<text class="expire">{{ item.expire }}</text>
-					<text v-if="current === 'unused' && item.verifyCode" class="code">核销码 {{ item.verifyCode }}</text>
+					<text v-if="expireText(item.expire)" class="expire">{{ expireText(item.expire) }}</text>
 				</view>
+				<view v-if="current === 'unused'" class="use-btn" @tap="onUse(item)">去使用</view>
 			</view>
 		</view>
+		<verify-code-modal
+			:visible="verifyVisible"
+			:code="verifyCode"
+			:expire="verifyExpire"
+			@close="verifyVisible = false"
+		/>
 	</view>
 </template>
 
@@ -53,7 +60,10 @@
 					unused: [],
 					used: [],
 					expired: []
-				}
+				},
+				verifyVisible: false,
+				verifyCode: '',
+				verifyExpire: ''
 			}
 		},
 		computed: {
@@ -75,6 +85,29 @@
 						expired: res.expired || []
 					}
 				} catch (e) {}
+			},
+			expireText(expire) {
+				const raw = String(expire || '').trim()
+				if (!raw) return ''
+				if (raw.indexOf('有效期') === 0) return raw
+				const month = raw.match(/^(\d{4})-(\d{2})$/)
+				if (month) {
+					const last = new Date(Number(month[1]), Number(month[2]), 0).getDate()
+					const day = String(last).padStart(2, '0')
+					return `有效期至：${month[1]}-${month[2]}-${day} 23:59:59`
+				}
+				if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return `有效期至：${raw} 23:59:59`
+				if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}/.test(raw)) return `有效期至：${raw}`
+				return `有效期至：${raw}`
+			},
+			onUse(item) {
+				if (!item.verifyCode) {
+					uni.showToast({ title: '核销码生成中，请稍后重试', icon: 'none' })
+					return
+				}
+				this.verifyCode = item.verifyCode
+				this.verifyExpire = this.expireText(item.expire)
+				this.verifyVisible = true
 			}
 		}
 	}
@@ -204,11 +237,14 @@
 		color: #999999;
 	}
 
-	.code {
-		margin-top: 12rpx;
-		font-size: 30rpx;
-		font-weight: 700;
-		letter-spacing: 2rpx;
-		color: #e85a4a;
+	.use-btn {
+		align-self: center;
+		margin-right: 20rpx;
+		padding: 10rpx 28rpx;
+		border-radius: 999rpx;
+		background: #e23636;
+		color: #ffffff;
+		font-size: 24rpx;
+		flex-shrink: 0;
 	}
 </style>

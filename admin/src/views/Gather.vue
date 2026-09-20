@@ -20,7 +20,7 @@
         <el-table-column label="操作" width="140">
           <template #default="{ row }">
             <el-button link type="primary" @click="openRegion(row)">编辑</el-button>
-            <el-button link type="danger" :disabled="row.id === 'all'" @click="removeRegion(row)">删除</el-button>
+            <el-button link type="danger" :disabled="row.id === 'all'" :loading="busy('region-' + row.id)" @click="removeRegion(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -49,7 +49,7 @@
         <el-table-column label="操作" width="140">
           <template #default="{ row }">
             <el-button link type="primary" @click="openTab(row)">编辑</el-button>
-            <el-button link type="danger" @click="removeTab(row)">删除</el-button>
+            <el-button link type="danger" :loading="busy('tab-' + row.id)" @click="removeTab(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -90,7 +90,7 @@
         <el-table-column label="操作" width="140" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="openProduct(row)">编辑</el-button>
-            <el-button link type="danger" @click="removeProduct(row)">删除</el-button>
+            <el-button link type="danger" :loading="busy('product-' + row.id)" @click="removeProduct(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -123,7 +123,7 @@
       </el-form>
       <template #footer>
         <el-button @click="regionVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveRegion">保存</el-button>
+        <el-button type="primary" :loading="busy('save-region')" @click="saveRegion">保存</el-button>
       </template>
     </el-dialog>
 
@@ -145,7 +145,7 @@
       </el-form>
       <template #footer>
         <el-button @click="tabVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveTab">保存</el-button>
+        <el-button type="primary" :loading="busy('save-tab')" @click="saveTab">保存</el-button>
       </template>
     </el-dialog>
 
@@ -212,7 +212,7 @@
       </el-form>
       <template #footer>
         <el-button @click="productVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveProduct">保存</el-button>
+        <el-button type="primary" :loading="busy('save-product')" @click="saveProduct">保存</el-button>
       </template>
     </el-dialog>
   </div>
@@ -224,6 +224,9 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
 import ImageField from '../components/ImageField.vue'
 import { usePager } from '../composables/usePager'
+import { useLock } from '../composables/useLock'
+
+const { busy, run } = useLock()
 
 const tabs = ref([])
 const regions = ref([])
@@ -297,6 +300,7 @@ function openRegion(row) {
 }
 
 async function saveRegion() {
+  return run('save-region', async () => {
   if (!regionForm.name?.trim()) {
     ElMessage.warning('请填写显示名称')
     return
@@ -315,12 +319,15 @@ async function saveRegion() {
   ElMessage.success('已保存')
   regionVisible.value = false
   load()
+  })
 }
 
 async function removeRegion(row) {
+  return run('region-' + row.id, async () => {
   await ElMessageBox.confirm(`确认删除地区「${row.name}」？`, '提示')
   await http.delete(`/gather/regions/${row.id}`)
   load()
+  })
 }
 
 function openTab(row) {
@@ -329,6 +336,7 @@ function openTab(row) {
 }
 
 async function saveTab() {
+  return run('save-tab', async () => {
   if (!tabForm.name?.trim()) {
     ElMessage.warning('请填写分类名称')
     return
@@ -345,12 +353,15 @@ async function saveTab() {
   ElMessage.success('已保存')
   tabVisible.value = false
   load()
+  })
 }
 
 async function removeTab(row) {
+  return run('tab-' + row.id, async () => {
   await ElMessageBox.confirm(`确认删除分类「${row.name}」？`, '提示')
   await http.delete(`/gather/tabs/${row.id}`)
   load()
+  })
 }
 
 function openProduct(row) {
@@ -376,6 +387,7 @@ function openProduct(row) {
 }
 
 async function saveProduct() {
+  return run('save-product', async () => {
   if (!productForm.tab) {
     ElMessage.warning('请选择所属分类')
     return
@@ -397,12 +409,15 @@ async function saveProduct() {
   ElMessage.success('已保存')
   productVisible.value = false
   loadProducts()
+  })
 }
 
 async function removeProduct(row) {
+  return run('product-' + row.id, async () => {
   await ElMessageBox.confirm(`确认删除商品「${row.title}」？`, '提示')
   await http.delete(`/gather/products/${row.id}`)
   loadProducts()
+  })
 }
 
 onMounted(load)

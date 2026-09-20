@@ -69,9 +69,10 @@ def ensure_schema() -> None:
                 ).fetchone()
                 if not marker:
                     conn.execute(text("UPDATE gather_products SET sold_text = ''"))
+                    # text() 会把 :true 当成绑定参数，标记值不要写成 JSON
                     conn.execute(
                         text(
-                            "INSERT INTO site_configs (`key`, value) VALUES ('sold_text_manual_v1', '{\"ok\":true}')"
+                            "INSERT INTO site_configs (`key`, value) VALUES ('sold_text_manual_v1', '1')"
                         )
                     )
         if "orders" in tables:

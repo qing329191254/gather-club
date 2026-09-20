@@ -1,5 +1,6 @@
 <template>
 	<page-meta :page-style="'overflow:' + (successVisible ? 'hidden' : 'visible')"></page-meta>
+	<app-loading />
 	<view class="page">
 		<view class="hero-card">
 			<image class="ring ring-l" src="/static/checkin/ring.png" mode="aspectFit" />
@@ -60,6 +61,7 @@
 						v-for="(cell, index) in calendarCells"
 						:key="'d' + index"
 						class="cal-cell day-cell"
+						:class="{ 'tap-busy': cell.mark === 'today' && isTapBusy('checkin') }"
 						@tap="onDayTap(cell)"
 					>
 						<template v-if="cell.day">
@@ -100,7 +102,7 @@
 			<view class="success-dialog" @tap.stop>
 				<image class="success-icon" src="/static/checkin/success-icon.png" mode="aspectFit" />
 				<text class="success-title">恭喜您成功补签</text>
-				<view class="success-btn" @tap="onClaimPoints">
+				<view class="success-btn" :class="{ 'tap-busy': isTapBusy('claim') }" @tap="onClaimPoints">
 					<text>点击领取一大波积分</text>
 				</view>
 			</view>
@@ -270,6 +272,8 @@
 				}
 			},
 			async doCheckin(makeup) {
+				const key = makeup ? 'claim' : 'checkin'
+				return this.tapGuard(key, async () => {
 				await this.ensureLogin()
 				try {
 					const res = await api.checkin(!!makeup)
@@ -293,6 +297,7 @@
 				} catch (e) {
 					uni.showToast({ title: (e && e.message) || '签到失败', icon: 'none' })
 				}
+				})
 			},
 			onMakeup() {
 				if (this.makeupClaimed) {

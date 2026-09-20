@@ -1,4 +1,5 @@
 <template>
+	<app-loading />
 	<view class="page">
 		<view class="article">
 			<text class="title">天天俱乐部积分规则说明</text>

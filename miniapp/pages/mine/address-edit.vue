@@ -1,4 +1,5 @@
 <template>
+	<app-loading />
 	<view class="page">
 		<view class="card">
 			<view class="row">
@@ -66,7 +67,7 @@
 		</view>
 
 		<view class="footer">
-			<view class="save" @tap="onSave">保存</view>
+			<view class="save" :class="{ 'tap-busy': isTapBusy('save') }" @tap="onSave">保存</view>
 		</view>
 	</view>
 </template>
@@ -185,6 +186,7 @@
 					uni.showToast({ title: '请填写详细地址', icon: 'none' })
 					return
 				}
+				return this.tapGuard('save', async () => {
 				if (!isLoggedIn()) await silentLogin()
 				const payload = {
 					name,
@@ -206,6 +208,7 @@
 				} catch (e) {
 					uni.showToast({ title: (e && e.message) || '保存失败', icon: 'none' })
 				}
+				})
 			}
 		}
 	}

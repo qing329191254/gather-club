@@ -1,5 +1,6 @@
 <template>
 	<page-meta :page-style="'overflow:' + (stewardVisible || calendarVisible || couponVisible ? 'hidden' : 'visible')"></page-meta>
+	<app-loading />
 	<view v-if="detail" class="page">
 		<view class="sec">
 			<view class="sec-title">
@@ -105,7 +106,7 @@
 				<text>客服</text>
 			</view>
 			<text class="total">¥{{ total }}</text>
-			<view class="pay" @tap="onPay">立即支付</view>
+			<view class="pay" :class="{ 'tap-busy': isTapBusy('pay') }" @tap="onPay">立即支付</view>
 		</view>
 
 		<steward-dialog :visible="stewardVisible" @close="closeSteward" />
@@ -394,6 +395,8 @@
 				this.continuePay()
 			},
 			async continuePay() {
+				if (this.isTapBusy('pay')) return
+				return this.tapGuard('pay', async () => {
 				const storeId = (this.detail && this.detail.id) || ''
 				const storeName = (this.detail && this.detail.name) || '天天俱乐部'
 				const cur = this.current
@@ -413,48 +416,44 @@
 				}
 
 				const amount = this.total
-				uni.showModal({
+				const ok = await this.askModal({
 					title: '确认支付',
 					content: `需支付 ¥${amount}`,
 					confirmText: '立即支付',
-					confirmColor: '#e54148',
-					success: async (res) => {
-						if (!res.confirm) return
-						uni.showLoading({ title: '支付中', mask: true })
-						try {
-							if (!isLoggedIn()) await silentLogin()
-							const created = await api.createOrder({
-								type: 'nye',
-								store_id: storeId,
-								store_name: storeName,
-								title: storeName + '-年夜饭',
-								spec: cur.name + (this.date ? ' · ' + this.date : ''),
-								cover: cur.cover || (this.detail && this.detail.cover) || '/static/orders/nye-xinzhuang.png',
-								quantity: this.quantity,
-								price: amount,
-								amount,
-								package_id: String(cur.id || ''),
-								contact_name: this.name,
-								contact_phone: this.phone,
-								people: this.people,
-								remark: this.remark,
-								room_date: this.date || '',
-								room_slot: this.date ? this.roomSlot : ''
-							})
-							if (created && created.id) {
-								const payRes = await api.payOrder(created.id)
-								await settlePay(payRes)
-							}
-							uni.hideLoading()
-							uni.showToast({ title: '支付成功', icon: 'success' })
-							setTimeout(() => {
-								uni.navigateTo({ url: '/pages/orders/orders' })
-							}, 600)
-						} catch (e) {
-							uni.hideLoading()
-							uni.showToast({ title: (e && e.message) || '支付失败', icon: 'none' })
-						}
+					confirmColor: '#e54148'
+				})
+				if (!ok) return
+				try {
+					if (!isLoggedIn()) await silentLogin()
+					const created = await api.createOrder({
+						type: 'nye',
+						store_id: storeId,
+						store_name: storeName,
+						title: storeName + '-年夜饭',
+						spec: cur.name + (this.date ? ' · ' + this.date : ''),
+						cover: cur.cover || (this.detail && this.detail.cover) || '/static/orders/nye-xinzhuang.png',
+						quantity: this.quantity,
+						price: amount,
+						amount,
+						package_id: String(cur.id || ''),
+						contact_name: this.name,
+						contact_phone: this.phone,
+						people: this.people,
+						remark: this.remark,
+						room_date: this.date || '',
+						room_slot: this.date ? this.roomSlot : ''
+					})
+					if (created && created.id) {
+						const payRes = await api.payOrder(created.id)
+						await settlePay(payRes)
 					}
+					uni.showToast({ title: '支付成功', icon: 'success' })
+					setTimeout(() => {
+						uni.navigateTo({ url: '/pages/orders/orders' })
+					}, 600)
+				} catch (e) {
+					uni.showToast({ title: (e && e.message) || '支付失败', icon: 'none' })
+				}
 				})
 			},
 			closeCoupon() {

@@ -4,8 +4,8 @@ export const api = {
 	health() {
 		return request('/api/v1/health')
 	},
-	wxLogin(payload) {
-		return request('/api/v1/auth/wx-login', { method: 'POST', data: payload || {} })
+	wxLogin(payload, options) {
+		return request('/api/v1/auth/wx-login', Object.assign({ method: 'POST', data: payload || {} }, options || {}))
 	},
 	bindPhone(payload) {
 		return request('/api/v1/auth/bind-phone', { method: 'POST', data: payload || {} })
@@ -68,8 +68,8 @@ export const api = {
 	cancelOrder(id) {
 		return request('/api/v1/orders/' + id + '/cancel', { method: 'POST' })
 	},
-	profile() {
-		return request('/api/v1/user/profile')
+	profile(options) {
+		return request('/api/v1/user/profile', options || {})
 	},
 	updateProfile(payload) {
 		return request('/api/v1/user/profile', { method: 'PUT', data: payload || {} })

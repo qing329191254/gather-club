@@ -1,5 +1,6 @@
 <template>
 	<page-meta :page-style="'overflow:' + (stewardVisible || phoneLoginVisible ? 'hidden' : 'visible')"></page-meta>
+	<app-loading />
 	<view class="page">
 		<view class="hero" :style="{ paddingTop: statusBarHeight + 'px' }">
 			<image class="hero-bg" src="/static/mine-header.png" mode="aspectFill" />
@@ -51,6 +52,7 @@
 		<app-tabbar :current="3" />
 		<steward-dialog :visible="stewardVisible" @close="closeSteward" />
 		<phone-login-dialog
+			ref="phoneLogin"
 			:visible="phoneLoginVisible"
 			@cancel="onPhoneCancel"
 			@confirm="onPhoneConfirm"
@@ -132,10 +134,8 @@
 				this.phoneLoginVisible = false
 			},
 			onPhoneConfirm(detail) {
-				uni.showLoading({ title: '登录中', mask: true })
 				bindPhoneFromDetail(detail)
 					.then(() => {
-						uni.hideLoading()
 						this.phoneLoginVisible = false
 						this.refreshUser()
 						const app = getApp()
@@ -143,8 +143,11 @@
 						uni.showToast({ title: '登录成功', icon: 'success' })
 					})
 					.catch((e) => {
-						uni.hideLoading()
 						uni.showToast({ title: (e && e.message) || '登录失败', icon: 'none' })
+					})
+					.finally(() => {
+						const dlg = this.$refs.phoneLogin
+						if (dlg && dlg.resetBusy) dlg.resetBusy()
 					})
 			},
 			ensureLogin() {

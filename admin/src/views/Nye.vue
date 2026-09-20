@@ -31,7 +31,7 @@
         <template #default="{ row }">
           <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
           <el-button link type="warning" @click="openPackages(row)">套餐</el-button>
-          <el-button link type="danger" @click="onRemove(row)">删除</el-button>
+          <el-button link type="danger" :loading="busy('remove-' + row.id)" @click="onRemove(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -88,7 +88,7 @@
       </el-form>
       <template #footer>
         <el-button @click="visible = false">取消</el-button>
-        <el-button type="primary" @click="onSave">保存</el-button>
+        <el-button type="primary" :loading="busy('save')" @click="onSave">保存</el-button>
       </template>
     </el-dialog>
 
@@ -174,8 +174,11 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
+import { useLock } from '../composables/useLock'
 import ImageField from '../components/ImageField.vue'
 import ImageListField from '../components/ImageListField.vue'
+
+const { busy, run } = useLock()
 
 const list = ref([])
 const visible = ref(false)
@@ -290,6 +293,7 @@ function openPackages(row) {
 }
 
 async function onSave() {
+  return run('save', async () => {
   if (!form.name?.trim()) {
     ElMessage.warning('请填写名称')
     return
@@ -309,9 +313,11 @@ async function onSave() {
   ElMessage.success('已保存')
   visible.value = false
   load()
+  })
 }
 
 async function onSavePackages() {
+  if (pkgSaving.value) return
   const row = list.value.find((r) => r.id === pkgStoreId.value)
   if (!row) {
     ElMessage.error('门店不存在或已删除')
@@ -333,9 +339,11 @@ async function onSavePackages() {
 }
 
 async function onRemove(row) {
+  return run('remove-' + row.id, async () => {
   await ElMessageBox.confirm(`确认删除「${row.name}」？`, '提示')
   await http.delete(`/nye/${row.id}`)
   load()
+  })
 }
 
 onMounted(load)

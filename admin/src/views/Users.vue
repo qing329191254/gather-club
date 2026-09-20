@@ -15,8 +15,8 @@
       <el-table-column label="操作" width="260" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="openDetail(row)">详情</el-button>
-          <el-button link type="primary" @click="adjust(row)">调积分</el-button>
-          <el-button link type="warning" @click="setVip(row)">改等级</el-button>
+          <el-button link type="primary" :loading="busy('adjust-list-' + row.id)" @click="adjust(row, 'adjust-list-' + row.id)">调积分</el-button>
+          <el-button link type="warning" :loading="busy('vip-list-' + row.id)" @click="setVip(row, 'vip-list-' + row.id)">改等级</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -63,15 +63,15 @@
             <el-descriptions-item label="注册时间">{{ formatTime(detail.created_at) }}</el-descriptions-item>
           </el-descriptions>
           <div class="detail-actions">
-            <el-button type="primary" @click="adjust(detail)">调积分</el-button>
-            <el-button type="warning" @click="setVip(detail)">改等级</el-button>
+            <el-button type="primary" :loading="busy('adjust-profile-' + detail.id)" @click="adjust(detail, 'adjust-profile-' + detail.id)">调积分</el-button>
+            <el-button type="warning" :loading="busy('vip-profile-' + detail.id)" @click="setVip(detail, 'vip-profile-' + detail.id)">改等级</el-button>
           </div>
         </template>
 
         <template v-else-if="detailTab === 'points'">
           <div class="subbar">
             <span>当前余额 <b>{{ pointsBalance }}</b></span>
-            <el-button size="small" type="primary" @click="adjust(detail)">调积分</el-button>
+            <el-button size="small" type="primary" :loading="busy('adjust-points-' + detail.id)" @click="adjust(detail, 'adjust-points-' + detail.id)">调积分</el-button>
           </div>
           <el-table :data="pointsList" size="small" stripe max-height="420">
             <el-table-column prop="created_at" label="时间" width="160" />
@@ -107,7 +107,7 @@
                 :value="c.id"
               />
             </el-select>
-            <el-button type="primary" size="small" :disabled="!issueCouponId" @click="issueCoupon">补发</el-button>
+            <el-button type="primary" size="small" :disabled="!issueCouponId" :loading="busy('issue')" @click="issueCoupon">补发</el-button>
           </div>
           <el-table :data="couponsList" size="small" stripe max-height="460">
             <el-table-column prop="name" label="名称" min-width="120" />
@@ -122,6 +122,7 @@
                   v-if="row.status === 'unused'"
                   link
                   type="danger"
+                  :loading="busy('void-' + row.id)"
                   @click="voidCoupon(row)"
                 >作废</el-button>
               </template>
@@ -152,6 +153,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
+import { useLock } from '../composables/useLock'
 import { usePager } from '../composables/usePager'
 
 const list = ref([])
@@ -160,6 +162,7 @@ const { page, pageSize, total, applyPage, resetPage, pageParams } = usePager()
 
 const drawer = ref(false)
 const detailLoading = ref(false)
+const { busy, run } = useLock()
 const detailTab = ref('profile')
 const detail = reactive({
   id: null,
@@ -274,8 +277,9 @@ async function loadAddresses() {
   addressesList.value = await http.get(`/users/${detail.id}/addresses`)
 }
 
-async function adjust(row) {
+async function adjust(row, visual) {
   if (!row?.id) return
+  return run('adjust-' + row.id, async () => {
   const { value } = await ElMessageBox.prompt('输入增减积分（可为负数）', '调整积分', {
     inputValue: '10',
     inputPattern: /^-?\d+$/,
@@ -289,10 +293,12 @@ async function adjust(row) {
     Object.assign(detail, res)
     if (detailTab.value === 'points') await loadPoints()
   }
+  }, visual)
 }
 
-async function setVip(row) {
+async function setVip(row, visual) {
   if (!row?.id) return
+  return run('vip-' + row.id, async () => {
   const { value } = await ElMessageBox.prompt('输入等级：V0 / V1 / V2 / V3。保存后锁定，不再被桌数自动覆盖。', '修改会员等级', {
     inputValue: row.vip_level || detail.vip_level || 'V0'
   })
@@ -303,21 +309,26 @@ async function setVip(row) {
     const res = await http.get(`/users/${row.id}`)
     Object.assign(detail, res)
   }
+  }, visual)
 }
 
 async function issueCoupon() {
   if (!detail.id || !issueCouponId.value) return
+  return run('issue', async () => {
   await http.post(`/users/${detail.id}/coupons`, null, { params: { coupon_id: issueCouponId.value } })
   ElMessage.success('已补发')
   issueCouponId.value = null
   await loadCoupons()
+  })
 }
 
 async function voidCoupon(row) {
+  return run('void-' + row.id, async () => {
   await ElMessageBox.confirm(`确认作废「${row.name}」？`, '提示')
   await http.post(`/users/${detail.id}/coupons/${row.id}/void`)
   ElMessage.success('已作废')
   await loadCoupons()
+  })
 }
 
 onMounted(load)

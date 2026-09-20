@@ -1,4 +1,5 @@
 <template>
+	<app-loading />
 	<view v-if="item" class="page">
 		<image class="cover" :src="item.cover" mode="aspectFill" />
 		<view class="body">
@@ -14,7 +15,7 @@
 			<text v-if="item.soldText" class="sold">{{ item.soldText }}</text>
 		</view>
 		<view class="bar">
-			<view class="buy" @tap="onBuy">立即购买</view>
+			<view class="buy" :class="{ 'tap-busy': isTapBusy('buy') }" @tap="onBuy">立即购买</view>
 		</view>
 	</view>
 </template>
@@ -45,40 +46,37 @@
 			async onBuy() {
 				const item = this.item
 				if (!item) return
-				if (!isLoggedIn()) await silentLogin()
-				uni.showModal({
-					title: '确认支付',
-					content: `需支付 ¥${item.price}`,
-					confirmText: '立即支付',
-					confirmColor: '#e54148',
-					success: async (res) => {
-						if (!res.confirm) return
-						uni.showLoading({ title: '支付中', mask: true })
-						try {
-							const created = await api.createOrder({
-								type: 'gather',
-								store_id: item.id,
-								store_name: item.title,
-								title: item.title,
-								spec: item.tag || '去哪聚',
-								cover: item.cover,
-								quantity: 1,
-								price: item.price,
-								amount: item.price
-							})
-							if (created && created.id) {
-								const payRes = await api.payOrder(created.id)
-								await settlePay(payRes)
-							}
-							uni.hideLoading()
-							uni.showToast({ title: '支付成功', icon: 'success' })
-							setTimeout(() => {
-								uni.navigateTo({ url: '/pages/orders/orders' })
-							}, 600)
-						} catch (e) {
-							uni.hideLoading()
-							uni.showToast({ title: (e && e.message) || '支付失败', icon: 'none' })
+				return this.tapGuard('buy', async () => {
+					if (!isLoggedIn()) await silentLogin()
+					const ok = await this.askModal({
+						title: '确认支付',
+						content: `需支付 ¥${item.price}`,
+						confirmText: '立即支付',
+						confirmColor: '#e54148'
+					})
+					if (!ok) return
+					try {
+						const created = await api.createOrder({
+							type: 'gather',
+							store_id: item.id,
+							store_name: item.title,
+							title: item.title,
+							spec: item.tag || '去哪聚',
+							cover: item.cover,
+							quantity: 1,
+							price: item.price,
+							amount: item.price
+						})
+						if (created && created.id) {
+							const payRes = await api.payOrder(created.id)
+							await settlePay(payRes)
 						}
+						uni.showToast({ title: '支付成功', icon: 'success' })
+						setTimeout(() => {
+							uni.navigateTo({ url: '/pages/orders/orders' })
+						}, 600)
+					} catch (e) {
+						uni.showToast({ title: (e && e.message) || '支付失败', icon: 'none' })
 					}
 				})
 			}

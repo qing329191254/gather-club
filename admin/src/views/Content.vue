@@ -614,6 +614,7 @@ async function onTabChange(name) {
 }
 
 async function onSave(showToast = true) {
+  if (saving.value || restoring.value) return
   saving.value = true
   try {
     await persistTab(tab.value, showToast)
@@ -623,6 +624,7 @@ async function onSave(showToast = true) {
 }
 
 async function onRestore() {
+  if (saving.value || restoring.value) return
   const configKey = configKeyForTab(tab.value)
   restoring.value = true
   try {

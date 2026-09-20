@@ -32,7 +32,7 @@
       <el-table-column label="操作" width="160" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
-          <el-button link type="danger" @click="onRemove(row)">删除</el-button>
+          <el-button link type="danger" :loading="busy('remove-' + row.id)" @click="onRemove(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -80,7 +80,7 @@
       </el-form>
       <template #footer>
         <el-button @click="visible = false">取消</el-button>
-        <el-button type="primary" @click="onSave">保存</el-button>
+        <el-button type="primary" :loading="busy('save')" @click="onSave">保存</el-button>
       </template>
     </el-dialog>
   </el-card>
@@ -90,7 +90,10 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
+import { useLock } from '../composables/useLock'
 import { usePager } from '../composables/usePager'
+
+const { busy, run } = useLock()
 
 const list = ref([])
 const stores = ref([])
@@ -136,6 +139,7 @@ function openEdit(row) {
 }
 
 async function onSave() {
+  return run('save', async () => {
   if (!form.store_id) {
     ElMessage.warning('请选择门店')
     return
@@ -148,12 +152,15 @@ async function onSave() {
   ElMessage.success('已保存')
   visible.value = false
   load()
+  })
 }
 
 async function onRemove(row) {
+  return run('remove-' + row.id, async () => {
   await ElMessageBox.confirm(`确认删除「${storeName(row.store_id)} ${row.date} ${slotLabel(row.slot)}」库存？`, '提示')
   await http.delete(`/rooms/${row.id}`)
   load()
+  })
 }
 
 onMounted(async () => {

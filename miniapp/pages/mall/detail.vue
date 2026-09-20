@@ -1,5 +1,6 @@
 <template>
 	<page-meta :page-style="'overflow:' + (stewardVisible ? 'hidden' : 'visible')"></page-meta>
+	<app-loading />
 	<view v-if="goods" class="page">
 		<image class="hero" :src="goods.cover" mode="aspectFill" />
 
@@ -29,7 +30,7 @@
 				<image src="/static/icons/service.png" mode="aspectFit" />
 				<text>客服</text>
 			</view>
-			<view class="action" :class="{ off: !canRedeem }" @tap="onRedeem">
+			<view class="action" :class="{ off: !canRedeem, 'tap-busy': isTapBusy('redeem') }" @tap="onRedeem">
 				{{ canRedeem ? '立即兑换' : '积分不足' }}
 			</view>
 		</view>
@@ -98,35 +99,32 @@
 			},
 			onRedeem() {
 				if (!this.canRedeem) return
+				return this.tapGuard('redeem', async () => {
 				if (!this.addressId) {
-					uni.showModal({
+					const go = await this.askModal({
 						title: '请先添加收货地址',
 						content: '兑换需要选择收货地址',
-						confirmText: '去添加',
-						success: (res) => {
-							if (res.confirm) uni.navigateTo({ url: '/pages/mine/address' })
-						}
+						confirmText: '去添加'
 					})
+					if (go) uni.navigateTo({ url: '/pages/mine/address' })
 					return
 				}
 				const addr = this.addresses.find((a) => a.id === this.addressId)
 				const addrText = addr
 					? `${addr.name} ${addr.phone}\n${addr.region || ''}${addr.detail || ''}`
 					: ''
-				uni.showModal({
+				const ok = await this.askModal({
 					title: '确认兑换',
 					content: `将消耗 ${this.goods.cost} 积分兑换「${this.goods.title || this.goods.name}」\n${addrText}`,
-					confirmColor: '#e54148',
-					success: async (res) => {
-						if (!res.confirm) return
-						uni.showLoading({ title: '兑换中', mask: true })
-						try {
-							const result = await api.mallRedeem(this.goods.id, this.addressId)
+					confirmColor: '#e54148'
+				})
+				if (!ok) return
+				try {
+					const result = await api.mallRedeem(this.goods.id, this.addressId)
 							const user = getUser()
 							user.points = result.balance != null ? result.balance : Math.max(0, user.points - this.goods.cost)
 							saveLogin(user, getOpenid())
 							this.points = user.points
-							uni.hideLoading()
 							uni.showToast({
 								title: result.redeemCode ? '兑换成功 ' + result.redeemCode : '兑换成功',
 								icon: 'none'
@@ -134,10 +132,8 @@
 							setTimeout(() => {
 								uni.navigateTo({ url: '/pages/mall/records' })
 							}, 600)
-						} catch (e) {
-							uni.hideLoading()
-							uni.showToast({ title: (e && e.message) || '兑换失败', icon: 'none' })
-						}
+					} catch (e) {
+						uni.showToast({ title: (e && e.message) || '兑换失败', icon: 'none' })
 					}
 				})
 			}

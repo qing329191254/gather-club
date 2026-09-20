@@ -25,7 +25,7 @@
         <template #default="{ row }">
           <el-button link type="primary" @click="showDetail(row)">详情</el-button>
           <el-dropdown @command="(cmd) => setStatus(row, cmd)">
-            <el-button link type="primary">改状态</el-button>
+            <el-button link type="primary" :loading="busy('status-' + row.id)">改状态</el-button>
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item command="pending">待支付</el-dropdown-item>
@@ -79,9 +79,11 @@ import { onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import http from '../api/http'
+import { useLock } from '../composables/useLock'
 import { usePager } from '../composables/usePager'
 
 const route = useRoute()
+const { busy, run } = useLock()
 const list = ref([])
 const status = ref('')
 const keyword = ref('')
@@ -122,9 +124,11 @@ function onSearch() {
 }
 
 async function setStatus(row, next) {
+  return run('status-' + row.id, async () => {
   await http.put(`/orders/${row.id}/status`, { status: next })
   ElMessage.success('已更新')
   load()
+  })
 }
 
 watch(

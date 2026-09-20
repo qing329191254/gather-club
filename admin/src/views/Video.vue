@@ -42,7 +42,7 @@
         <el-table-column label="操作" width="140">
           <template #default="{ row }">
             <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
-            <el-button link type="danger" @click="onRemove(row)">删除</el-button>
+            <el-button link type="danger" :loading="busy('remove-' + row.id)" @click="onRemove(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -67,7 +67,7 @@
       </el-form>
       <template #footer>
         <el-button @click="visible = false">取消</el-button>
-        <el-button type="primary" @click="onSave">保存</el-button>
+        <el-button type="primary" :loading="busy('save')" @click="onSave">保存</el-button>
       </template>
     </el-dialog>
   </div>
@@ -77,7 +77,10 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
+import { useLock } from '../composables/useLock'
 import ImageField from '../components/ImageField.vue'
+
+const { busy, run } = useLock()
 
 const profile = reactive({
   name: '',
@@ -158,6 +161,7 @@ function openEdit(row) {
 }
 
 async function onSave() {
+  return run('save', async () => {
   const payload = {
     status: form.status,
     time_text: form.time_text,
@@ -174,12 +178,15 @@ async function onSave() {
   ElMessage.success('已保存')
   visible.value = false
   loadLives()
+  })
 }
 
 async function onRemove(row) {
+  return run('remove-' + row.id, async () => {
   await ElMessageBox.confirm('确认删除这条直播？', '提示')
   await http.delete(`/video/lives/${row.id}`)
   loadLives()
+  })
 }
 
 onMounted(() => {

@@ -17,12 +17,13 @@
 					<button
 						v-if="phoneAuth"
 						class="btn solid phone-auth-btn"
+						:class="{ 'tap-busy': busy }"
 						open-type="getPhoneNumber"
 						@getphonenumber="onGetPhoneNumber"
 					>
 						{{ confirmText }}
 					</button>
-					<view v-else class="btn solid" @tap="onConfirm">{{ confirmText }}</view>
+					<view v-else class="btn solid" :class="{ 'tap-busy': busy }" @tap="onConfirm">{{ confirmText }}</view>
 				</view>
 			</view>
 			<view class="close" @tap="onClose">
@@ -61,6 +62,9 @@
 				default: false
 			}
 		},
+		data() {
+			return { busy: false }
+		},
 		methods: {
 			preventTouchMove() {},
 			onClose() {
@@ -71,10 +75,15 @@
 				this.$emit('close')
 			},
 			onConfirm() {
+				if (this.busy) return
+				this.busy = true
 				this.$emit('confirm')
 				this.$emit('close')
+				this.busy = false
 			},
 			onGetPhoneNumber(e) {
+				if (this.busy) return
+				this.busy = true
 				this.$emit('confirm', (e && e.detail) || {})
 				this.$emit('close')
 			}

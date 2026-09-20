@@ -1,4 +1,5 @@
 <template>
+	<app-loading />
 	<view class="page">
 		<view v-if="!list.length" class="empty">
 			<image class="empty-img" src="/static/mall/empty-exchange.png" mode="aspectFit" />

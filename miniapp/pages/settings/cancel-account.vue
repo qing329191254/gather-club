@@ -1,4 +1,5 @@
 <template>
+	<app-loading />
 	<view class="page">
 		<view class="card">
 			<text class="title">您可以通过以下方式联系我们帮您注销账号</text>
@@ -14,7 +15,7 @@
 				即便您后续重新以相同的手机号注册新账号，本账号及其中所有数据、权益均不可恢复，亦无法继续使用。为保障系统安全，防范滥用账号注销、注册功能的行为，您的账号注销后，如需再次以同一手机号申请注册，需要符合我们设置的时间间隔要求（以系统提示为准）。
 			</text>
 			<text class="foot" @tap="openCancelAgreement">*具体细则以注销协议内容为准。</text>
-			<view class="cancel-btn" @tap="onCancelAccount">确认注销账号</view>
+			<view class="cancel-btn" :class="{ 'tap-busy': isTapBusy('cancel') }" @tap="onCancelAccount">确认注销账号</view>
 		</view>
 	</view>
 </template>
@@ -42,24 +43,24 @@
 				})
 			},
 			onCancelAccount() {
-				uni.showModal({
+				return this.tapGuard('cancel', async () => {
+				const ok = await this.askModal({
 					title: '确认注销',
 					content: '注销后账号数据与权益将清除且不可恢复，确定继续？',
-					confirmColor: '#e54148',
-					success: async (res) => {
-						if (!res.confirm) return
-						try {
-							if (!isLoggedIn()) await silentLogin()
-							await api.cancelAccount()
-							logout()
-							uni.showToast({ title: '已提交注销', icon: 'none' })
-							setTimeout(() => {
-								uni.reLaunch({ url: '/pages/index/index' })
-							}, 600)
-						} catch (e) {
-							uni.showToast({ title: (e && e.message) || '注销失败', icon: 'none' })
-						}
-					}
+					confirmColor: '#e54148'
+				})
+				if (!ok) return
+				try {
+					if (!isLoggedIn()) await silentLogin()
+					await api.cancelAccount()
+					logout()
+					uni.showToast({ title: '已提交注销', icon: 'none' })
+					setTimeout(() => {
+						uni.reLaunch({ url: '/pages/index/index' })
+					}, 600)
+				} catch (e) {
+					uni.showToast({ title: (e && e.message) || '注销失败', icon: 'none' })
+				}
 				})
 			}
 		}

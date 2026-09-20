@@ -1,5 +1,6 @@
 import { api } from './api.js'
 import { initCloud } from './cloud.js'
+import { withLoading } from './loading.js'
 
 const AUTH_KEY = 'gather_auth'
 const PRIVACY_KEY = 'gather_privacy'
@@ -108,6 +109,8 @@ export function silentLogin(extra) {
 		return Promise.reject(new Error('请先同意用户隐私保护协议'))
 	}
 	const cleanExtra = Object.assign({}, extra || {})
+	const quiet = !!cleanExtra.quiet
+	delete cleanExtra.quiet
 	delete cleanExtra.__privacyJustAgreed
 	return new Promise((resolve, reject) => {
 		initCloud()
@@ -120,12 +123,15 @@ export function silentLogin(extra) {
 					return
 				}
 				api
-					.wxLogin({
-						code,
-						nickname: cleanExtra.nickname || '',
-						avatar: cleanExtra.avatar || '',
-						phone: cleanExtra.phone || ''
-					})
+					.wxLogin(
+						{
+							code,
+							nickname: cleanExtra.nickname || '',
+							avatar: cleanExtra.avatar || '',
+							phone: cleanExtra.phone || ''
+						},
+						quiet ? { loading: false } : {}
+					)
 					.then((res) => {
 						const openid = res.openid || ''
 						const user = Object.assign({}, mapServerUser(res.user, openid), cleanExtra)
@@ -170,12 +176,14 @@ export function bindPhoneFromDetail(detail) {
 	// 开发者工具可能直接回传 phoneNumber（无 code）
 	if (!phoneCode && !(encryptedData && iv)) {
 		if (d.phoneNumber && /^1\d{10}$/.test(String(d.phoneNumber))) {
-			return silentLogin({ phone: String(d.phoneNumber) }).then(() => getAuth())
+			return withLoading(() => silentLogin({ phone: String(d.phoneNumber) }).then(() => getAuth()), '绑定中')
 		}
 		return Promise.reject(new Error('未获取到手机号授权数据'))
 	}
 
-	return new Promise((resolve, reject) => {
+	return withLoading(
+		() =>
+			new Promise((resolve, reject) => {
 		initCloud()
 		uni.login({
 			provider: 'weixin',
@@ -197,7 +205,9 @@ export function bindPhoneFromDetail(detail) {
 			},
 			fail: () => reject(new Error('微信登录失败'))
 		})
-	})
+	}),
+		'绑定中'
+	)
 }
 
 export function refreshProfile() {
@@ -205,7 +215,7 @@ export function refreshProfile() {
 		return Promise.resolve(getUser())
 	}
 	return api
-		.profile()
+		.profile({ loading: false })
 		.then((res) => {
 			const user = mapServerUser(res, getOpenid())
 			saveLogin(user, getOpenid())

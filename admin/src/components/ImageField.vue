@@ -56,7 +56,7 @@ function clear() {
 
 async function onUpload(option) {
   const file = option.file
-  if (!file) return
+  if (!file || loading.value) return
   loading.value = true
   try {
     const body = new FormData()

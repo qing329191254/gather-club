@@ -1,4 +1,5 @@
 <template>
+	<app-loading />
 	<view class="page">
 		<text class="title">添加兴趣爱好</text>
 		<view class="tags">
@@ -15,7 +16,7 @@
 		</view>
 		<view v-if="!loading && !options.length" class="empty">暂无可选兴趣，请稍后再试</view>
 		<view class="footer">
-			<view class="done" @tap="onDone">完成</view>
+			<view class="done" :class="{ 'tap-busy': isTapBusy('done') }" @tap="onDone">完成</view>
 		</view>
 	</view>
 </template>
@@ -115,7 +116,7 @@
 					profile.hobby = hobby
 					uni.setStorageSync(PROFILE_KEY, profile)
 				} catch (e) {}
-				uni.showLoading({ title: '保存中', mask: true })
+				return this.tapGuard('done', async () => {
 				try {
 					if (!isLoggedIn()) await silentLogin()
 					const res = await api.updateProfile({ hobby })
@@ -124,12 +125,11 @@
 							hobby: (res && res.hobby) || hobby
 						})
 					)
-					uni.hideLoading()
 					uni.navigateBack({ fail() {} })
 				} catch (e) {
-					uni.hideLoading()
 					uni.showToast({ title: (e && e.message) || '保存失败', icon: 'none' })
 				}
+				})
 			}
 		}
 	}

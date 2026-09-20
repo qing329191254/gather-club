@@ -1,4 +1,5 @@
 import { CLOUD_ENV, CLOUD_SERVICE, PUBLIC_BASE, COS_CDN } from './config.js'
+import { beginLoading, endLoading } from './loading.js'
 
 let cloudReady = false
 
@@ -155,8 +156,22 @@ export function request(path, options = {}) {
 			: ''
 	const fullPath = path + query
 	const body = method === 'GET' ? {} : data
+	const page = Number(data && data.page)
+	const tracked = options.loading !== false && !(page > 1)
+	if (tracked) beginLoading(options.loadingTitle)
 
-	return callByContainer(fullPath, method, body, header).catch(() =>
+	const run = callByContainer(fullPath, method, body, header).catch(() =>
 		callByHttp(fullPath, method, body, header)
+	)
+	if (!tracked) return run
+	return run.then(
+		(value) => {
+			endLoading()
+			return value
+		},
+		(err) => {
+			endLoading()
+			return Promise.reject(err)
+		}
 	)
 }
