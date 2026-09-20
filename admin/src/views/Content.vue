@@ -5,6 +5,7 @@
       <el-tab-pane label="收集清单" name="privacy_collect" />
       <el-tab-pane label="共享清单" name="privacy_share" />
       <el-tab-pane label="会员配置" name="member" />
+      <el-tab-pane label="会员章程" name="member_rules" />
     </el-tabs>
 
     <div v-loading="loading" class="pane">
@@ -180,8 +181,10 @@
             </div>
           </el-tab-pane>
         </el-tabs>
+      </template>
 
-        <el-divider content-position="left">会员章程</el-divider>
+      <!-- 会员章程（独立页，与会员配置共用 member 配置） -->
+      <template v-else-if="tab === 'member_rules'">
         <div class="section-head">
           <h3>章程章节</h3>
           <el-button type="primary" size="small" @click="addRuleSection">新增章节</el-button>
@@ -214,6 +217,7 @@
           </div>
           <el-button size="small" class="mt8" @click="addRuleBlock(rule)">+ 加小节</el-button>
         </div>
+        <el-empty v-if="!member.rules.length" description="暂无章程章节，点击上方新增" :image-size="72" />
       </template>
     </div>
 
@@ -335,10 +339,43 @@ function normalizeRulePara(p) {
   }
 }
 
+function configKeyForTab(key) {
+  if (key === 'member_rules') return 'member'
+  return key
+}
+
+function applyMemberValue(value) {
+  member.monthCoupon = {
+    title: value.monthCoupon?.title || '',
+    tip: value.monthCoupon?.tip || '',
+    tag: value.monthCoupon?.tag || ''
+  }
+  member.levels = (value.levels || []).map((lv) => ({
+    ...lv,
+    benefits: (lv.benefits || []).map((b) => ({
+      _key: keyOf(),
+      title: b.title || '',
+      desc: b.desc || '',
+      icon: b.icon || ''
+    }))
+  }))
+  levelTab.value = member.levels[0]?.id || 'V0'
+  member.rules = (value.rules || []).map((r) => ({
+    _key: keyOf(),
+    title: r.title || '',
+    blocks: (r.blocks || []).map((b) => ({
+      _key: keyOf(),
+      subtitle: b.subtitle || '',
+      paras: (b.paras || []).map(normalizeRulePara)
+    }))
+  }))
+}
+
 async function loadCurrent() {
   loading.value = true
   try {
-    const res = await http.get(`/config/${tab.value}`)
+    const configKey = configKeyForTab(tab.value)
+    const res = await http.get(`/config/${configKey}`)
     const value = res.value || {}
     if (tab.value === 'agreements') {
       agreementsRaw.value = value
@@ -366,31 +403,8 @@ async function loadCurrent() {
         scene: s.scene || '',
         method: s.method || ''
       }))
-    } else if (tab.value === 'member') {
-      member.monthCoupon = {
-        title: value.monthCoupon?.title || '',
-        tip: value.monthCoupon?.tip || '',
-        tag: value.monthCoupon?.tag || ''
-      }
-      member.levels = (value.levels || []).map((lv) => ({
-        ...lv,
-        benefits: (lv.benefits || []).map((b) => ({
-          _key: keyOf(),
-          title: b.title || '',
-          desc: b.desc || '',
-          icon: b.icon || ''
-        }))
-      }))
-      levelTab.value = member.levels[0]?.id || 'V0'
-      member.rules = (value.rules || []).map((r) => ({
-        _key: keyOf(),
-        title: r.title || '',
-        blocks: (r.blocks || []).map((b) => ({
-          _key: keyOf(),
-          subtitle: b.subtitle || '',
-          paras: (b.paras || []).map(normalizeRulePara)
-        }))
-      }))
+    } else if (tab.value === 'member' || tab.value === 'member_rules') {
+      applyMemberValue(value)
     }
   } finally {
     loading.value = false
@@ -487,7 +501,7 @@ function payloadForTab(key) {
   if (key === 'agreements') return buildAgreementPayload()
   if (key === 'privacy_collect') return buildCollectPayload()
   if (key === 'privacy_share') return buildSharePayload()
-  if (key === 'member') return buildMemberPayload()
+  if (key === 'member' || key === 'member_rules') return buildMemberPayload()
   return null
 }
 
@@ -496,7 +510,7 @@ function isEmptyConfig(key, value) {
   if (key === 'privacy_collect' || key === 'privacy_share') {
     return !(value.sections && value.sections.length)
   }
-  if (key === 'member') {
+  if (key === 'member' || key === 'member_rules') {
     return !(value.levels && value.levels.length)
   }
   if (key === 'agreements') {
@@ -510,7 +524,8 @@ async function persistTab(key, showToast = false) {
   if (!value) return
   // 切到尚未加载过的 Tab 时本地是空的，绝不能把空数据写回服务器
   if (isEmptyConfig(key, value)) return
-  await http.put(`/config/${key}`, { value })
+  const configKey = configKeyForTab(key)
+  await http.put(`/config/${configKey}`, { value })
   if (key === 'agreements') agreementsRaw.value = value
   if (showToast) ElMessage.success('已保存')
 }
