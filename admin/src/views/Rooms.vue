@@ -1,7 +1,7 @@
 <template>
   <el-card>
     <div class="toolbar">
-      <el-select v-model="storeId" placeholder="全部门店" clearable filterable style="width: 220px">
+      <el-select v-model="storeId" placeholder="全部门店" clearable filterable style="width: 220px" @change="onSearch">
         <el-option v-for="s in stores" :key="s.id" :label="s.name" :value="s.id" />
       </el-select>
       <el-date-picker
@@ -11,8 +11,9 @@
         placeholder="选择日期"
         clearable
         style="width: 180px"
+        @change="onSearch"
       />
-      <el-button @click="load">查询</el-button>
+      <el-button @click="onSearch">查询</el-button>
       <el-button type="primary" @click="openEdit()">新增/覆盖库存</el-button>
     </div>
     <el-table :data="list" stripe>
@@ -35,6 +36,18 @@
         </template>
       </el-table-column>
     </el-table>
+    <div class="pager">
+      <el-pagination
+        v-model:current-page="page"
+        v-model:page-size="pageSize"
+        :total="total"
+        :page-sizes="[10, 20, 50]"
+        layout="total, sizes, prev, pager, next"
+        background
+        @current-change="load"
+        @size-change="onSearch"
+      />
+    </div>
 
     <el-dialog v-model="visible" :title="editing ? '编辑库存' : '新增库存'" width="480px">
       <el-form label-width="90px">
@@ -77,6 +90,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
+import { usePager } from '../composables/usePager'
 
 const list = ref([])
 const stores = ref([])
@@ -85,6 +99,7 @@ const date = ref('')
 const visible = ref(false)
 const editing = ref(false)
 const form = reactive({ store_id: '', date: '', slot: 'dinner', capacity: 4, booked: 0 })
+const { page, pageSize, total, applyPage, resetPage, pageParams } = usePager()
 
 function storeName(id) {
   return stores.value.find((s) => s.id === id)?.name || id || '—'
@@ -101,9 +116,18 @@ async function loadStores() {
 }
 
 async function load() {
-  list.value = await http.get('/rooms', {
-    params: { store_id: storeId.value || undefined, date: date.value || undefined }
+  const res = await http.get('/rooms', {
+    params: pageParams({
+      store_id: storeId.value || undefined,
+      date: date.value || undefined
+    })
   })
+  list.value = applyPage(res)
+}
+
+function onSearch() {
+  resetPage()
+  load()
 }
 
 function openEdit(row) {
@@ -146,5 +170,10 @@ onMounted(async () => {
   gap: 10px;
   margin-bottom: 12px;
   align-items: center;
+}
+.pager {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
 }
 </style>

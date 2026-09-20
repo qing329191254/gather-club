@@ -18,6 +18,18 @@
         </template>
       </el-table-column>
     </el-table>
+    <div class="pager">
+      <el-pagination
+        v-model:current-page="page"
+        v-model:page-size="pageSize"
+        :total="total"
+        :page-sizes="[10, 20, 50]"
+        layout="total, sizes, prev, pager, next"
+        background
+        @current-change="load"
+        @size-change="() => { page = 1; load() }"
+      />
+    </div>
 
     <el-dialog v-model="visible" title="优惠券" width="520px">
       <el-form label-width="90px">
@@ -40,13 +52,16 @@
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
+import { usePager } from '../composables/usePager'
 
 const list = ref([])
 const visible = ref(false)
 const form = reactive({ id: null, name: '', amount: 0, condition: '无门槛', expire: '', total: 0, enabled: true })
+const { page, pageSize, total, applyPage, pageParams } = usePager()
 
 async function load() {
-  list.value = await http.get('/coupons')
+  const res = await http.get('/coupons', { params: pageParams() })
+  list.value = applyPage(res)
 }
 
 function openEdit(row) {
@@ -81,4 +96,9 @@ onMounted(load)
 
 <style scoped>
 .toolbar { margin-bottom: 12px; }
+.pager {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
 </style>

@@ -45,7 +45,7 @@
 
 		<view class="end-line">
 			<view class="end-rule" />
-			<text class="end-text">没有更多了</text>
+			<text class="end-text">{{ loading ? '加载中…' : (hasMore ? '上拉加载更多' : '没有更多了') }}</text>
 			<view class="end-rule" />
 		</view>
 	</view>
@@ -59,11 +59,18 @@
 	export default {
 		data() {
 			return {
-				orders: []
+				orders: [],
+				page: 1,
+				pageSize: 20,
+				hasMore: true,
+				loading: false
 			}
 		},
 		onShow() {
-			this.loadOrders()
+			this.reloadOrders()
+		},
+		onReachBottom() {
+			this.loadMoreOrders()
 		},
 		methods: {
 			mapOrder(row) {
@@ -84,16 +91,32 @@
 					roomSlot: row.roomSlot
 				}
 			},
-			async loadOrders() {
-				if (!isLoggedIn()) {
-					await silentLogin()
-				}
+			async reloadOrders() {
+				this.page = 1
+				this.hasMore = true
+				this.orders = []
+				await this.loadMoreOrders(true)
+			},
+			async loadMoreOrders(reset) {
+				if (this.loading || (!this.hasMore && !reset)) return
+				this.loading = true
 				try {
-					const res = await api.orders()
-					this.orders = (res.list || []).map((row) => this.mapOrder(row))
+					if (!isLoggedIn()) {
+						await silentLogin()
+					}
+					const res = await api.orders({ page: this.page, page_size: this.pageSize })
+					const rows = (res.list || []).map((row) => this.mapOrder(row))
+					this.orders = reset || this.page === 1 ? rows : this.orders.concat(rows)
+					this.hasMore = !!res.has_more
+					if (this.hasMore) this.page += 1
 				} catch (e) {
 					uni.showToast({ title: '订单加载失败', icon: 'none' })
+				} finally {
+					this.loading = false
 				}
+			},
+			async loadOrders() {
+				await this.reloadOrders()
 			},
 			onOrder(order) {
 				if (order.status === 'pending') {

@@ -64,6 +64,18 @@
           </template>
         </el-table-column>
       </el-table>
+      <div class="pager">
+        <el-pagination
+          v-model:current-page="page"
+          v-model:page-size="pageSize"
+          :total="total"
+          :page-sizes="[10, 20, 50]"
+          layout="total, sizes, prev, pager, next"
+          background
+          @current-change="loadProducts"
+          @size-change="() => { page = 1; loadProducts() }"
+        />
+      </div>
     </el-card>
 
     <el-dialog v-model="tabVisible" :title="tabForm.id ? '编辑分类' : '新增分类'" width="440px">
@@ -148,6 +160,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
 import ImageField from '../components/ImageField.vue'
+import { usePager } from '../composables/usePager'
 
 const tabs = ref([])
 const products = ref([])
@@ -156,6 +169,7 @@ const tabVisible = ref(false)
 const productVisible = ref(false)
 const productEditing = ref(false)
 const tagsText = ref('')
+const { page, pageSize, total, applyPage, resetPage, pageParams } = usePager()
 const tabForm = reactive({ id: null, key: '', name: '', show_sold: true, sort: 0, enabled: true })
 const productForm = reactive({
   id: '',
@@ -184,15 +198,19 @@ function genProductId() {
   return `g${Date.now().toString(36)}`
 }
 
+async function loadProducts() {
+  const res = await http.get('/gather/products', { params: pageParams() })
+  products.value = applyPage(res)
+}
+
 async function load() {
-  const [tabList, productList, storeList] = await Promise.all([
+  const [tabList, storeList] = await Promise.all([
     http.get('/gather/tabs'),
-    http.get('/gather/products'),
     http.get('/stores')
   ])
   tabs.value = tabList
-  products.value = productList
   stores.value = storeList || []
+  await loadProducts()
 }
 
 function openTab(row) {
@@ -266,13 +284,13 @@ async function saveProduct() {
   else await http.post('/gather/products', payload)
   ElMessage.success('已保存')
   productVisible.value = false
-  load()
+  loadProducts()
 }
 
 async function removeProduct(row) {
   await ElMessageBox.confirm(`确认删除商品「${row.title}」？`, '提示')
   await http.delete(`/gather/products/${row.id}`)
-  load()
+  loadProducts()
 }
 
 onMounted(load)
@@ -283,4 +301,9 @@ onMounted(load)
 .head { display: flex; justify-content: space-between; align-items: center; }
 .hint { margin-left: 8px; color: #94a3b8; font-size: 12px; }
 .muted { color: #94a3b8; font-size: 12px; }
+.pager {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
 </style>

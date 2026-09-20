@@ -14,6 +14,7 @@
 				<text class="cost">-{{ item.cost }}</text>
 			</view>
 		</view>
+		<view v-if="list.length" class="end">{{ loading ? '加载中…' : (hasMore ? '上拉加载更多' : '没有更多了') }}</view>
 	</view>
 </template>
 
@@ -24,21 +25,44 @@
 	export default {
 		data() {
 			return {
-				list: []
+				list: [],
+				page: 1,
+				pageSize: 20,
+				hasMore: true,
+				loading: false
 			}
 		},
 		onShow() {
-			this.loadRecords()
+			this.reloadRecords()
+		},
+		onReachBottom() {
+			this.loadMore()
 		},
 		methods: {
-			async loadRecords() {
+			async reloadRecords() {
 				if (!isLoggedIn()) await silentLogin()
+				this.page = 1
+				this.hasMore = true
+				this.list = []
+				await this.loadMore(true)
+			},
+			async loadMore(reset) {
+				if (this.loading || (!this.hasMore && !reset)) return
+				this.loading = true
 				try {
-					const res = await api.mallRecords()
-					this.list = res.list || []
+					const res = await api.mallRecords({ page: this.page, page_size: this.pageSize })
+					const rows = res.list || []
+					this.list = reset || this.page === 1 ? rows : this.list.concat(rows)
+					this.hasMore = !!res.has_more
+					if (this.hasMore) this.page += 1
 				} catch (e) {
-					this.list = []
+					if (reset) this.list = []
+				} finally {
+					this.loading = false
 				}
+			},
+			async loadRecords() {
+				await this.reloadRecords()
 			}
 		}
 	}
@@ -117,5 +141,12 @@
 		color: #e64750;
 		font-weight: 600;
 		flex-shrink: 0;
+	}
+
+	.end {
+		padding: 24rpx 0 40rpx;
+		text-align: center;
+		font-size: 24rpx;
+		color: #999;
 	}
 </style>

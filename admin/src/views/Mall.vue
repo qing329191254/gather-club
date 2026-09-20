@@ -21,6 +21,18 @@
         </template>
       </el-table-column>
     </el-table>
+    <div class="pager">
+      <el-pagination
+        v-model:current-page="page"
+        v-model:page-size="pageSize"
+        :total="total"
+        :page-sizes="[10, 20, 50]"
+        layout="total, sizes, prev, pager, next"
+        background
+        @current-change="load"
+        @size-change="() => { page = 1; load() }"
+      />
+    </div>
 
     <el-dialog v-model="visible" :title="form.id ? '编辑商品' : '新增商品'" width="640px">
       <el-form label-width="90px">
@@ -47,14 +59,17 @@ import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
 import ImageField from '../components/ImageField.vue'
+import { usePager } from '../composables/usePager'
 
 const list = ref([])
 const visible = ref(false)
 const empty = () => ({ id: null, name: '', title: '', cover: '', cost: 0, usage: '', valid: '', stock: 999, sort: 0, enabled: true })
 const form = reactive(empty())
+const { page, pageSize, total, applyPage, resetPage, pageParams } = usePager()
 
 async function load() {
-  list.value = await http.get('/mall/goods')
+  const res = await http.get('/mall/goods', { params: pageParams() })
+  list.value = applyPage(res)
 }
 
 function openEdit(row) {
@@ -83,4 +98,9 @@ onMounted(load)
 
 <style scoped>
 .toolbar { margin-bottom: 12px; }
+.pager {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
 </style>

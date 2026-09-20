@@ -1,8 +1,8 @@
 <template>
   <el-card>
     <div class="toolbar">
-      <el-input v-model="keyword" placeholder="昵称/手机/openid" style="width: 240px" clearable @keyup.enter="load" />
-      <el-button type="primary" @click="load">查询</el-button>
+      <el-input v-model="keyword" placeholder="昵称/手机/openid" style="width: 240px" clearable @keyup.enter="onSearch" />
+      <el-button type="primary" @click="onSearch">查询</el-button>
     </div>
     <el-table :data="list" stripe>
       <el-table-column prop="id" label="ID" width="70" />
@@ -18,6 +18,18 @@
         </template>
       </el-table-column>
     </el-table>
+    <div class="pager">
+      <el-pagination
+        v-model:current-page="page"
+        v-model:page-size="pageSize"
+        :total="total"
+        :page-sizes="[10, 20, 50]"
+        layout="total, sizes, prev, pager, next"
+        background
+        @current-change="load"
+        @size-change="onSearch"
+      />
+    </div>
   </el-card>
 </template>
 
@@ -25,12 +37,22 @@
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
+import { usePager } from '../composables/usePager'
 
 const list = ref([])
 const keyword = ref('')
+const { page, pageSize, total, applyPage, resetPage, pageParams } = usePager()
 
 async function load() {
-  list.value = await http.get('/users', { params: { keyword: keyword.value || undefined } })
+  const res = await http.get('/users', {
+    params: pageParams({ keyword: keyword.value || undefined })
+  })
+  list.value = applyPage(res)
+}
+
+function onSearch() {
+  resetPage()
+  load()
 }
 
 async function adjust(row) {
@@ -61,5 +83,10 @@ onMounted(load)
   display: flex;
   gap: 10px;
   margin-bottom: 12px;
+}
+.pager {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
 }
 </style>

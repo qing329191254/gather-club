@@ -39,7 +39,7 @@ from ..schemas import (
     TokenResponse,
 )
 from ..storage import storage_configured, upload_file
-from ..utils import STATUS_TEXT, dumps, get_config, loads, set_config
+from ..utils import STATUS_TEXT, dumps, get_config, loads, normalize_page, page_payload, set_config
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -208,25 +208,41 @@ def delete_gather_tab(tab_id: int, db: Session = Depends(get_db), _: AdminUser =
 
 
 @router.get("/gather/products")
-def list_gather_products(db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
-    rows = db.query(GatherProduct).order_by(GatherProduct.sort.asc(), GatherProduct.id.asc()).all()
-    return [
-        {
-            "id": r.id,
-            "tab": r.tab,
-            "detail_id": r.detail_id,
-            "cover": r.cover,
-            "title": r.title,
-            "tag": r.tag,
-            "tags": loads(r.tags, []),
-            "sold_text": r.sold_text,
-            "price": r.price,
-            "origin_price": r.origin_price,
-            "sort": r.sort,
-            "enabled": r.enabled,
-        }
-        for r in rows
-    ]
+def list_gather_products(
+    page: int = Query(1),
+    page_size: int = Query(20),
+    tab: str = Query(""),
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    page, page_size, offset = normalize_page(page, page_size)
+    q = db.query(GatherProduct).order_by(GatherProduct.sort.asc(), GatherProduct.id.asc())
+    if tab:
+        q = q.filter(GatherProduct.tab == tab)
+    total = q.count()
+    rows = q.offset(offset).limit(page_size).all()
+    return page_payload(
+        [
+            {
+                "id": r.id,
+                "tab": r.tab,
+                "detail_id": r.detail_id,
+                "cover": r.cover,
+                "title": r.title,
+                "tag": r.tag,
+                "tags": loads(r.tags, []),
+                "sold_text": r.sold_text,
+                "price": r.price,
+                "origin_price": r.origin_price,
+                "sort": r.sort,
+                "enabled": r.enabled,
+            }
+            for r in rows
+        ],
+        total,
+        page,
+        page_size,
+    )
 
 
 @router.post("/gather/products")
@@ -427,8 +443,17 @@ def delete_recommend(item_id: int, db: Session = Depends(get_db), _: AdminUser =
 
 # ---- mall ----
 @router.get("/mall/goods")
-def list_mall(db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
-    return db.query(MallGoods).order_by(MallGoods.sort.asc(), MallGoods.id.asc()).all()
+def list_mall(
+    page: int = Query(1),
+    page_size: int = Query(20),
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    page, page_size, offset = normalize_page(page, page_size)
+    q = db.query(MallGoods).order_by(MallGoods.sort.asc(), MallGoods.id.asc())
+    total = q.count()
+    rows = q.offset(offset).limit(page_size).all()
+    return page_payload(rows, total, page, page_size)
 
 
 @router.post("/mall/goods")
@@ -471,9 +496,12 @@ def delete_mall(goods_id: int, db: Session = Depends(get_db), _: AdminUser = Dep
 def list_orders(
     status: Optional[str] = Query(None),
     keyword: str = Query(""),
+    page: int = Query(1),
+    page_size: int = Query(20),
     db: Session = Depends(get_db),
     _: AdminUser = Depends(get_current_admin),
 ):
+    page, page_size, offset = normalize_page(page, page_size)
     q = db.query(Order).order_by(Order.created_at.desc())
     if status:
         q = q.filter(Order.status == status)
@@ -485,32 +513,38 @@ def list_orders(
             | (Order.contact_phone.like(like))
             | (Order.title.like(like))
         )
-    rows = q.limit(200).all()
-    return [
-        {
-            "id": r.id,
-            "type": r.type,
-            "store_id": r.store_id,
-            "store_name": r.store_name,
-            "title": r.title,
-            "spec": r.spec,
-            "cover": r.cover,
-            "quantity": r.quantity,
-            "price": r.price,
-            "amount": r.amount,
-            "status": r.status,
-            "status_text": r.status_text,
-            "contact_name": r.contact_name,
-            "contact_phone": r.contact_phone,
-            "people": r.people,
-            "remark": r.remark,
-            "room_date": r.room_date,
-            "room_slot": r.room_slot,
-            "openid": r.openid,
-            "created_at": r.created_at.isoformat() if r.created_at else None,
-        }
-        for r in rows
-    ]
+    total = q.count()
+    rows = q.offset(offset).limit(page_size).all()
+    return page_payload(
+        [
+            {
+                "id": r.id,
+                "type": r.type,
+                "store_id": r.store_id,
+                "store_name": r.store_name,
+                "title": r.title,
+                "spec": r.spec,
+                "cover": r.cover,
+                "quantity": r.quantity,
+                "price": r.price,
+                "amount": r.amount,
+                "status": r.status,
+                "status_text": r.status_text,
+                "contact_name": r.contact_name,
+                "contact_phone": r.contact_phone,
+                "people": r.people,
+                "remark": r.remark,
+                "room_date": r.room_date,
+                "room_slot": r.room_slot,
+                "openid": r.openid,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ],
+        total,
+        page,
+        page_size,
+    )
 
 
 @router.put("/orders/{order_id}/status")
@@ -534,15 +568,20 @@ def update_order_status(
 def list_rooms(
     store_id: str = Query(""),
     date: str = Query(""),
+    page: int = Query(1),
+    page_size: int = Query(20),
     db: Session = Depends(get_db),
     _: AdminUser = Depends(get_current_admin),
 ):
+    page, page_size, offset = normalize_page(page, page_size)
     q = db.query(RoomSlot).order_by(RoomSlot.date.desc(), RoomSlot.store_id.asc())
     if store_id:
         q = q.filter(RoomSlot.store_id == store_id)
     if date:
         q = q.filter(RoomSlot.date == date)
-    return q.limit(300).all()
+    total = q.count()
+    rows = q.offset(offset).limit(page_size).all()
+    return page_payload(rows, total, page, page_size)
 
 
 @router.post("/rooms")
@@ -578,8 +617,17 @@ def delete_room(slot_id: int, db: Session = Depends(get_db), _: AdminUser = Depe
 
 # ---- coupons ----
 @router.get("/coupons")
-def list_coupons(db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
-    return db.query(Coupon).order_by(Coupon.id.desc()).all()
+def list_coupons(
+    page: int = Query(1),
+    page_size: int = Query(20),
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    page, page_size, offset = normalize_page(page, page_size)
+    q = db.query(Coupon).order_by(Coupon.id.desc())
+    total = q.count()
+    rows = q.offset(offset).limit(page_size).all()
+    return page_payload(rows, total, page, page_size)
 
 
 @router.post("/coupons")
@@ -616,9 +664,12 @@ def delete_coupon(coupon_id: int, db: Session = Depends(get_db), _: AdminUser = 
 @router.get("/users")
 def list_users(
     keyword: str = Query(""),
+    page: int = Query(1),
+    page_size: int = Query(20),
     db: Session = Depends(get_db),
     _: AdminUser = Depends(get_current_admin),
 ):
+    page, page_size, offset = normalize_page(page, page_size)
     q = db.query(AppUser).order_by(AppUser.id.desc())
     if keyword:
         like = f"%{keyword}%"
@@ -627,7 +678,9 @@ def list_users(
             | (AppUser.phone.like(like))
             | (AppUser.openid.like(like))
         )
-    return q.limit(200).all()
+    total = q.count()
+    rows = q.offset(offset).limit(page_size).all()
+    return page_payload(rows, total, page, page_size)
 
 
 @router.post("/users/{user_id}/points")

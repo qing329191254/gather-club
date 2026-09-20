@@ -34,8 +34,8 @@ export const api = {
 	mallRedeem(goodsId) {
 		return request('/api/v1/mall/redeem', { method: 'POST', data: { goodsId } })
 	},
-	mallRecords() {
-		return request('/api/v1/mall/records')
+	mallRecords(params) {
+		return request('/api/v1/mall/records', { data: params || {} })
 	},
 	roomAvailability(storeId, date, slot) {
 		return request('/api/v1/rooms/availability', {
@@ -47,8 +47,8 @@ export const api = {
 			data: { store_id: storeId, year, month }
 		})
 	},
-	orders() {
-		return request('/api/v1/orders')
+	orders(params) {
+		return request('/api/v1/orders', { data: params || {} })
 	},
 	orderDetail(id) {
 		return request('/api/v1/orders/' + id)
@@ -71,8 +71,8 @@ export const api = {
 	cancelAccount() {
 		return request('/api/v1/user/cancel', { method: 'POST' })
 	},
-	points() {
-		return request('/api/v1/user/points')
+	points(params) {
+		return request('/api/v1/user/points', { data: params || {} })
 	},
 	coupons() {
 		return request('/api/v1/user/coupons')

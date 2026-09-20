@@ -43,7 +43,7 @@ from ..pay import (
     unified_order,
 )
 from ..schemas import OrderCreateIn, OkResponse, WxLoginIn, WxPhoneIn
-from ..utils import STATUS_TEXT, dumps, get_config, loads
+from ..utils import STATUS_TEXT, dumps, get_config, loads, normalize_page, page_payload
 from ..wx import code2session, phone_from_code, phone_from_encrypted, resolve_demo_openid, wx_configured
 
 router = APIRouter(prefix="/api/v1", tags=["miniapp"])
@@ -571,14 +571,18 @@ def room_month(
 def list_orders(
     x_openid: str = Header(default="", alias="X-Openid"),
     openid: str = Query(default=""),
+    page: int = Query(1),
+    page_size: int = Query(20),
     db: Session = Depends(get_db),
 ):
+    page, page_size, offset = normalize_page(page, page_size)
     oid = x_openid or openid
     q = db.query(Order).order_by(Order.created_at.desc())
     if oid:
         q = q.filter(Order.openid == oid)
-    rows = q.limit(100).all()
-    return {"list": [_order_out(r) for r in rows]}
+    total = q.count()
+    rows = q.offset(offset).limit(page_size).all()
+    return page_payload([_order_out(r) for r in rows], total, page, page_size)
 
 
 @router.post("/orders")
@@ -1033,18 +1037,21 @@ def claim_coupon(
 def mall_records(
     x_openid: str = Header(default="", alias="X-Openid"),
     openid: str = Query(default=""),
+    page: int = Query(1),
+    page_size: int = Query(20),
     db: Session = Depends(get_db),
 ):
+    page, page_size, offset = normalize_page(page, page_size)
     user = _ensure_user(db, x_openid or openid or "anonymous")
-    rows = (
+    q = (
         db.query(Order)
         .filter(Order.user_id == user.id, Order.type == "mall")
         .order_by(Order.created_at.desc())
-        .limit(100)
-        .all()
     )
-    return {
-        "list": [
+    total = q.count()
+    rows = q.offset(offset).limit(page_size).all()
+    return page_payload(
+        [
             {
                 "id": r.id,
                 "name": r.title,
@@ -1055,8 +1062,11 @@ def mall_records(
                 "statusText": r.status_text,
             }
             for r in rows
-        ]
-    }
+        ],
+        total,
+        page,
+        page_size,
+    )
 
 
 @router.get("/orders/{order_id}")
@@ -1079,20 +1089,22 @@ def order_detail(
 def user_points(
     x_openid: str = Header(default="", alias="X-Openid"),
     openid: str = Query(default=""),
+    page: int = Query(1),
+    page_size: int = Query(20),
     db: Session = Depends(get_db),
 ):
+    page, page_size, offset = normalize_page(page, page_size)
     oid = x_openid or openid
     user = _ensure_user(db, oid or "anonymous")
-    rows = (
+    q = (
         db.query(PointLedger)
         .filter(PointLedger.user_id == user.id)
         .order_by(PointLedger.created_at.desc())
-        .limit(100)
-        .all()
     )
-    return {
-        "balance": user.points,
-        "list": [
+    total = q.count()
+    rows = q.offset(offset).limit(page_size).all()
+    payload = page_payload(
+        [
             {
                 "id": r.id,
                 "title": r.title,
@@ -1101,7 +1113,12 @@ def user_points(
             }
             for r in rows
         ],
-    }
+        total,
+        page,
+        page_size,
+    )
+    payload["balance"] = user.points
+    return payload
 
 
 @router.get("/user/coupons")

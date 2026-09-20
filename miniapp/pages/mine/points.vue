@@ -21,7 +21,7 @@
 			</view>
 		</view>
 
-		<view class="end">没有更多了</view>
+		<view class="end">{{ loading ? '加载中…' : (hasMore ? '上拉加载更多' : '没有更多了') }}</view>
 	</view>
 </template>
 
@@ -33,24 +33,47 @@
 		data() {
 			return {
 				balance: 0,
-				list: []
+				list: [],
+				page: 1,
+				pageSize: 20,
+				hasMore: true,
+				loading: false
 			}
 		},
 		onShow() {
-			this.loadPoints()
+			this.reloadPoints()
+		},
+		onReachBottom() {
+			this.loadMore()
 		},
 		methods: {
-			async loadPoints() {
+			async reloadPoints() {
 				if (!isLoggedIn()) await silentLogin()
 				else await refreshProfile()
 				this.balance = getUser().points || 0
+				this.page = 1
+				this.hasMore = true
+				this.list = []
+				await this.loadMore(true)
+			},
+			async loadMore(reset) {
+				if (this.loading || (!this.hasMore && !reset)) return
+				this.loading = true
 				try {
-					const res = await api.points()
+					const res = await api.points({ page: this.page, page_size: this.pageSize })
 					this.balance = res.balance != null ? res.balance : this.balance
-					this.list = res.list || []
+					const rows = res.list || []
+					this.list = reset || this.page === 1 ? rows : this.list.concat(rows)
+					this.hasMore = !!res.has_more
+					if (this.hasMore) this.page += 1
 				} catch (e) {
-					this.list = []
+					if (reset) this.list = []
+				} finally {
+					this.loading = false
 				}
+			},
+			async loadPoints() {
+				await this.reloadPoints()
 			}
 		}
 	}

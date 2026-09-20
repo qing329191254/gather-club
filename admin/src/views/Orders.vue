@@ -1,14 +1,14 @@
 <template>
   <el-card>
     <div class="toolbar">
-      <el-select v-model="status" clearable placeholder="状态" style="width: 140px" @change="load">
+      <el-select v-model="status" clearable placeholder="状态" style="width: 140px" @change="onSearch">
         <el-option label="待支付" value="pending" />
         <el-option label="已支付" value="paid" />
         <el-option label="已取消" value="cancelled" />
         <el-option label="已完成" value="completed" />
       </el-select>
-      <el-input v-model="keyword" placeholder="订单号/手机号/门店" style="width: 240px" clearable @keyup.enter="load" />
-      <el-button type="primary" @click="load">查询</el-button>
+      <el-input v-model="keyword" placeholder="订单号/手机号/门店" style="width: 240px" clearable @keyup.enter="onSearch" />
+      <el-button type="primary" @click="onSearch">查询</el-button>
     </div>
     <el-table :data="list" stripe>
       <el-table-column prop="id" label="订单号" width="160" />
@@ -36,6 +36,18 @@
         </template>
       </el-table-column>
     </el-table>
+    <div class="pager">
+      <el-pagination
+        v-model:current-page="page"
+        v-model:page-size="pageSize"
+        :total="total"
+        :page-sizes="[10, 20, 50]"
+        layout="total, sizes, prev, pager, next"
+        background
+        @current-change="load"
+        @size-change="onSearch"
+      />
+    </div>
   </el-card>
 </template>
 
@@ -43,13 +55,26 @@
 import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '../api/http'
+import { usePager } from '../composables/usePager'
 
 const list = ref([])
 const status = ref('')
 const keyword = ref('')
+const { page, pageSize, total, applyPage, resetPage, pageParams } = usePager()
 
 async function load() {
-  list.value = await http.get('/orders', { params: { status: status.value || undefined, keyword: keyword.value || undefined } })
+  const res = await http.get('/orders', {
+    params: pageParams({
+      status: status.value || undefined,
+      keyword: keyword.value || undefined
+    })
+  })
+  list.value = applyPage(res)
+}
+
+function onSearch() {
+  resetPage()
+  load()
 }
 
 async function setStatus(row, next) {
@@ -66,5 +91,11 @@ onMounted(load)
   display: flex;
   gap: 10px;
   margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.pager {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
 }
 </style>
