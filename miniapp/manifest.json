@@ -1,5 +1,5 @@
 {
-    "name" : "miniapp",
+    "name" : "天天俱乐部",
     "appid" : "__UNI__ACA9203",
     "description" : "",
     "versionName" : "1.0.0",
@@ -50,11 +50,12 @@
     "quickapp" : {},
     /* 小程序特有相关 */
     "mp-weixin" : {
-        "appid" : "",
+        "appid" : "wxc85b8624dd75e61c",
         "setting" : {
             "urlCheck" : false
         },
-        "usingComponents" : true
+        "usingComponents" : true,
+        "requiredPrivateInfos" : [ "chooseAddress" ]
     },
     "mp-alipay" : {
         "usingComponents" : true

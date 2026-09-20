@@ -1,17 +1,326 @@
 {
-	"pages": [ //pages数组中第一项表示应用启动页，参考：https://uniapp.dcloud.io/collocation/pages
+	"pages": [
 		{
 			"path": "pages/index/index",
 			"style": {
-				"navigationBarTitleText": "uni-app"
+				"navigationStyle": "custom",
+				"navigationBarTitleText": "天天俱乐部",
+				"navigationBarTextStyle": "black",
+				"backgroundColor": "#F4F0E7"
+			}
+		},
+		{
+			"path": "pages/gather/gather",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTitleText": "去哪聚",
+				"navigationBarTextStyle": "black",
+				"backgroundColor": "#FFFFFF"
+			}
+		},
+		{
+			"path": "pages/video/video",
+			"style": {
+				"navigationBarTitleText": "视频号",
+				"navigationBarBackgroundColor": "#F25B5B",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#FFF5F5"
+			}
+		},
+		{
+			"path": "pages/mine/mine",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTitleText": "我的",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#F5F5F5"
+			}
+		},
+		{
+			"path": "pages/checkin/checkin",
+			"style": {
+				"navigationBarTitleText": "每日签到",
+				"navigationBarBackgroundColor": "#F94852",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#FF565C"
+			}
+		},
+		{
+			"path": "pages/checkin/share",
+			"style": {
+				"navigationBarTitleText": "领取补签",
+				"navigationBarBackgroundColor": "#F94852",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#FF565C"
+			}
+		},
+		{
+			"path": "pages/orders/orders",
+			"style": {
+				"navigationBarTitleText": "订单管理",
+				"navigationBarBackgroundColor": "#FFFFFF",
+				"navigationBarTextStyle": "black",
+				"backgroundColor": "#F5F5F5"
+			}
+		},
+		{
+			"path": "pages/booking/booking",
+			"style": {
+				"navigationBarTitleText": "包房预约",
+				"navigationBarBackgroundColor": "#FFFFFF",
+				"navigationBarTextStyle": "black",
+				"backgroundColor": "#F5F5F5"
+			}
+		},
+		{
+			"path": "pages/recommend/recommend",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTitleText": "推荐位集合",
+				"navigationBarTextStyle": "black",
+				"backgroundColor": "#F5F5F5"
+			}
+		},
+		{
+			"path": "pages/nye/nye",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTitleText": "年夜饭",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#F5F5F5"
+			}
+		},
+		{
+			"path": "pages/nye/detail",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTitleText": "年夜饭详情",
+				"navigationBarTextStyle": "black",
+				"backgroundColor": "#F5F5F5"
+			}
+		},
+		{
+			"path": "pages/nye/setmeal",
+			"style": {
+				"navigationBarTitleText": "选择套餐",
+				"navigationBarBackgroundColor": "#FFFFFF",
+				"navigationBarTextStyle": "black",
+				"backgroundColor": "#FFFFFF"
+			}
+		},
+		{
+			"path": "pages/mall/mall",
+			"style": {
+				"navigationBarTitleText": "积分商城",
+				"navigationBarBackgroundColor": "#FF5A5F",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#F5F5F5"
+			}
+		},
+		{
+			"path": "pages/mall/records",
+			"style": {
+				"navigationBarTitleText": "兑换列表",
+				"navigationBarBackgroundColor": "#FFFFFF",
+				"navigationBarTextStyle": "black",
+				"backgroundColor": "#F5F5F5"
+			}
+		},
+		{
+			"path": "pages/mall/detail",
+			"style": {
+				"navigationBarTitleText": "商品详情",
+				"navigationBarBackgroundColor": "#FFFFFF",
+				"navigationBarTextStyle": "black",
+				"backgroundColor": "#FFFFFF"
+			}
+		},
+		{
+			"path": "pages/mall/rules",
+			"style": {
+				"navigationBarTitleText": "积分规则",
+				"navigationBarBackgroundColor": "#FFFFFF",
+				"navigationBarTextStyle": "black",
+				"backgroundColor": "#F7F4EF"
+			}
+		},
+		{
+			"path": "pages/settings/settings",
+			"style": {
+				"navigationBarTitleText": "设置",
+				"navigationBarBackgroundColor": "#FFFFFF",
+				"navigationBarTextStyle": "black",
+				"backgroundColor": "#FFFFFF"
+			}
+		},
+		{
+			"path": "pages/settings/agreements",
+			"style": {
+				"navigationBarTitleText": "查询协议",
+				"navigationBarBackgroundColor": "#FFFFFF",
+				"navigationBarTextStyle": "black",
+				"backgroundColor": "#FFFFFF"
+			}
+		},
+		{
+			"path": "pages/settings/agreement-detail",
+			"style": {
+				"navigationBarTitleText": "协议",
+				"navigationBarBackgroundColor": "#FFFFFF",
+				"navigationBarTextStyle": "black",
+				"backgroundColor": "#FFFFFF"
+			}
+		},
+		{
+			"path": "pages/settings/cancel-account",
+			"style": {
+				"navigationBarTitleText": "注销账号",
+				"navigationBarBackgroundColor": "#FFFFFF",
+				"navigationBarTextStyle": "black",
+				"backgroundColor": "#F5F5F5"
+			}
+		},
+		{
+			"path": "pages/settings/collect-list",
+			"style": {
+				"navigationBarTitleText": "个人信息收集清单",
+				"navigationBarBackgroundColor": "#FFFFFF",
+				"navigationBarTextStyle": "black",
+				"backgroundColor": "#FFFFFF"
+			}
+		},
+		{
+			"path": "pages/settings/share-list",
+			"style": {
+				"navigationBarTitleText": "个人信息三方共享清单",
+				"navigationBarBackgroundColor": "#FFFFFF",
+				"navigationBarTextStyle": "black",
+				"backgroundColor": "#FFFFFF"
+			}
+		},
+		{
+			"path": "pages/mine/profile",
+			"style": {
+				"navigationBarTitleText": "个人资料",
+				"navigationBarBackgroundColor": "#FFE8EC",
+				"navigationBarTextStyle": "black",
+				"backgroundColor": "#F5F5F5"
+			}
+		},
+		{
+			"path": "pages/mine/hobbies",
+			"style": {
+				"navigationBarTitleText": " ",
+				"navigationBarBackgroundColor": "#FFFFFF",
+				"navigationBarTextStyle": "black",
+				"backgroundColor": "#FFFFFF"
+			}
+		},
+		{
+			"path": "pages/mine/points",
+			"style": {
+				"navigationBarTitleText": "积分明细",
+				"navigationBarBackgroundColor": "#FFFFFF",
+				"navigationBarTextStyle": "black",
+				"backgroundColor": "#F5F5F5"
+			}
+		},
+		{
+			"path": "pages/mine/coupons",
+			"style": {
+				"navigationBarTitleText": "优惠券",
+				"navigationBarBackgroundColor": "#FFFFFF",
+				"navigationBarTextStyle": "black",
+				"backgroundColor": "#FFFFFF"
+			}
+		},
+		{
+			"path": "pages/mine/address",
+			"style": {
+				"navigationBarTitleText": "地址管理",
+				"navigationBarBackgroundColor": "#FFFFFF",
+				"navigationBarTextStyle": "black",
+				"backgroundColor": "#F5F5F5"
+			}
+		},
+		{
+			"path": "pages/mine/address-edit",
+			"style": {
+				"navigationBarTitleText": "新建地址",
+				"navigationBarBackgroundColor": "#FFFFFF",
+				"navigationBarTextStyle": "black",
+				"backgroundColor": "#F7F3F3"
+			}
+		},
+		{
+			"path": "pages/mine/member",
+			"style": {
+				"navigationStyle": "custom",
+				"navigationBarTitleText": "会员中心",
+				"navigationBarTextStyle": "white",
+				"backgroundColor": "#0B1423"
+			}
+		},
+		{
+			"path": "pages/mine/member-rules",
+			"style": {
+				"navigationBarTitleText": "权益规则",
+				"navigationBarBackgroundColor": "#F3E4D2",
+				"navigationBarTextStyle": "black",
+				"backgroundColor": "#F3E4D2"
 			}
 		}
 	],
+	"easycom": {
+		"autoscan": true,
+		"custom": {
+			"^app-tabbar$": "@/components/app-tabbar/app-tabbar.vue",
+			"^steward-dialog$": "@/components/steward-dialog/steward-dialog.vue",
+			"^coupon-dialog$": "@/components/coupon-dialog/coupon-dialog.vue",
+			"^privacy-dialog$": "@/components/privacy-dialog/privacy-dialog.vue",
+			"^phone-login-dialog$": "@/components/phone-login-dialog/phone-login-dialog.vue",
+			"^region-picker$": "@/components/region-picker/region-picker.vue",
+			"^date-picker$": "@/components/date-picker/date-picker.vue",
+			"^tip-dialog$": "@/components/tip-dialog/tip-dialog.vue"
+		}
+	},
 	"globalStyle": {
 		"navigationBarTextStyle": "black",
-		"navigationBarTitleText": "uni-app",
-		"navigationBarBackgroundColor": "#F8F8F8",
-		"backgroundColor": "#F8F8F8"
+		"navigationBarTitleText": "天天俱乐部",
+		"navigationBarBackgroundColor": "#FFFFFF",
+		"backgroundColor": "#F6F3EF"
 	},
-	"uniIdRouter": {}
+	"tabBar": {
+		"custom": true,
+		"color": "#333333",
+		"selectedColor": "#E64750",
+		"backgroundColor": "#F4F0E7",
+		"borderStyle": "white",
+		"list": [
+			{
+				"pagePath": "pages/index/index",
+				"text": "首页",
+				"iconPath": "static/tab/home-v2.png",
+				"selectedIconPath": "static/tab/home-v2-active.png"
+			},
+			{
+				"pagePath": "pages/gather/gather",
+				"text": "去哪聚",
+				"iconPath": "static/tab/gather-v2.png",
+				"selectedIconPath": "static/tab/gather-v2-active.png"
+			},
+			{
+				"pagePath": "pages/video/video",
+				"text": "视频号",
+				"iconPath": "static/tab/video-v2.png",
+				"selectedIconPath": "static/tab/video-v2-active.png"
+			},
+			{
+				"pagePath": "pages/mine/mine",
+				"text": "我的",
+				"iconPath": "static/tab/mine-v2.png",
+				"selectedIconPath": "static/tab/mine-v2-active.png"
+			}
+		]
+	}
 }

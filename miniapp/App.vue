@@ -1,17 +1,22 @@
 <script>
 	export default {
-		onLaunch: function() {
-			console.log('App Launch')
+		globalData: {
+			gatherTab: '',
+			authVersion: 0
 		},
-		onShow: function() {
-			console.log('App Show')
+		onLaunch() {
+			uni.hideTabBar({ fail() {} })
 		},
-		onHide: function() {
-			console.log('App Hide')
-		}
+		onShow() {
+			uni.hideTabBar({ fail() {} })
+		},
+		onHide() {}
 	}
 </script>
 
 <style>
-	/*每个页面公共css */
+	page {
+		background-color: #F6F3EF;
+		font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Helvetica, "Microsoft YaHei", sans-serif;
+	}
 </style>
