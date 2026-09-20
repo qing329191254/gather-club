@@ -13,7 +13,7 @@ import httpx
 from fastapi import HTTPException, UploadFile
 
 from .config import get_settings
-from .wx import get_access_token, wx_configured
+from .wx import get_access_token, wx_api_url, wx_configured, wx_http_client
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +118,7 @@ async def diagnose_storage() -> dict:
         "access_token_error": token_err,
         "hint": (
             "正常只需 WX_APPID+WX_SECRET，不必开开放接口服务。"
-            "若 access_token_ok=false，请核对 Secret 是否与小程序后台一致、有无空格/引号，并确认云托管已重新发布最新版本。"
+            "若 access_token_ok=false：先确认已发布含 SSL 修复的版本；仍失败再核对 Secret 是否与小程序后台一致、有无空格/引号。"
         ),
     }
 
@@ -136,7 +136,7 @@ async def _prepare_upload_attempts(env: str, path: str) -> list[tuple[str, dict]
                 (
                     "access_token",
                     {
-                        "url": f"https://api.weixin.qq.com/tcb/uploadfile?access_token={token}",
+                        "url": wx_api_url(f"/tcb/uploadfile?access_token={token}"),
                         "json": body,
                     },
                 )
@@ -154,7 +154,7 @@ async def _prepare_upload_attempts(env: str, path: str) -> list[tuple[str, dict]
             (
                 "cloudbase_access_token",
                 {
-                    "url": f"https://api.weixin.qq.com/tcb/uploadfile?cloudbase_access_token={cloud}",
+                    "url": wx_api_url(f"/tcb/uploadfile?cloudbase_access_token={cloud}"),
                     "json": body,
                 },
             )
@@ -164,7 +164,7 @@ async def _prepare_upload_attempts(env: str, path: str) -> list[tuple[str, dict]
     attempts.append(
         (
             "openapi_http",
-            {"url": "http://api.weixin.qq.com/tcb/uploadfile", "json": body},
+            {"url": wx_api_url("/tcb/uploadfile"), "json": body},
         )
     )
     return attempts
@@ -184,7 +184,7 @@ async def prepare_upload(path: str) -> dict:
         )
 
     errors: list[str] = []
-    async with httpx.AsyncClient(timeout=20.0, follow_redirects=True) as client:
+    async with wx_http_client(timeout=20.0) as client:
         for name, req in attempts:
             try:
                 resp = await client.post(req["url"], json=req["json"])
@@ -292,9 +292,9 @@ async def resolve_file_urls(file_ids: list[str], max_age: int = 86400) -> dict[s
     if not token or not env:
         return {fid: file_id_to_url(fid) for fid in ids}
 
-    url = f"https://api.weixin.qq.com/tcb/batchdownloadfile?{token_key}={token}"
+    url = wx_api_url(f"/tcb/batchdownloadfile?{token_key}={token}")
     payload = {"env": env, "file_list": [{"fileid": fid, "max_age": max_age} for fid in ids]}
-    async with httpx.AsyncClient(timeout=20.0) as client:
+    async with wx_http_client(timeout=20.0) as client:
         resp = await client.post(url, json=payload)
         data = resp.json()
     if int(data.get("errcode") or 0):

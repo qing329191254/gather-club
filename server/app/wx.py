@@ -15,6 +15,21 @@ from .config import get_settings
 
 _TOKEN_CACHE: dict[str, Any] = {"token": "", "expires_at": 0.0, "key": ""}
 
+# 云托管容器内常注入 api.weixin.qq.com 自签证书，https + 默认校验会失败；
+# 官方也建议容器内用 http 访问该域名。
+WX_API_HOST = "http://api.weixin.qq.com"
+
+
+def wx_api_url(path: str) -> str:
+    if not path.startswith("/"):
+        path = "/" + path
+    return WX_API_HOST + path
+
+
+def wx_http_client(timeout: float = 15.0, **kwargs) -> httpx.AsyncClient:
+    """调用微信开放接口的 httpx 客户端（跳过自签证书校验）。"""
+    return httpx.AsyncClient(timeout=timeout, verify=False, follow_redirects=True, **kwargs)
+
 
 def wx_configured() -> bool:
     s = get_settings()
@@ -29,14 +44,14 @@ async def code2session(js_code: str) -> dict[str, str]:
     if not settings.wx_appid or not settings.wx_secret:
         raise HTTPException(status_code=500, detail="未配置 WX_APPID / WX_SECRET")
 
-    url = "https://api.weixin.qq.com/sns/jscode2session"
+    url = wx_api_url("/sns/jscode2session")
     params = {
         "appid": settings.wx_appid,
         "secret": settings.wx_secret,
         "js_code": js_code,
         "grant_type": "authorization_code",
     }
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    async with wx_http_client(timeout=10.0) as client:
         resp = await client.get(url, params=params)
         data = resp.json()
 
@@ -72,13 +87,13 @@ async def get_access_token() -> str:
     ):
         return str(_TOKEN_CACHE["token"])
 
-    url = "https://api.weixin.qq.com/cgi-bin/token"
+    url = wx_api_url("/cgi-bin/token")
     params = {
         "grant_type": "client_credential",
         "appid": appid,
         "secret": secret,
     }
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    async with wx_http_client(timeout=10.0) as client:
         resp = await client.get(url, params=params)
         try:
             data = resp.json()
@@ -105,8 +120,8 @@ async def phone_from_code(phone_code: str) -> str:
     if not phone_code:
         raise HTTPException(status_code=400, detail="缺少手机号 code")
     token = await get_access_token()
-    url = f"https://api.weixin.qq.com/wxa/business/getuserphonenumber?access_token={token}"
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    url = wx_api_url(f"/wxa/business/getuserphonenumber?access_token={token}")
+    async with wx_http_client(timeout=10.0) as client:
         resp = await client.post(url, json={"code": phone_code})
         data = resp.json()
 
