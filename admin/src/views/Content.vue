@@ -8,7 +8,7 @@
     </el-tabs>
     <el-input v-model="text" type="textarea" :rows="22" />
     <div class="actions">
-      <el-button type="primary" @click="onSave">保存 JSON</el-button>
+      <el-button type="primary" @click="onSave">保存</el-button>
     </div>
   </el-card>
 </template>

@@ -27,7 +27,7 @@
     <el-dialog v-model="visible" title="包房库存" width="480px">
       <el-form label-width="90px">
         <el-form-item label="门店ID"><el-input v-model="form.store_id" /></el-form-item>
-        <el-form-item label="日期"><el-input v-model="form.date" placeholder="2026-09-20" /></el-form-item>
+        <el-form-item label="日期"><el-input v-model="form.date" placeholder="YYYY-MM-DD" /></el-form-item>
         <el-form-item label="时段">
           <el-select v-model="form.slot" style="width: 100%">
             <el-option label="午市 lunch" value="lunch" />

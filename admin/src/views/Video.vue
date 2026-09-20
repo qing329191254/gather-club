@@ -2,20 +2,13 @@
   <div>
     <el-card>
       <template #header>视频号资料</template>
-      <el-alert
-        type="info"
-        :closable="false"
-        show-icon
-        title="视频号未过审时，视频号 ID 留空。小程序只记录关注和预约并发积分，不会跳转视频号。过审后填入视频号 ID，预告填 noticeId，即可跳转。"
-        style="margin-bottom: 16px"
-      />
       <el-form label-width="120px" style="max-width: 720px">
         <el-form-item label="名称"><el-input v-model="profile.name" /></el-form-item>
         <el-form-item label="头像"><el-input v-model="profile.avatar" /></el-form-item>
         <el-form-item label="封面"><el-input v-model="profile.cover" /></el-form-item>
         <el-form-item label="简介"><el-input v-model="profile.intro" type="textarea" :rows="3" /></el-form-item>
         <el-form-item label="视频号 ID">
-          <el-input v-model="profile.finderUserName" placeholder="过审后填写 finderUserName，例如 sphxxxxxxxx" />
+          <el-input v-model="profile.finderUserName" placeholder="视频号 ID" />
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="saveProfile">保存资料</el-button>
@@ -58,12 +51,12 @@
             <el-option label="预约" value="scheduled" />
           </el-select>
         </el-form-item>
-        <el-form-item label="时间"><el-input v-model="form.time_text" placeholder="例如 09月20 11:30" /></el-form-item>
+        <el-form-item label="时间"><el-input v-model="form.time_text" placeholder="开播时间" /></el-form-item>
         <el-form-item label="标题"><el-input v-model="form.line1" /></el-form-item>
         <el-form-item label="副标题"><el-input v-model="form.line2" /></el-form-item>
         <el-form-item label="预约积分"><el-input-number v-model="form.points" :min="0" /></el-form-item>
-        <el-form-item label="头像"><el-input v-model="form.avatar" placeholder="留空则用视频号头像" /></el-form-item>
-        <el-form-item label="预告 ID"><el-input v-model="form.notice_id" placeholder="过审后填写 noticeId" /></el-form-item>
+        <el-form-item label="头像"><el-input v-model="form.avatar" placeholder="可选，留空使用视频号头像" /></el-form-item>
+        <el-form-item label="预告 ID"><el-input v-model="form.notice_id" placeholder="直播预告 ID" /></el-form-item>
         <el-form-item label="排序"><el-input-number v-model="form.sort" :min="0" /></el-form-item>
         <el-form-item label="启用"><el-switch v-model="form.enabled" /></el-form-item>
       </el-form>

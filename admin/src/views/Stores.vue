@@ -24,7 +24,7 @@
 
     <el-dialog v-model="visible" :title="editing ? '编辑门店' : '新增门店'" width="640px">
       <el-form label-width="90px">
-        <el-form-item label="门店ID"><el-input v-model="form.id" :disabled="editing" placeholder="如 shibo" /></el-form-item>
+        <el-form-item label="门店ID"><el-input v-model="form.id" :disabled="editing" placeholder="门店唯一标识" /></el-form-item>
         <el-form-item label="名称"><el-input v-model="form.name" /></el-form-item>
         <el-form-item label="封面"><el-input v-model="form.cover" /></el-form-item>
         <el-form-item label="地址"><el-input v-model="form.address" /></el-form-item>

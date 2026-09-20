@@ -5,10 +5,10 @@
       <p class="tip">管理小程序内容、订单与库存</p>
       <el-form :model="form" @submit.prevent>
         <el-form-item label="账号">
-          <el-input v-model="form.username" placeholder="admin" />
+          <el-input v-model="form.username" placeholder="请输入账号" />
         </el-form-item>
         <el-form-item label="密码">
-          <el-input v-model="form.password" type="password" show-password placeholder="密码" @keyup.enter="onLogin" />
+          <el-input v-model="form.password" type="password" show-password placeholder="请输入密码" @keyup.enter="onLogin" />
         </el-form-item>
         <el-button type="primary" style="width: 100%" :loading="loading" @click="onLogin">登录</el-button>
       </el-form>
@@ -24,7 +24,7 @@ import http from '../api/http'
 
 const router = useRouter()
 const loading = ref(false)
-const form = reactive({ username: 'admin', password: 'admin123' })
+const form = reactive({ username: '', password: '' })
 
 async function onLogin() {
   loading.value = true

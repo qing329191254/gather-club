@@ -30,7 +30,7 @@
         <el-form-item label="路线"><el-input v-model="form.route" type="textarea" :rows="2" /></el-form-item>
         <el-form-item label="轮播图"><el-input v-model="bannersText" type="textarea" :rows="2" placeholder="每行一个图片地址" /></el-form-item>
         <el-form-item label="详情长图"><el-input v-model="detailText" type="textarea" :rows="2" placeholder="每行一个图片地址" /></el-form-item>
-        <el-form-item label="套餐 JSON"><el-input v-model="packagesText" type="textarea" :rows="8" placeholder="JSON 数组，留空则接口按价格自动生成" /></el-form-item>
+        <el-form-item label="套餐 JSON"><el-input v-model="packagesText" type="textarea" :rows="8" placeholder="套餐列表 JSON" /></el-form-item>
         <el-form-item label="开放起"><el-input v-model="form.open_start" placeholder="YYYY-MM-DD" /></el-form-item>
         <el-form-item label="开放止"><el-input v-model="form.open_end" placeholder="YYYY-MM-DD" /></el-form-item>
         <el-form-item label="排序"><el-input-number v-model="form.sort" :min="0" /></el-form-item>

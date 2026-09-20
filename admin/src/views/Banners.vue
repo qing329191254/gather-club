@@ -29,7 +29,7 @@
     <el-dialog v-model="visible" :title="form.id ? '编辑轮播' : '新增轮播'" width="520px">
       <el-form label-width="90px">
         <el-form-item label="图片地址"><el-input v-model="form.image" /></el-form-item>
-        <el-form-item label="跳转链接"><el-input v-model="form.link" placeholder="/pages/nye/nye" /></el-form-item>
+        <el-form-item label="跳转链接"><el-input v-model="form.link" placeholder="小程序页面路径" /></el-form-item>
         <el-form-item label="排序"><el-input-number v-model="form.sort" :min="0" /></el-form-item>
         <el-form-item label="启用"><el-switch v-model="form.enabled" /></el-form-item>
       </el-form>

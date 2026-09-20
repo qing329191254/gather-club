@@ -70,7 +70,7 @@
         </el-form-item>
         <el-form-item label="标题"><el-input v-model="productForm.title" /></el-form-item>
         <el-form-item label="封面"><el-input v-model="productForm.cover" /></el-form-item>
-        <el-form-item label="详情门店"><el-input v-model="productForm.detail_id" placeholder="对应年夜饭/门店 id" /></el-form-item>
+        <el-form-item label="详情门店"><el-input v-model="productForm.detail_id" placeholder="关联详情门店 ID，可选" /></el-form-item>
         <el-form-item label="标签"><el-input v-model="productForm.tag" /></el-form-item>
         <el-form-item label="多标签"><el-input v-model="tagsText" placeholder="逗号分隔" /></el-form-item>
         <el-form-item label="已购文案"><el-input v-model="productForm.sold_text" /></el-form-item>
