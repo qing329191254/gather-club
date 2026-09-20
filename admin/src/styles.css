@@ -1,0 +1,5 @@
+/* 禁止多行输入框被用户拖拽改变大小 */
+textarea,
+.el-textarea__inner {
+  resize: none !important;
+}
