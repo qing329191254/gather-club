@@ -4,6 +4,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
+from ..cms_data import AGREEMENTS, MEMBER_CONFIG, PRIVACY_COLLECT, PRIVACY_SHARE
 from ..commerce import bump_sold_on_paid, sync_user_vip, table_count
 from ..database import get_db
 from ..deps import create_access_token, get_current_admin, verify_password
@@ -836,9 +837,38 @@ def update_vip(
 
 
 # ---- site config ----
+CMS_DEFAULTS: dict[str, Any] = {
+    "privacy_collect": PRIVACY_COLLECT,
+    "privacy_share": PRIVACY_SHARE,
+    "member": MEMBER_CONFIG,
+    "agreements": AGREEMENTS,
+}
+
+
+def _cms_value_empty(key: str, value: Any) -> bool:
+    if not isinstance(value, dict) or not value:
+        return True
+    if key in ("privacy_collect", "privacy_share"):
+        return not (value.get("sections") or [])
+    if key == "member":
+        return not (value.get("levels") or [])
+    if key == "agreements":
+        return not value
+    return False
+
+
+def _resolve_cms_value(db: Session, key: str) -> Any:
+    value = get_config(db, key, {})
+    default = CMS_DEFAULTS.get(key)
+    if default is not None and _cms_value_empty(key, value):
+        set_config(db, key, default)
+        return default
+    return value if value is not None else {}
+
+
 @router.get("/config/{key}")
 def get_site_config(key: str, db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
-    return {"key": key, "value": get_config(db, key, {})}
+    return {"key": key, "value": _resolve_cms_value(db, key)}
 
 
 @router.put("/config/{key}")
@@ -849,8 +879,19 @@ def put_site_config(
     _: AdminUser = Depends(get_current_admin),
 ):
     value = payload.get("value", payload)
+    if key in CMS_DEFAULTS and _cms_value_empty(key, value):
+        raise HTTPException(400, "内容不能为空，请填写后再保存（或刷新页面从模板恢复）")
     set_config(db, key, value)
     return {"key": key, "value": value}
+
+
+@router.post("/config/{key}/restore")
+def restore_site_config(key: str, db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
+    default = CMS_DEFAULTS.get(key)
+    if default is None:
+        raise HTTPException(400, "该配置不支持从模板恢复")
+    set_config(db, key, default)
+    return {"key": key, "value": default}
 
 
 def _live_admin(row: VideoLive) -> dict:

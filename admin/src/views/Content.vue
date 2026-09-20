@@ -222,6 +222,13 @@
     </div>
 
     <div class="actions">
+      <el-button
+        v-if="tab === 'privacy_collect' || tab === 'privacy_share' || tab === 'member' || tab === 'member_rules' || tab === 'agreements'"
+        :loading="restoring"
+        @click="onRestore"
+      >
+        从模板恢复
+      </el-button>
       <el-button type="primary" :loading="saving" @click="onSave">保存当前页</el-button>
     </div>
   </div>
@@ -237,6 +244,7 @@ const tab = ref('agreements')
 const prevTab = ref('agreements')
 const loading = ref(false)
 const saving = ref(false)
+const restoring = ref(false)
 let uid = 1
 const keyOf = () => `k${uid++}`
 
@@ -550,6 +558,18 @@ async function onSave(showToast = true) {
   }
 }
 
+async function onRestore() {
+  const configKey = configKeyForTab(tab.value)
+  restoring.value = true
+  try {
+    await http.post(`/config/${configKey}/restore`)
+    ElMessage.success('已从模板恢复')
+    await loadCurrent()
+  } finally {
+    restoring.value = false
+  }
+}
+
 onMounted(() => {
   prevTab.value = tab.value
   loadCurrent()
@@ -618,5 +638,8 @@ onMounted(() => {
   margin-top: 16px;
   padding-top: 12px;
   border-top: 1px solid #e2e8f0;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
 }
 </style>
