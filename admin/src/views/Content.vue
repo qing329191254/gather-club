@@ -230,6 +230,7 @@ import http from '../api/http'
 import ImageField from '../components/ImageField.vue'
 
 const tab = ref('agreements')
+const prevTab = ref('agreements')
 const loading = ref(false)
 const saving = ref(false)
 let uid = 1
@@ -421,16 +422,6 @@ function onAgreeKeyChange(nextKey) {
   loadAgreementDoc()
 }
 
-async function onTabChange() {
-  // 切 Tab 前先把当前页写入服务器，避免上传/改文案后丢掉
-  try {
-    await onSave(false)
-  } catch {
-    /* ignore */
-  }
-  loadCurrent()
-}
-
 function buildAgreementPayload() {
   stashAgreementDoc(agreeKey.value)
   return { ...agreementsRaw.value }
@@ -466,44 +457,88 @@ function buildMemberPayload() {
   }
 }
 
+function buildCollectPayload() {
+  return {
+    intro: collect.intro,
+    sections: collect.sections.map(({ title, content, purpose, scene }) => ({
+      title,
+      content,
+      purpose,
+      scene
+    }))
+  }
+}
+
+function buildSharePayload() {
+  return {
+    intro: share.intro,
+    sections: share.sections.map(({ title, name, info, purpose, scene, method }) => ({
+      title,
+      name,
+      info,
+      purpose,
+      scene,
+      method
+    }))
+  }
+}
+
+function payloadForTab(key) {
+  if (key === 'agreements') return buildAgreementPayload()
+  if (key === 'privacy_collect') return buildCollectPayload()
+  if (key === 'privacy_share') return buildSharePayload()
+  if (key === 'member') return buildMemberPayload()
+  return null
+}
+
+function isEmptyConfig(key, value) {
+  if (!value || typeof value !== 'object') return true
+  if (key === 'privacy_collect' || key === 'privacy_share') {
+    return !(value.sections && value.sections.length)
+  }
+  if (key === 'member') {
+    return !(value.levels && value.levels.length)
+  }
+  if (key === 'agreements') {
+    return !Object.keys(value).length
+  }
+  return false
+}
+
+async function persistTab(key, showToast = false) {
+  const value = payloadForTab(key)
+  if (!value) return
+  // 切到尚未加载过的 Tab 时本地是空的，绝不能把空数据写回服务器
+  if (isEmptyConfig(key, value)) return
+  await http.put(`/config/${key}`, { value })
+  if (key === 'agreements') agreementsRaw.value = value
+  if (showToast) ElMessage.success('已保存')
+}
+
+async function onTabChange(name) {
+  const leaving = prevTab.value
+  prevTab.value = name || tab.value
+  try {
+    await persistTab(leaving, false)
+  } catch {
+    /* ignore */
+  }
+  await loadCurrent()
+}
+
 async function onSave(showToast = true) {
   saving.value = true
   try {
-    let value
-    if (tab.value === 'agreements') value = buildAgreementPayload()
-    else if (tab.value === 'privacy_collect') {
-      value = {
-        intro: collect.intro,
-        sections: collect.sections.map(({ title, content, purpose, scene }) => ({
-          title,
-          content,
-          purpose,
-          scene
-        }))
-      }
-    } else if (tab.value === 'privacy_share') {
-      value = {
-        intro: share.intro,
-        sections: share.sections.map(({ title, name, info, purpose, scene, method }) => ({
-          title,
-          name,
-          info,
-          purpose,
-          scene,
-          method
-        }))
-      }
-    } else value = buildMemberPayload()
-
-    await http.put(`/config/${tab.value}`, { value })
-    if (tab.value === 'agreements') agreementsRaw.value = value
-    if (showToast) ElMessage.success('已保存')
+    await persistTab(tab.value, showToast)
   } finally {
     saving.value = false
   }
 }
 
-onMounted(loadCurrent)
+onMounted(() => {
+  prevTab.value = tab.value
+  loadCurrent()
+})
 </script>
 
 <style scoped>

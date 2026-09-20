@@ -399,11 +399,25 @@ def seed_all(db: Session) -> None:
         set_config(db, "recommend", {"banners": RECOMMEND_BANNERS})
     if not get_config(db, "agreements"):
         set_config(db, "agreements", AGREEMENTS)
-    if not get_config(db, "privacy_collect"):
-        set_config(db, "privacy_collect", PRIVACY_COLLECT)
-    if not get_config(db, "privacy_share"):
-        set_config(db, "privacy_share", PRIVACY_SHARE)
-    if not get_config(db, "member"):
-        set_config(db, "member", MEMBER_CONFIG)
+    # 若曾被空数据覆盖，自动从内置模板恢复
+    for key, default in (
+        ("privacy_collect", PRIVACY_COLLECT),
+        ("privacy_share", PRIVACY_SHARE),
+        ("member", MEMBER_CONFIG),
+        ("agreements", AGREEMENTS),
+    ):
+        cur = get_config(db, key)
+        if not cur:
+            set_config(db, key, default)
+            continue
+        if key in ("privacy_collect", "privacy_share"):
+            if not (isinstance(cur, dict) and (cur.get("sections") or [])):
+                set_config(db, key, default)
+        elif key == "member":
+            if not (isinstance(cur, dict) and (cur.get("levels") or [])):
+                set_config(db, key, default)
+        elif key == "agreements":
+            if not (isinstance(cur, dict) and cur):
+                set_config(db, key, default)
 
     refresh_demo_covers(db)
