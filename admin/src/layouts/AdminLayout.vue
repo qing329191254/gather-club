@@ -125,5 +125,23 @@ function logout() {
 }
 .el-menu {
   border-right: none;
+  padding: 8px 0;
+}
+.el-menu :deep(.el-menu-item) {
+  margin: 2px 10px;
+  height: 44px;
+  line-height: 44px;
+  border-radius: 8px;
+}
+.el-menu :deep(.el-menu-item:hover) {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+}
+.el-menu :deep(.el-menu-item.is-active) {
+  background-color: rgba(229, 65, 72, 0.18) !important;
+  color: #fff !important;
+  font-weight: 600;
+}
+.el-menu :deep(.el-menu-item.is-active .el-icon) {
+  color: #ff8a8f;
 }
 </style>
