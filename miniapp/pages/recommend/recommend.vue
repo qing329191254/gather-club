@@ -10,7 +10,7 @@
 					<view class="back-arrow" :class="{ dark: navSolid }" />
 					<text :class="{ dark: navSolid }">返回</text>
 				</view>
-				<text v-if="navSolid" class="nav-title">顶酒店</text>
+				<text v-if="navSolid" class="nav-title">订酒店</text>
 			</view>
 		</view>
 
@@ -120,7 +120,7 @@
 								store_id: String(item.id),
 								store_name: item.name,
 								title: item.name,
-								spec: '顶酒店',
+								spec: '订酒店',
 								cover: item.cover,
 								quantity: 1,
 								price: item.price,

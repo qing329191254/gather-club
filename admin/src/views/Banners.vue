@@ -66,7 +66,7 @@ import ImageField from '../components/ImageField.vue'
 /** 运营可选的跳转目标；value 仍是小程序路径，界面只展示中文 */
 const linkOptions = [
   { label: '不跳转', value: '' },
-  { label: '顶酒店', value: '/pages/recommend/recommend' },
+  { label: '订酒店', value: '/pages/recommend/recommend' },
   { label: '宴会专题', value: '/pages/nye/nye' },
   { label: '去哪聚', value: '/pages/gather/gather' },
   { label: '积分商城', value: '/pages/mall/mall' },

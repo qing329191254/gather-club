@@ -309,7 +309,7 @@ def _resolve_order_price(db: Session, payload: OrderCreateIn) -> tuple[float, fl
         unit = float(row.price or 0)
         if unit <= 0:
             raise HTTPException(status_code=400, detail="酒店价格异常")
-        return unit, round(unit * qty, 2), row.name, row.cover or "", payload.spec or "顶酒店"
+        return unit, round(unit * qty, 2), row.name, row.cover or "", payload.spec or "订酒店"
 
     if otype == "nye":
         store = (

@@ -54,7 +54,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="bannerVisible" title="顶酒店页顶部轮播" width="640px">
+    <el-dialog v-model="bannerVisible" title="订酒店页顶部轮播" width="640px">
       <ImageListField v-model="banners" folder="recommend" />
       <template #footer>
         <el-button @click="bannerVisible = false">取消</el-button>
