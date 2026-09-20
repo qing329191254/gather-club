@@ -587,6 +587,18 @@ RECOMMEND_ITEMS = [
 ]
 
 
+HOBBY_OPTIONS = {
+    "items": [
+        {"name": "旅游", "color": "#f08a3a", "enabled": True, "sort": 1},
+        {"name": "美食", "color": "#5aa8e8", "enabled": True, "sort": 2},
+        {"name": "酒店", "color": "#3cbf7a", "enabled": True, "sort": 3},
+        {"name": "休闲娱乐", "color": "#8b6bc9", "enabled": True, "sort": 4},
+        {"name": "线下活动", "color": "#3d6fd9", "enabled": True, "sort": 5},
+        {"name": "老年大学", "color": "#e24b4b", "enabled": True, "sort": 6},
+    ]
+}
+
+
 def default_nye_packages(price: float, cover: str) -> list[dict]:
     p = price or 2388
     c = cover or ""

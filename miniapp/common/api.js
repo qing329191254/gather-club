@@ -95,6 +95,9 @@ export const api = {
 	setDefaultAddress(id) {
 		return request('/api/v1/user/addresses/' + id + '/default', { method: 'POST' })
 	},
+	hobbyOptions() {
+		return request('/api/v1/hobby/options')
+	},
 	checkin(makeup) {
 		const q = makeup ? '?makeup=true' : ''
 		return request('/api/v1/checkin' + q, { method: 'POST' })

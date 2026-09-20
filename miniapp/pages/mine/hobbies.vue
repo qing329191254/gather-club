@@ -13,6 +13,7 @@
 				{{ item.name }}
 			</view>
 		</view>
+		<view v-if="!loading && !options.length" class="empty">暂无可选兴趣，请稍后再试</view>
 		<view class="footer">
 			<view class="done" @tap="onDone">完成</view>
 		</view>
@@ -20,25 +21,31 @@
 </template>
 
 <script>
+	import { api } from '../../common/api.js'
+	import { getUser, isLoggedIn, saveLogin, silentLogin } from '../../common/auth.js'
+
 	const PROFILE_KEY = 'gather_profile'
 	const HOBBY_KEY = 'gather_hobbies'
+	const FALLBACK_OPTIONS = [
+		{ name: '旅游', color: '#f08a3a' },
+		{ name: '美食', color: '#5aa8e8' },
+		{ name: '酒店', color: '#3cbf7a' },
+		{ name: '休闲娱乐', color: '#8b6bc9' },
+		{ name: '线下活动', color: '#3d6fd9' },
+		{ name: '老年大学', color: '#e24b4b' }
+	]
 
 	export default {
 		data() {
 			return {
+				loading: false,
 				selected: [],
-				options: [
-					{ name: '旅游', color: '#f08a3a' },
-					{ name: '美食', color: '#5aa8e8' },
-					{ name: '酒店', color: '#3cbf7a' },
-					{ name: '休闲娱乐', color: '#8b6bc9' },
-					{ name: '线下活动', color: '#3d6fd9' },
-					{ name: '老年大学', color: '#e24b4b' }
-				]
+				options: []
 			}
 		},
 		onLoad() {
 			this.loadSelected()
+			this.loadOptions()
 		},
 		methods: {
 			loadSelected() {
@@ -49,13 +56,31 @@
 						return
 					}
 					const profile = uni.getStorageSync(PROFILE_KEY)
-					if (profile && profile.hobby) {
-						this.selected = String(profile.hobby)
+					const hobby = (profile && profile.hobby) || (getUser() && getUser().hobby) || ''
+					if (hobby) {
+						this.selected = String(hobby)
 							.split(/[、,，/\s]+/)
 							.map((s) => s.trim())
 							.filter(Boolean)
 					}
 				} catch (e) {}
+			},
+			async loadOptions() {
+				this.loading = true
+				try {
+					const res = await api.hobbyOptions()
+					const items = (res && res.items) || []
+					this.options = items.length
+						? items.map((i) => ({
+								name: i.name,
+								color: i.color || '#e85a4a'
+						  }))
+						: FALLBACK_OPTIONS.slice()
+				} catch (e) {
+					this.options = FALLBACK_OPTIONS.slice()
+				} finally {
+					this.loading = false
+				}
 			},
 			tagStyle(item) {
 				const on = this.selected.indexOf(item.name) !== -1
@@ -82,7 +107,7 @@
 					this.selected.splice(idx, 1)
 				}
 			},
-			onDone() {
+			async onDone() {
 				const hobby = this.selected.join('、')
 				uni.setStorageSync(HOBBY_KEY, this.selected)
 				try {
@@ -90,7 +115,21 @@
 					profile.hobby = hobby
 					uni.setStorageSync(PROFILE_KEY, profile)
 				} catch (e) {}
-				uni.navigateBack({ fail() {} })
+				uni.showLoading({ title: '保存中', mask: true })
+				try {
+					if (!isLoggedIn()) await silentLogin()
+					const res = await api.updateProfile({ hobby })
+					saveLogin(
+						Object.assign({}, getUser(), {
+							hobby: (res && res.hobby) || hobby
+						})
+					)
+					uni.hideLoading()
+					uni.navigateBack({ fail() {} })
+				} catch (e) {
+					uni.hideLoading()
+					uni.showToast({ title: (e && e.message) || '保存失败', icon: 'none' })
+				}
 			}
 		}
 	}
@@ -126,6 +165,13 @@
 		font-size: 28rpx;
 		line-height: 1.3;
 		box-sizing: border-box;
+	}
+
+	.empty {
+		margin-top: 40rpx;
+		text-align: center;
+		color: #999999;
+		font-size: 28rpx;
 	}
 
 	.footer {

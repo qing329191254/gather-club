@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from ..cms_data import (
     AGREEMENTS,
+    HOBBY_OPTIONS,
     MEMBER_CONFIG,
     PRIVACY_COLLECT,
     PRIVACY_SHARE,
@@ -643,6 +644,30 @@ def privacy_share(db: Session = Depends(get_db)):
 @router.get("/member/config")
 def member_config(db: Session = Depends(get_db)):
     return get_config(db, "member") or MEMBER_CONFIG
+
+
+@router.get("/hobby/options")
+def hobby_options(db: Session = Depends(get_db)):
+    data = get_config(db, "hobby_options") or HOBBY_OPTIONS
+    items = data.get("items") if isinstance(data, dict) else []
+    out = []
+    for i, raw in enumerate(items or []):
+        if not isinstance(raw, dict):
+            continue
+        name = str(raw.get("name") or "").strip()
+        if not name:
+            continue
+        if raw.get("enabled") is False:
+            continue
+        out.append(
+            {
+                "name": name,
+                "color": str(raw.get("color") or "#e85a4a").strip() or "#e85a4a",
+                "sort": int(raw.get("sort") or i + 1),
+            }
+        )
+    out.sort(key=lambda x: (x["sort"], x["name"]))
+    return {"items": out}
 
 
 @router.get("/mall/goods")

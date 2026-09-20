@@ -6,6 +6,7 @@
       <el-tab-pane label="共享清单" name="privacy_share" />
       <el-tab-pane label="会员配置" name="member" />
       <el-tab-pane label="会员章程" name="member_rules" />
+      <el-tab-pane label="兴趣选项" name="hobby_options" />
     </el-tabs>
 
     <div v-loading="loading" class="pane">
@@ -219,11 +220,38 @@
         </div>
         <el-empty v-if="!member.rules.length" description="暂无章程章节，点击上方新增" :image-size="72" />
       </template>
+
+      <!-- 兴趣爱好选项 -->
+      <template v-else-if="tab === 'hobby_options'">
+        <div class="section-head">
+          <h3>用户可选标签</h3>
+          <el-button type="primary" size="small" @click="addHobbyItem">新增标签</el-button>
+        </div>
+        <p class="hint">小程序兴趣页只展示「启用」的标签；用户已选过的旧标签仍会保留在资料里。</p>
+        <div v-for="(item, i) in hobbies" :key="item._key" class="card">
+          <div class="card-head">
+            <strong>标签 {{ i + 1 }}</strong>
+            <el-button link type="danger" @click="hobbies.splice(i, 1)">删除</el-button>
+          </div>
+          <el-form label-width="80px">
+            <el-form-item label="名称"><el-input v-model="item.name" placeholder="例如：旅游" /></el-form-item>
+            <el-form-item label="颜色">
+              <div class="color-row">
+                <el-color-picker v-model="item.color" />
+                <el-input v-model="item.color" placeholder="#f08a3a" style="width: 140px" />
+              </div>
+            </el-form-item>
+            <el-form-item label="排序"><el-input-number v-model="item.sort" :min="0" /></el-form-item>
+            <el-form-item label="启用"><el-switch v-model="item.enabled" /></el-form-item>
+          </el-form>
+        </div>
+        <el-empty v-if="!hobbies.length" description="暂无标签，点击上方新增" :image-size="72" />
+      </template>
     </div>
 
     <div class="actions">
       <el-button
-        v-if="tab === 'privacy_collect' || tab === 'privacy_share' || tab === 'member' || tab === 'member_rules' || tab === 'agreements'"
+        v-if="tab === 'privacy_collect' || tab === 'privacy_share' || tab === 'member' || tab === 'member_rules' || tab === 'agreements' || tab === 'hobby_options'"
         :loading="restoring"
         @click="onRestore"
       >
@@ -267,6 +295,17 @@ const member = reactive({
   monthCoupon: { title: '', tip: '', tag: '' },
   rules: []
 })
+const hobbies = ref([])
+
+function addHobbyItem() {
+  hobbies.value.push({
+    _key: keyOf(),
+    name: '',
+    color: '#e85a4a',
+    enabled: true,
+    sort: hobbies.value.length + 1
+  })
+}
 
 function normalizeParas(list) {
   return (list || []).map((p) => (typeof p === 'string' ? p : String(p ?? '')))
@@ -413,6 +452,14 @@ async function loadCurrent() {
       }))
     } else if (tab.value === 'member' || tab.value === 'member_rules') {
       applyMemberValue(value)
+    } else if (tab.value === 'hobby_options') {
+      hobbies.value = (value.items || []).map((item, i) => ({
+        _key: keyOf(),
+        name: item.name || '',
+        color: item.color || '#e85a4a',
+        enabled: item.enabled !== false,
+        sort: Number(item.sort) || i + 1
+      }))
     }
   } finally {
     loading.value = false
@@ -505,11 +552,25 @@ function buildSharePayload() {
   }
 }
 
+function buildHobbyPayload() {
+  return {
+    items: hobbies.value
+      .map((item, i) => ({
+        name: String(item.name || '').trim(),
+        color: String(item.color || '#e85a4a').trim() || '#e85a4a',
+        enabled: item.enabled !== false,
+        sort: Number(item.sort) || i + 1
+      }))
+      .filter((item) => item.name)
+  }
+}
+
 function payloadForTab(key) {
   if (key === 'agreements') return buildAgreementPayload()
   if (key === 'privacy_collect') return buildCollectPayload()
   if (key === 'privacy_share') return buildSharePayload()
   if (key === 'member' || key === 'member_rules') return buildMemberPayload()
+  if (key === 'hobby_options') return buildHobbyPayload()
   return null
 }
 
@@ -523,6 +584,9 @@ function isEmptyConfig(key, value) {
   }
   if (key === 'agreements') {
     return !Object.keys(value).length
+  }
+  if (key === 'hobby_options') {
+    return !(value.items && value.items.some((i) => i && i.name))
   }
   return false
 }
@@ -641,5 +705,16 @@ onMounted(() => {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
+}
+.hint {
+  margin: 0 0 12px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.color-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 </style>

@@ -4,11 +4,12 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
-from ..cms_data import AGREEMENTS, MEMBER_CONFIG, PRIVACY_COLLECT, PRIVACY_SHARE
+from ..cms_data import AGREEMENTS, HOBBY_OPTIONS, MEMBER_CONFIG, PRIVACY_COLLECT, PRIVACY_SHARE
 from ..commerce import bump_sold_on_paid, sync_user_vip, table_count, add_points, award_order_points
 from ..database import get_db
 from ..deps import create_access_token, get_current_admin, verify_password
 from ..models import (
+    Address,
     AdminUser,
     AppUser,
     Banner,
@@ -23,6 +24,7 @@ from ..models import (
     RecommendItem,
     RoomSlot,
     Store,
+    UserCoupon,
     VideoLive,
 )
 from ..schemas import (
@@ -805,6 +807,189 @@ def list_users(
     )
 
 
+def _user_or_404(db: Session, user_id: int) -> AppUser:
+    user = db.query(AppUser).filter(AppUser.id == user_id).first()
+    if not user:
+        raise HTTPException(404, "用户不存在")
+    return user
+
+
+def _user_detail(db: Session, user: AppUser) -> dict:
+    return {
+        "id": user.id,
+        "openid": user.openid or "",
+        "nickname": user.nickname or "",
+        "avatar": user.avatar or "",
+        "phone": user.phone or "",
+        "birthday": getattr(user, "birthday", "") or "",
+        "hobby": getattr(user, "hobby", "") or "",
+        "points": user.points or 0,
+        "vip_level": user.vip_level or "V0",
+        "table_count": table_count(db, user.id),
+        "phone_edited": bool(getattr(user, "phone_edited", False)),
+        "cancelled": bool(getattr(user, "cancelled", False)),
+        "created_at": user.created_at.isoformat() if user.created_at else None,
+        "updated_at": user.updated_at.isoformat() if user.updated_at else None,
+    }
+
+
+@router.get("/users/{user_id}")
+def get_user(user_id: int, db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
+    return _user_detail(db, _user_or_404(db, user_id))
+
+
+@router.get("/users/{user_id}/points")
+def list_user_points(
+    user_id: int,
+    page: int = Query(1),
+    page_size: int = Query(20),
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    user = _user_or_404(db, user_id)
+    page, page_size, offset = normalize_page(page, page_size)
+    q = (
+        db.query(PointLedger)
+        .filter(PointLedger.user_id == user.id)
+        .order_by(PointLedger.created_at.desc(), PointLedger.id.desc())
+    )
+    total = q.count()
+    rows = q.offset(offset).limit(page_size).all()
+    payload = page_payload(
+        [
+            {
+                "id": r.id,
+                "title": r.title,
+                "value": r.value,
+                "created_at": r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else "",
+            }
+            for r in rows
+        ],
+        total,
+        page,
+        page_size,
+    )
+    payload["balance"] = user.points or 0
+    return payload
+
+
+@router.get("/users/{user_id}/coupons")
+def list_user_coupons(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    _user_or_404(db, user_id)
+    rows = (
+        db.query(UserCoupon)
+        .filter(UserCoupon.user_id == user_id)
+        .order_by(UserCoupon.id.desc())
+        .all()
+    )
+    return [
+        {
+            "id": r.id,
+            "coupon_id": r.coupon_id,
+            "name": r.name,
+            "amount": r.amount,
+            "condition": r.condition,
+            "expire": r.expire,
+            "status": r.status,
+            "created_at": r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else "",
+        }
+        for r in rows
+    ]
+
+
+@router.post("/users/{user_id}/coupons")
+def issue_user_coupon(
+    user_id: int,
+    coupon_id: int = Query(...),
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    user = _user_or_404(db, user_id)
+    coupon = db.query(Coupon).filter(Coupon.id == coupon_id).first()
+    if not coupon:
+        raise HTTPException(404, "优惠券模板不存在")
+    if coupon.total and coupon.claimed >= coupon.total:
+        raise HTTPException(400, "优惠券已领完")
+    row = UserCoupon(
+        user_id=user.id,
+        coupon_id=coupon.id,
+        name=coupon.name,
+        amount=coupon.amount,
+        condition=coupon.condition,
+        expire=coupon.expire or "",
+        status="unused",
+    )
+    coupon.claimed = int(coupon.claimed or 0) + 1
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return {
+        "id": row.id,
+        "coupon_id": row.coupon_id,
+        "name": row.name,
+        "amount": row.amount,
+        "condition": row.condition,
+        "expire": row.expire,
+        "status": row.status,
+    }
+
+
+@router.post("/users/{user_id}/coupons/{uc_id}/void")
+def void_user_coupon(
+    user_id: int,
+    uc_id: int,
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    _user_or_404(db, user_id)
+    row = (
+        db.query(UserCoupon)
+        .filter(UserCoupon.id == uc_id, UserCoupon.user_id == user_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(404, "用户优惠券不存在")
+    if row.status != "unused":
+        raise HTTPException(400, "仅未使用的券可作废")
+    row.status = "expired"
+    db.commit()
+    return {"id": row.id, "status": row.status}
+
+
+@router.get("/users/{user_id}/addresses")
+def list_user_addresses(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    _user_or_404(db, user_id)
+    rows = (
+        db.query(Address)
+        .filter(Address.user_id == user_id)
+        .order_by(Address.is_default.desc(), Address.id.desc())
+        .all()
+    )
+    return [
+        {
+            "id": r.id,
+            "name": r.name,
+            "phone": r.phone,
+            "region": r.region or f"{r.province or ''}{r.city or ''}{r.district or ''}".strip(),
+            "province": r.province or "",
+            "city": r.city or "",
+            "district": r.district or "",
+            "detail": r.detail or "",
+            "is_default": bool(r.is_default),
+            "created_at": r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else "",
+        }
+        for r in rows
+    ]
+
+
 @router.post("/users/{user_id}/points")
 def adjust_points(
     user_id: int,
@@ -812,9 +997,7 @@ def adjust_points(
     db: Session = Depends(get_db),
     _: AdminUser = Depends(get_current_admin),
 ):
-    user = db.query(AppUser).filter(AppUser.id == user_id).first()
-    if not user:
-        raise HTTPException(404, "用户不存在")
+    user = _user_or_404(db, user_id)
     add_points(db, user, payload.title or "后台调整", int(payload.points or 0))
     db.commit()
     db.refresh(user)
@@ -828,9 +1011,7 @@ def update_vip(
     db: Session = Depends(get_db),
     _: AdminUser = Depends(get_current_admin),
 ):
-    user = db.query(AppUser).filter(AppUser.id == user_id).first()
-    if not user:
-        raise HTTPException(404, "用户不存在")
+    user = _user_or_404(db, user_id)
     user.vip_level = vip_level.upper()
     db.commit()
     return {"id": user.id, "vip_level": user.vip_level, "table_count": table_count(db, user.id)}
@@ -842,6 +1023,7 @@ CMS_DEFAULTS: dict[str, Any] = {
     "privacy_share": PRIVACY_SHARE,
     "member": MEMBER_CONFIG,
     "agreements": AGREEMENTS,
+    "hobby_options": HOBBY_OPTIONS,
 }
 
 
@@ -854,6 +1036,9 @@ def _cms_value_empty(key: str, value: Any) -> bool:
         return not (value.get("levels") or [])
     if key == "agreements":
         return not value
+    if key == "hobby_options":
+        items = value.get("items") or []
+        return not any(str(i.get("name") or "").strip() for i in items if isinstance(i, dict))
     return False
 
 
