@@ -91,24 +91,36 @@
                 <el-input v-model="pkg.time" placeholder="例如：10:00-14:00" />
               </el-form-item>
             </el-col>
-            <el-col :span="6">
-              <el-form-item label="价格">
-                <el-input-number v-model="pkg.price" :min="0" :precision="0" style="width: 100%" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="6">
-              <el-form-item label="人数">
-                <el-input-number v-model="pkg.people" :min="1" :precision="0" style="width: 100%" />
-              </el-form-item>
-            </el-col>
-            <el-col :span="12">
-              <el-form-item label="套餐封面">
-                <ImageField v-model="pkg.cover" folder="nye" />
-              </el-form-item>
-            </el-col>
             <el-col :span="12">
               <el-form-item label="可否预订">
                 <el-switch v-model="pkg.bookable" active-text="可订" inactive-text="已满/停售" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="价格">
+                <el-input-number
+                  v-model="pkg.price"
+                  :min="0"
+                  :precision="0"
+                  controls-position="right"
+                  class="pkg-num"
+                />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="人数">
+                <el-input-number
+                  v-model="pkg.people"
+                  :min="1"
+                  :precision="0"
+                  controls-position="right"
+                  class="pkg-num"
+                />
+              </el-form-item>
+            </el-col>
+            <el-col :span="24">
+              <el-form-item label="套餐封面">
+                <ImageField v-model="pkg.cover" folder="nye" />
               </el-form-item>
             </el-col>
           </el-row>
@@ -293,5 +305,8 @@ onMounted(load)
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
+}
+.pkg-num {
+  width: 168px;
 }
 </style>
