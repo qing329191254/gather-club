@@ -1,10 +1,33 @@
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 
-/** Shared admin list pager state */
+const STORAGE_KEY = 'gather_admin_page_size'
+const ALLOWED = [10, 20, 50]
+
+function readStoredSize(fallback) {
+  try {
+    const n = Number(localStorage.getItem(STORAGE_KEY))
+    if (ALLOWED.includes(n)) return n
+  } catch {
+    /* ignore */
+  }
+  return fallback
+}
+
+/** Shared admin list pager state; page size persists across menu switches. */
 export function usePager(defaultSize = 20) {
   const page = ref(1)
-  const pageSize = ref(defaultSize)
+  const pageSize = ref(readStoredSize(defaultSize))
   const total = ref(0)
+
+  watch(pageSize, (n) => {
+    const size = Number(n)
+    if (!ALLOWED.includes(size)) return
+    try {
+      localStorage.setItem(STORAGE_KEY, String(size))
+    } catch {
+      /* ignore */
+    }
+  })
 
   function applyPage(res) {
     const data = res || {}
