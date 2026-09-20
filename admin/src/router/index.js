@@ -23,7 +23,7 @@ const routes = [
       { path: 'orders', name: 'orders', meta: { title: '订单管理' }, component: () => import('../views/Orders.vue') },
       { path: 'rooms', name: 'rooms', meta: { title: '包房库存' }, component: () => import('../views/Rooms.vue') },
       { path: 'coupons', name: 'coupons', meta: { title: '优惠券' }, component: () => import('../views/Coupons.vue') },
-      { path: 'users', name: 'users', meta: { title: '用户积分' }, component: () => import('../views/Users.vue') },
+      { path: 'users', name: 'users', meta: { title: '用户' }, component: () => import('../views/Users.vue') },
       { path: 'video', name: 'video', meta: { title: '视频号' }, component: () => import('../views/Video.vue') },
       { path: 'settings', name: 'settings', meta: { title: '站点配置' }, component: () => import('../views/Settings.vue') }
     ]

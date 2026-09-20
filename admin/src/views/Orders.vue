@@ -52,15 +52,21 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import http from '../api/http'
 import { usePager } from '../composables/usePager'
 
+const route = useRoute()
 const list = ref([])
 const status = ref('')
 const keyword = ref('')
 const { page, pageSize, total, applyPage, resetPage, pageParams } = usePager()
+
+function syncFromQuery() {
+  status.value = route.query.status ? String(route.query.status) : ''
+}
 
 async function load() {
   const res = await http.get('/orders', {
@@ -83,7 +89,18 @@ async function setStatus(row, next) {
   load()
 }
 
-onMounted(load)
+watch(
+  () => route.query.status,
+  () => {
+    syncFromQuery()
+    onSearch()
+  }
+)
+
+onMounted(() => {
+  syncFromQuery()
+  load()
+})
 </script>
 
 <style scoped>

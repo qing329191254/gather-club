@@ -51,7 +51,7 @@ const menus = [
   { path: '/orders', title: '订单管理', icon: 'List' },
   { path: '/rooms', title: '包房库存', icon: 'Calendar' },
   { path: '/coupons', title: '优惠券', icon: 'Ticket' },
-  { path: '/users', title: '用户积分', icon: 'User' },
+  { path: '/users', title: '用户', icon: 'User' },
   { path: '/video', title: '视频号', icon: 'VideoCamera' },
   { path: '/settings', title: '站点配置', icon: 'Setting' }
 ]
