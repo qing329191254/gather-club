@@ -15,6 +15,7 @@ from .seed import seed_all
 settings = get_settings()
 BASE_DIR = Path(__file__).resolve().parent.parent
 ADMIN_DIST = BASE_DIR / "static" / "admin"
+UPLOADS_DIR = BASE_DIR / "static" / "uploads"
 
 app = FastAPI(title=settings.app_name, docs_url="/api/docs", redoc_url="/api/redoc")
 
@@ -28,6 +29,9 @@ app.add_middleware(
 
 app.include_router(miniapp.router)
 app.include_router(admin_api.router)
+
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
 
 @app.on_event("startup")

@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     cos_bucket: str = "7072-prod-d7gemg7fe0004adc9-1492244999"
     cos_region: str = "ap-shanghai"
     cos_cdn_domain: str = "https://7072-prod-d7gemg7fe0004adc9-1492244999.tcb.qcloud.la"
+    # 本地上传回退时拼绝对地址（云托管公网域名）；为空则用请求的 Host
+    public_base_url: str = ""
     port: int = 80
 
 
