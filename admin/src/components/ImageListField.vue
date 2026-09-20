@@ -2,12 +2,14 @@
   <div class="img-list">
     <div class="grid">
       <div v-for="(url, idx) in list" :key="`${url}-${idx}`" class="item">
-        <el-image :src="url" fit="cover" class="thumb" :preview-src-list="list" :initial-index="idx" />
-        <div class="badge">{{ idx + 1 }}</div>
+        <div class="media">
+          <el-image :src="url" fit="cover" class="thumb" :preview-src-list="list" :initial-index="idx" />
+          <div class="badge">{{ idx + 1 }}</div>
+        </div>
         <div class="ops">
-          <el-button size="small" text :disabled="idx === 0" @click="move(idx, -1)">上移</el-button>
-          <el-button size="small" text :disabled="idx === list.length - 1" @click="move(idx, 1)">下移</el-button>
-          <el-button size="small" text type="danger" @click="remove(idx)">删除</el-button>
+          <button type="button" class="op" :disabled="idx === 0" @click="move(idx, -1)">上移</button>
+          <button type="button" class="op" :disabled="idx === list.length - 1" @click="move(idx, 1)">下移</button>
+          <button type="button" class="op danger" @click="remove(idx)">删除</button>
         </div>
       </div>
 
@@ -104,18 +106,22 @@ function onUpload(option) {
   gap: 12px;
 }
 .item {
-  width: 140px;
+  width: 168px;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
-  overflow: hidden;
   background: #fff;
+  overflow: hidden;
+}
+.media {
   position: relative;
+  width: 100%;
+  height: 112px;
+  background: #f8fafc;
 }
 .thumb {
-  width: 140px;
-  height: 100px;
+  width: 100%;
+  height: 112px;
   display: block;
-  background: #f8fafc;
 }
 .badge {
   position: absolute;
@@ -134,16 +140,44 @@ function onUpload(option) {
 }
 .ops {
   display: flex;
-  justify-content: space-between;
-  padding: 2px 4px;
+  align-items: center;
+  justify-content: space-around;
+  gap: 2px;
+  padding: 6px 4px;
   border-top: 1px solid #f1f5f9;
+  box-sizing: border-box;
+}
+.op {
+  flex: 1;
+  margin: 0;
+  padding: 2px 0;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.op:hover:not(:disabled) {
+  color: #2563eb;
+}
+.op:disabled {
+  color: #cbd5e1;
+  cursor: not-allowed;
+}
+.op.danger {
+  color: #ef4444;
+}
+.op.danger:hover {
+  color: #dc2626;
 }
 .add :deep(.el-upload) {
   display: block;
 }
 .add-box {
-  width: 140px;
-  height: 100px;
+  width: 168px;
+  height: 112px;
   border: 1px dashed #d1d5db;
   border-radius: 8px;
   display: flex;
