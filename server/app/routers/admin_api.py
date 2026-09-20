@@ -19,6 +19,7 @@ from ..models import (
     PointLedger,
     RoomSlot,
     Store,
+    VideoLive,
 )
 from ..schemas import (
     BannerIn,
@@ -585,3 +586,71 @@ def put_site_config(
     value = payload.get("value", payload)
     set_config(db, key, value)
     return {"key": key, "value": value}
+
+
+def _live_admin(row: VideoLive) -> dict:
+    return {
+        "id": row.id,
+        "status": row.status,
+        "time_text": row.time_text,
+        "line1": row.line1,
+        "line2": row.line2,
+        "points": row.points,
+        "avatar": row.avatar,
+        "notice_id": row.notice_id,
+        "sort": row.sort,
+        "enabled": row.enabled,
+    }
+
+
+@router.get("/video/lives")
+def list_video_lives(db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
+    rows = db.query(VideoLive).order_by(VideoLive.sort.asc(), VideoLive.id.asc()).all()
+    return [_live_admin(r) for r in rows]
+
+
+@router.post("/video/lives")
+def create_video_live(payload: dict, db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
+    row = VideoLive(
+        status=payload.get("status") or "scheduled",
+        time_text=payload.get("time_text") or "",
+        line1=payload.get("line1") or "",
+        line2=payload.get("line2") or "",
+        points=int(payload.get("points") or 0),
+        avatar=payload.get("avatar") or "",
+        notice_id=payload.get("notice_id") or "",
+        sort=int(payload.get("sort") or 0),
+        enabled=bool(payload.get("enabled", True)),
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return _live_admin(row)
+
+
+@router.put("/video/lives/{live_id}")
+def update_video_live(live_id: int, payload: dict, db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
+    row = db.query(VideoLive).filter(VideoLive.id == live_id).first()
+    if not row:
+        raise HTTPException(404, "不存在")
+    row.status = payload.get("status") or row.status
+    row.time_text = payload.get("time_text", row.time_text) or ""
+    row.line1 = payload.get("line1", row.line1) or ""
+    row.line2 = payload.get("line2", row.line2) or ""
+    row.points = int(payload.get("points", row.points) or 0)
+    row.avatar = payload.get("avatar", row.avatar) or ""
+    row.notice_id = payload.get("notice_id", row.notice_id) or ""
+    row.sort = int(payload.get("sort", row.sort) or 0)
+    row.enabled = bool(payload.get("enabled", row.enabled))
+    db.commit()
+    db.refresh(row)
+    return _live_admin(row)
+
+
+@router.delete("/video/lives/{live_id}")
+def delete_video_live(live_id: int, db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
+    row = db.query(VideoLive).filter(VideoLive.id == live_id).first()
+    if row:
+        db.delete(row)
+        db.commit()
+    return OkResponse()

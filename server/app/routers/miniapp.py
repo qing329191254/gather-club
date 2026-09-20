@@ -20,6 +20,9 @@ from ..models import (
     RoomSlot,
     Store,
     UserCoupon,
+    VideoFollow,
+    VideoLive,
+    VideoReserve,
 )
 from ..schemas import OrderCreateIn, OkResponse, WxLoginIn
 from ..utils import STATUS_TEXT, get_config, loads
@@ -926,4 +929,130 @@ def checkin_month(
         "dates": [r.date for r in rows],
         "signedDays": len(rows),
         "monthPoints": sum(r.points for r in rows),
+    }
+
+
+def _live_out(row: VideoLive, reserved: bool = False) -> dict:
+    return {
+        "id": row.id,
+        "status": row.status,
+        "time": row.time_text,
+        "line1": row.line1,
+        "line2": row.line2,
+        "points": row.points,
+        "avatar": row.avatar,
+        "noticeId": row.notice_id,
+        "reserved": reserved,
+    }
+
+
+@router.get("/video")
+def video_home(
+    x_openid: str = Header(default="", alias="X-Openid"),
+    openid: str = Query(default=""),
+    db: Session = Depends(get_db),
+):
+    profile = get_config(db, "video", {}) or {}
+    rows = (
+        db.query(VideoLive)
+        .filter(VideoLive.enabled.is_(True))
+        .order_by(VideoLive.sort.asc(), VideoLive.id.asc())
+        .all()
+    )
+    reserved_ids = set()
+    followed = False
+    oid = x_openid or openid
+    if oid:
+        user = _user_by_openid(db, oid)
+        if user:
+            followed = db.query(VideoFollow).filter(VideoFollow.user_id == user.id).first() is not None
+            reserved_ids = {
+                r.live_id
+                for r in db.query(VideoReserve).filter(VideoReserve.user_id == user.id).all()
+            }
+    living = None
+    lives = []
+    for row in rows:
+        item = _live_out(row, row.id in reserved_ids)
+        if row.status == "living" and living is None:
+            living = item
+        else:
+            lives.append(item)
+    return {"profile": profile, "living": living, "lives": lives, "followed": followed}
+
+
+@router.post("/video/follow")
+def video_follow(
+    x_openid: str = Header(default="", alias="X-Openid"),
+    openid: str = Query(default=""),
+    db: Session = Depends(get_db),
+):
+    user = _ensure_user(db, x_openid or openid or "anonymous")
+    exists = db.query(VideoFollow).filter(VideoFollow.user_id == user.id).first()
+    if not exists:
+        db.add(VideoFollow(user_id=user.id))
+        db.commit()
+    profile = get_config(db, "video", {}) or {}
+    return {
+        "ok": True,
+        "followed": True,
+        "finderUserName": profile.get("finderUserName") or "",
+        "message": "已记录关注",
+    }
+
+
+@router.post("/video/reserve")
+def video_reserve(
+    payload: dict = Body(default={}),
+    x_openid: str = Header(default="", alias="X-Openid"),
+    openid: str = Query(default=""),
+    db: Session = Depends(get_db),
+):
+    user = _ensure_user(db, x_openid or openid or "anonymous")
+    live_id = int(payload.get("liveId") or payload.get("live_id") or 0)
+    live = db.query(VideoLive).filter(VideoLive.id == live_id, VideoLive.enabled.is_(True)).first()
+    if not live:
+        raise HTTPException(status_code=404, detail="直播不存在")
+    exists = (
+        db.query(VideoReserve)
+        .filter(VideoReserve.user_id == user.id, VideoReserve.live_id == live.id)
+        .first()
+    )
+    if exists:
+        return OkResponse(ok=True, message="已预约", data={"points": 0, "balance": user.points, "reserved": True})
+    gained = live.points or 0
+    db.add(VideoReserve(user_id=user.id, live_id=live.id, points=gained))
+    if gained:
+        user.points += gained
+        db.add(PointLedger(user_id=user.id, title="预约直播", value=gained))
+    db.commit()
+    db.refresh(user)
+    profile = get_config(db, "video", {}) or {}
+    return OkResponse(
+        message="预约成功",
+        data={
+            "points": gained,
+            "balance": user.points,
+            "reserved": True,
+            "finderUserName": profile.get("finderUserName") or "",
+            "noticeId": live.notice_id or "",
+        },
+    )
+
+
+@router.post("/video/watch")
+def video_watch(
+    payload: dict = Body(default={}),
+    db: Session = Depends(get_db),
+):
+    profile = get_config(db, "video", {}) or {}
+    finder = profile.get("finderUserName") or ""
+    live_id = int(payload.get("liveId") or payload.get("live_id") or 0)
+    live = db.query(VideoLive).filter(VideoLive.id == live_id).first() if live_id else None
+    return {
+        "ok": True,
+        "finderUserName": finder,
+        "noticeId": (live.notice_id if live else "") or "",
+        "ready": bool(finder),
+        "message": "视频号尚未过审，直播间稍后开放" if not finder else "ok",
     }

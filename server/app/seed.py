@@ -15,6 +15,7 @@ from .models import (
     MallGoods,
     NyeStore,
     Store,
+    VideoLive,
 )
 from .utils import get_config, set_config
 
@@ -262,6 +263,29 @@ def seed_all(db: Session) -> None:
         db.add(Coupon(name="红酒20元立减券", amount=20, condition="前台核销使用", expire="领取当月有效", total=999, enabled=True))
         db.commit()
 
+    if db.query(VideoLive).count() == 0:
+        db.add(VideoLive(status="living", line1="新锦江4+6+10人", line2="中餐", points=10, sort=0, enabled=True))
+        lives = [
+            ("09月20 11:30", "天鹅宾馆下午茶/", "中餐"),
+            ("09月20 16:00", "外高桥喜来登中餐+", "自助下午茶"),
+            ("09月21 11:30", "海伦宾馆4/6/8人", "中餐"),
+            ("09月21 16:00", "虹桥宾馆", "大闸蟹自助"),
+            ("09月22 11:30", "静安洲际大闸蟹晚市自助", "（新品）"),
+        ]
+        for i, (time_text, line1, line2) in enumerate(lives, start=1):
+            db.add(
+                VideoLive(
+                    status="scheduled",
+                    time_text=time_text,
+                    line1=line1,
+                    line2=line2,
+                    points=10,
+                    sort=i,
+                    enabled=True,
+                )
+            )
+        db.commit()
+
     if not get_config(db, "site"):
         set_config(
             db,
@@ -281,5 +305,17 @@ def seed_all(db: Session) -> None:
                 "roomCapacity": {"lunch": 4, "dinner": 8},
                 "nyeOpenStart": "2027-02-05",
                 "nyeOpenEnd": "2027-02-12",
+            },
+        )
+    if not get_config(db, "video"):
+        set_config(
+            db,
+            "video",
+            {
+                "name": "天天俱乐部",
+                "avatar": "/static/icons/brand.png",
+                "cover": "/static/banners/video-cover.png",
+                "intro": "天天俱乐部！天天都有局！关注直播间，给您带来更多超高性价比的聚会餐，酒店直播！",
+                "finderUserName": "",
             },
         )

@@ -252,3 +252,38 @@ class CheckinRecord(Base):
     points: Mapped[int] = mapped_column(Integer, default=2)
     is_makeup: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+
+
+class VideoLive(Base):
+    __tablename__ = "video_lives"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    status: Mapped[str] = mapped_column(String(16), default="scheduled")  # living | scheduled
+    time_text: Mapped[str] = mapped_column(String(64), default="")
+    line1: Mapped[str] = mapped_column(String(128), default="")
+    line2: Mapped[str] = mapped_column(String(128), default="")
+    points: Mapped[int] = mapped_column(Integer, default=10)
+    avatar: Mapped[str] = mapped_column(String(512), default="")
+    notice_id: Mapped[str] = mapped_column(String(128), default="")
+    sort: Mapped[int] = mapped_column(Integer, default=0)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+
+
+class VideoFollow(Base):
+    __tablename__ = "video_follows"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+
+
+class VideoReserve(Base):
+    __tablename__ = "video_reserves"
+    __table_args__ = (UniqueConstraint("user_id", "live_id", name="uq_video_reserve"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, index=True)
+    live_id: Mapped[int] = mapped_column(Integer, index=True)
+    points: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now)

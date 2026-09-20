@@ -16,7 +16,7 @@
 				<view class="channel-row">
 					<image class="channel-avatar" :src="profile.avatar" mode="aspectFill" />
 					<text class="channel-name">{{ profile.name }}</text>
-					<view class="follow" @tap="onFollow">关注视频号</view>
+					<view class="follow" @tap.stop="onFollow">{{ followed ? '已关注' : '关注视频号' }}</view>
 				</view>
 				<text class="intro">{{ profile.intro }}</text>
 			</view>
@@ -67,7 +67,7 @@
 					<text>{{ item.line1 }}</text>
 					<text>{{ item.line2 }}</text>
 				</view>
-				<view class="reserve">预约直播</view>
+				<view class="reserve" :class="{ 'reserve--done': item.reserved }">{{ item.reserved ? '已预约' : '预约直播' }}</view>
 			</view>
 		</view>
 
@@ -76,6 +76,8 @@
 </template>
 
 <script>
+	import { api } from '../../common/api.js'
+
 	export default {
 		data() {
 			return {
@@ -83,42 +85,104 @@
 					name: '天天俱乐部',
 					avatar: '/static/icons/brand.png',
 					cover: '/static/banners/video-cover.png',
-					intro: '天天俱乐部！天天都有局！关注直播间，给您带来更多超高性价比的聚会餐，酒店直播！'
+					intro: '天天俱乐部！天天都有局！关注直播间，给您带来更多超高性价比的聚会餐，酒店直播！',
+					finderUserName: ''
 				},
+				followed: false,
 				living: null,
 				lives: []
 			}
 		},
-		onLoad() {
-			this.loadList()
-		},
 		onShow() {
 			uni.hideTabBar({ fail() {} })
+			this.loadList()
 		},
 		methods: {
-			loadList() {
-				this.living = {
-					id: 0,
-					line1: '新锦江4+6+10人',
-					line2: '中餐',
-					points: 10
+			async loadList() {
+				try {
+					const res = await api.videoHome()
+					if (res && res.profile) {
+						this.profile = Object.assign({}, this.profile, res.profile)
+					}
+					this.followed = !!(res && res.followed)
+					this.living = (res && res.living) || null
+					this.lives = (res && res.lives) || []
+				} catch (e) {
+					if (!this.lives.length && !this.living) {
+						this.living = { id: 0, line1: '新锦江4+6+10人', line2: '中餐', points: 10 }
+						this.lives = [
+							{ id: 1, time: '09月20 11:30', line1: '天鹅宾馆下午茶/', line2: '中餐', points: 10 },
+							{ id: 2, time: '09月20 16:00', line1: '外高桥喜来登中餐+', line2: '自助下午茶', points: 10 },
+							{ id: 3, time: '09月21 11:30', line1: '海伦宾馆4/6/8人', line2: '中餐', points: 10 },
+							{ id: 4, time: '09月21 16:00', line1: '虹桥宾馆', line2: '大闸蟹自助', points: 10 },
+							{ id: 5, time: '09月22 11:30', line1: '静安洲际大闸蟹晚市自助', line2: '（新品）', points: 10 }
+						]
+					}
 				}
-				this.lives = [
-					{ id: 1, time: '09月20 11:30', line1: '天鹅宾馆下午茶/', line2: '中餐', points: 10 },
-					{ id: 2, time: '09月20 16:00', line1: '外高桥喜来登中餐+', line2: '自助下午茶', points: 10 },
-					{ id: 3, time: '09月21 11:30', line1: '海伦宾馆4/6/8人', line2: '中餐', points: 10 },
-					{ id: 4, time: '09月21 16:00', line1: '虹桥宾馆', line2: '大闸蟹自助', points: 10 },
-					{ id: 5, time: '09月22 11:30', line1: '静安洲际大闸蟹晚市自助', line2: '（新品）', points: 10 }
-				]
 			},
-			onFollow() {
-				uni.showToast({ title: '关注视频号即将开放', icon: 'none' })
+			async onFollow() {
+				try {
+					const res = await api.videoFollow()
+					this.followed = true
+					const finder = (res && res.finderUserName) || this.profile.finderUserName || ''
+					this.profile.finderUserName = finder
+					if (!finder) {
+						uni.showToast({ title: '已关注，视频号审核中', icon: 'none' })
+						return
+					}
+					this.openChannel('openChannelsUserProfile')
+				} catch (e) {
+					uni.showToast({ title: (e && e.message) || '关注失败', icon: 'none' })
+				}
 			},
-			onWatch() {
-				uni.showToast({ title: '直播间即将开放', icon: 'none' })
+			async onWatch(item) {
+				try {
+					const res = await api.videoWatch(item && item.id)
+					const finder = (res && res.finderUserName) || ''
+					this.profile.finderUserName = finder
+					if (!finder) {
+						uni.showToast({ title: '视频号审核中，直播稍后开放', icon: 'none' })
+						return
+					}
+					this.openChannel('openChannelsLive')
+				} catch (e) {
+					uni.showToast({ title: (e && e.message) || '打开失败', icon: 'none' })
+				}
 			},
-			onReserve() {
-				uni.showToast({ title: '预约直播即将开放', icon: 'none' })
+			async onReserve(item) {
+				if (!item || !item.id) return
+				try {
+					const res = await api.videoReserve(item.id)
+					const data = (res && res.data) || {}
+					item.reserved = true
+					const gained = data.points || 0
+					const finder = data.finderUserName || this.profile.finderUserName || ''
+					this.profile.finderUserName = finder
+					if (gained) {
+						uni.showToast({ title: '预约成功 +' + gained + '积分', icon: 'none' })
+					} else if (!finder) {
+						uni.showToast({ title: '已预约，视频号审核中', icon: 'none' })
+					}
+					if (finder && data.noticeId) {
+						this.openChannel('reserveChannelsLive', { noticeId: data.noticeId })
+					}
+				} catch (e) {
+					uni.showToast({ title: (e && e.message) || '预约失败', icon: 'none' })
+				}
+			},
+			openChannel(name, extra) {
+				const finder = this.profile.finderUserName || ''
+				if (!finder) return
+				const fn = (typeof wx !== 'undefined' && wx[name]) || uni[name]
+				if (typeof fn !== 'function') {
+					uni.showToast({ title: '请在微信中打开', icon: 'none' })
+					return
+				}
+				fn(Object.assign({ finderUserName: finder }, extra || {}, {
+					fail(err) {
+						uni.showToast({ title: (err && err.errMsg) || '打开视频号失败', icon: 'none' })
+					}
+				}))
 			}
 		}
 	}
@@ -469,6 +533,10 @@
 		padding: 0 20rpx;
 		border-radius: 12rpx;
 		flex-shrink: 0;
+	}
+
+	.reserve--done {
+		background: #c8c8c8;
 	}
 
 	.watch {

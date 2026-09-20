@@ -98,6 +98,18 @@ export const api = {
 	},
 	checkinMonth(year, month) {
 		return request('/api/v1/checkin/month', { data: { year, month } })
+	},
+	videoHome() {
+		return request('/api/v1/video')
+	},
+	videoFollow() {
+		return request('/api/v1/video/follow', { method: 'POST' })
+	},
+	videoReserve(liveId) {
+		return request('/api/v1/video/reserve', { method: 'POST', data: { liveId } })
+	},
+	videoWatch(liveId) {
+		return request('/api/v1/video/watch', { method: 'POST', data: { liveId: liveId || 0 } })
 	}
 }
 
