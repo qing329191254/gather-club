@@ -227,8 +227,6 @@ def seed_all(db: Session) -> None:
         db.commit()
 
     if db.query(GatherProduct).count() == 0:
-        from .utils import dumps
-
         for item in GATHER_PRODUCTS:
             payload = dict(item)
             tags = payload.pop("tags", [])

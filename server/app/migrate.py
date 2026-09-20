@@ -25,4 +25,8 @@ def ensure_schema() -> None:
             cols = {c["name"] for c in inspector.get_columns("nye_stores")}
             if "packages" not in cols:
                 conn.execute(text("ALTER TABLE nye_stores ADD COLUMN packages TEXT DEFAULT '[]'"))
+        if "orders" in tables:
+            cols = {c["name"] for c in inspector.get_columns("orders")}
+            if "extra" not in cols:
+                conn.execute(text("ALTER TABLE orders ADD COLUMN extra TEXT DEFAULT '{}'"))
         # recommend_items / addresses created by create_all
