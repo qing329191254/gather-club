@@ -2,7 +2,6 @@
   <el-card>
     <div class="toolbar">
       <el-button type="primary" :loading="saving" @click="onSave">保存配置</el-button>
-      <el-button :loading="bootstrapping" @click="onBootstrap">同步品牌图到云存储</el-button>
       <span class="hint">{{ statusText }}</span>
     </div>
     <el-form label-width="120px" style="max-width: 720px">
@@ -49,13 +48,11 @@ const rulesText = ref('')
 const form = reactive(defaults())
 const ready = ref(false)
 const saving = ref(false)
-const bootstrapping = ref(false)
 const dirty = ref(false)
 const lastSavedAt = ref('')
 let saveTimer = null
 
 const statusText = computed(() => {
-  if (bootstrapping.value) return '正在上传品牌图…'
   if (saving.value) return '正在保存…'
   if (dirty.value) return '有未保存修改，将自动保存'
   if (lastSavedAt.value) return `已自动保存 ${lastSavedAt.value}`
@@ -96,21 +93,6 @@ async function onSave(showToast = true) {
     if (showToast) ElMessage.success('已保存')
   } finally {
     saving.value = false
-  }
-}
-
-async function onBootstrap() {
-  bootstrapping.value = true
-  try {
-    const res = await http.post('/assets/bootstrap', null, { params: { force: true } })
-    if (res.ok === false) {
-      ElMessage.warning(res.reason || '云存储未就绪')
-      return
-    }
-    ElMessage.success(`已同步品牌图（上传 ${res.uploaded || 0} 张）`)
-    await load()
-  } finally {
-    bootstrapping.value = false
   }
 }
 
