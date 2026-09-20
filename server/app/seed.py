@@ -8,6 +8,7 @@ from .cms_data import (
     AGREEMENTS,
     CHECKIN_CONFIG,
     HOBBY_OPTIONS,
+    LOYALTY_CONFIG,
     MEMBER_CONFIG,
     PRIVACY_COLLECT,
     PRIVACY_SHARE,
@@ -422,6 +423,7 @@ def seed_all(db: Session) -> None:
         ("agreements", AGREEMENTS),
         ("hobby_options", HOBBY_OPTIONS),
         ("checkin", CHECKIN_CONFIG),
+        ("loyalty", LOYALTY_CONFIG),
     ):
         cur = get_config(db, key)
         if not cur:
@@ -442,6 +444,9 @@ def seed_all(db: Session) -> None:
                 set_config(db, key, default)
         elif key == "checkin":
             if not isinstance(cur, dict) or cur.get("dailyPoints") is None:
+                set_config(db, key, default)
+        elif key == "loyalty":
+            if not isinstance(cur, dict) or cur.get("earnRateDefault") is None:
                 set_config(db, key, default)
 
     refresh_demo_covers(db)

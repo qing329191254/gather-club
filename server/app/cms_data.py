@@ -598,6 +598,17 @@ HOBBY_OPTIONS = {
     ]
 }
 
+LOYALTY_CONFIG = {
+    "welcomePoints": 12,
+    "earnRateDefault": 0.5,
+    "earnRateV3": 1.0,
+    "firstOrderRate": 0.5,
+    "birthdayMultiplier": 2.0,
+    "vipTables": {"V1": 1, "V2": 2, "V3": 5},
+    "roomPrice": 0,
+}
+
+
 # 签到规则：每日积分 + 当月累计天数里程碑（与小程序签到页一致）
 CHECKIN_CONFIG = {
     "dailyPoints": 2,

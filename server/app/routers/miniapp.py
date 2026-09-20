@@ -22,7 +22,12 @@ from ..commerce import (
     bump_sold_on_paid,
     display_sold_text,
     get_checkin_config,
+    get_loyalty_config,
     nye_recent_buy,
+    order_earn_points,
+    release_room_if_needed,
+    reverse_order_points,
+    reverse_sold_on_refund,
     sync_user_vip,
     table_count,
 )
@@ -70,8 +75,19 @@ def _client_openid(
     x_wx_openid: str = "",
     openid: str = "",
 ) -> str:
-    """Prefer WeChat Cloud trusted X-WX-OPENID over client-supplied identity."""
-    return (x_wx_openid or x_openid or openid or "").strip()
+    """Prefer WeChat Cloud trusted X-WX-OPENID; never trust query openid when WX configured."""
+    trusted = (x_wx_openid or "").strip()
+    if trusted and trusted != "anonymous":
+        return trusted
+    header = (x_openid or "").strip()
+    if header and header != "anonymous":
+        return header
+    # 本地未配微信密钥时，才允许 query openid（方便调试）
+    if not wx_configured():
+        q = (openid or "").strip()
+        if q and q != "anonymous":
+            return q
+    return ""
 
 
 def _require_openid(
@@ -95,15 +111,24 @@ def _ensure_user(db: Session, openid: str, nickname: str = "微信用户", avata
     user = _user_by_openid(db, openid)
     if user:
         if getattr(user, "cancelled", False):
-            user.cancelled = False
-            user.nickname = nickname or "微信用户"
-            db.commit()
-            db.refresh(user)
+            # 已注销账号不可复活；应走新 openid 注册
+            raise HTTPException(status_code=403, detail="账号已注销")
         return user
-    user = AppUser(openid=openid, nickname=nickname or "微信用户", avatar=avatar or "", phone=phone or "", points=12)
+    welcome = int(get_loyalty_config(db).get("welcomePoints") or 0)
+    user = AppUser(
+        openid=openid,
+        nickname=nickname or "微信用户",
+        avatar=avatar or "",
+        phone=phone or "",
+        points=max(0, welcome),
+    )
     db.add(user)
     db.commit()
     db.refresh(user)
+    if welcome > 0:
+        db.add(PointLedger(user_id=user.id, title="新用户礼包", value=welcome))
+        db.commit()
+        db.refresh(user)
     return user
 
 
@@ -199,6 +224,7 @@ def _order_out(row: Order) -> dict:
         "remark": row.remark,
         "roomDate": row.room_date,
         "roomSlot": row.room_slot,
+        "extra": loads(row.extra or "{}", {}) or {},
         "createdAt": row.created_at.isoformat() if row.created_at else None,
     }
 
@@ -291,7 +317,13 @@ def _resolve_order_price(db: Session, payload: OrderCreateIn) -> tuple[float, fl
     otype = (payload.type or "").strip()
 
     if otype == "room":
-        return 0.0, 0.0, payload.title or "包房预约", payload.cover or "", payload.spec or ""
+        unit = float(get_loyalty_config(db).get("roomPrice") or 0)
+        title = payload.title or "包房预约"
+        cover = payload.cover or ""
+        spec = payload.spec or ""
+        if unit <= 0:
+            return 0.0, 0.0, title, cover, spec
+        return unit, round(unit * qty, 2), title, cover, spec
 
     if otype == "gather":
         row = (
@@ -648,6 +680,11 @@ def member_config(db: Session = Depends(get_db)):
     return get_config(db, "member") or MEMBER_CONFIG
 
 
+@router.get("/loyalty/config")
+def loyalty_config(db: Session = Depends(get_db)):
+    return get_loyalty_config(db)
+
+
 @router.get("/hobby/options")
 def hobby_options(db: Session = Depends(get_db)):
     data = get_config(db, "hobby_options") or HOBBY_OPTIONS
@@ -808,6 +845,24 @@ def create_order(
     qty = max(1, int(payload.quantity or 1))
     unit_price, amount, title, cover, spec = _resolve_order_price(db, payload)
 
+    coupon_discount = 0.0
+    user_coupon = None
+    coupon_id = int(getattr(payload, "coupon_id", 0) or 0)
+    if coupon_id and amount > 0:
+        user_coupon = (
+            db.query(UserCoupon)
+            .filter(
+                UserCoupon.id == coupon_id,
+                UserCoupon.user_id == user.id,
+                UserCoupon.status == "unused",
+            )
+            .first()
+        )
+        if not user_coupon:
+            raise HTTPException(status_code=400, detail="优惠券不可用")
+        coupon_discount = min(float(user_coupon.amount or 0), float(amount))
+        amount = round(max(0.0, float(amount) - coupon_discount), 2)
+
     if payload.room_date and payload.room_slot and payload.store_id:
         _release_stale_room_holds(db)
         info = _slot_info(db, payload.store_id, payload.room_date, payload.room_slot)
@@ -858,8 +913,18 @@ def create_order(
         remark=payload.remark,
         room_date=payload.room_date,
         room_slot=payload.room_slot,
+        extra=dumps(
+            {
+                "couponId": user_coupon.id if user_coupon else 0,
+                "couponDiscount": coupon_discount,
+            }
+        )
+        if user_coupon
+        else "{}",
     )
     db.add(order)
+    if user_coupon:
+        user_coupon.status = "used"
     db.commit()
     db.refresh(order)
     return _order_out(order)
@@ -960,6 +1025,12 @@ def cancel_order(
     if order.status != "pending":
         raise HTTPException(status_code=400, detail="订单状态不可取消")
     _release_room_slot(db, order)
+    extra = loads(order.extra or "{}", {}) or {}
+    uc_id = int(extra.get("couponId") or 0)
+    if uc_id:
+        uc = db.query(UserCoupon).filter(UserCoupon.id == uc_id, UserCoupon.user_id == order.user_id).first()
+        if uc and uc.status == "used":
+            uc.status = "unused"
     order.status = "cancelled"
     order.status_text = STATUS_TEXT["cancelled"]
     db.commit()
@@ -970,12 +1041,14 @@ def cancel_order(
 def mall_redeem(
     payload: dict = Body(default={}),
     x_openid: str = Header(default="", alias="X-Openid"),
+    x_wx_openid: str = Header(default="", alias="X-WX-OPENID"),
     openid: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
-    oid = x_openid or openid or "anonymous"
+    oid = _require_openid(x_openid, x_wx_openid, openid)
     user = _ensure_user(db, oid)
     goods_id = int(payload.get("goodsId") or payload.get("goods_id") or 0)
+    address_id = int(payload.get("addressId") or payload.get("address_id") or 0)
     row = db.query(MallGoods).filter(MallGoods.id == goods_id, MallGoods.enabled.is_(True)).first()
     if not row:
         raise HTTPException(status_code=404, detail="商品不存在")
@@ -983,6 +1056,12 @@ def mall_redeem(
         raise HTTPException(status_code=400, detail="库存不足")
     if user.points < row.cost:
         raise HTTPException(status_code=400, detail="积分不足")
+    if not address_id:
+        raise HTTPException(status_code=400, detail="请选择收货地址")
+    addr = db.query(Address).filter(Address.id == address_id, Address.user_id == user.id).first()
+    if not addr:
+        raise HTTPException(status_code=400, detail="收货地址无效")
+    region = addr.region or f"{addr.province or ''}{addr.city or ''}{addr.district or ''}".strip()
     row.stock -= 1
     add_points(db, user, f"积分兑换-{row.name}", -row.cost)
     order = Order(
@@ -999,14 +1078,31 @@ def mall_redeem(
         amount=0,
         status="paid",
         status_text=STATUS_TEXT["paid"],
+        contact_name=addr.name or "",
+        contact_phone=addr.phone or "",
+        remark=f"{region} {addr.detail or ''}".strip(),
+        extra=dumps(
+            {
+                "addressId": addr.id,
+                "address": {
+                    "name": addr.name,
+                    "phone": addr.phone,
+                    "region": region,
+                    "detail": addr.detail,
+                },
+                "redeemCode": f"R{user.id}{int(datetime.utcnow().timestamp()) % 1000000:06d}",
+            }
+        ),
     )
     db.add(order)
     db.commit()
     db.refresh(user)
+    extra = loads(order.extra or "{}", {}) or {}
     return {
         "ok": True,
         "balance": user.points,
         "orderId": order.id,
+        "redeemCode": extra.get("redeemCode") or "",
         "message": "兑换成功",
     }
 
@@ -1014,13 +1110,11 @@ def mall_redeem(
 @router.get("/user/profile")
 def user_profile(
     x_openid: str = Header(default="", alias="X-Openid"),
+    x_wx_openid: str = Header(default="", alias="X-WX-OPENID"),
     openid: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
-    oid = x_openid or openid
-    if not oid:
-        raise HTTPException(status_code=400, detail="缺少 openid")
-    user = _ensure_user(db, oid)
+    user = _ensure_user(db, _require_openid(x_openid, x_wx_openid, openid))
     return _profile_out(user, db)
 
 
@@ -1052,13 +1146,11 @@ def _profile_out(user: AppUser, db: Optional[Session] = None) -> dict:
 def update_profile(
     payload: dict = Body(default={}),
     x_openid: str = Header(default="", alias="X-Openid"),
+    x_wx_openid: str = Header(default="", alias="X-WX-OPENID"),
     openid: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
-    oid = x_openid or openid
-    if not oid:
-        raise HTTPException(status_code=400, detail="缺少 openid")
-    user = _ensure_user(db, oid)
+    user = _ensure_user(db, _require_openid(x_openid, x_wx_openid, openid))
     if getattr(user, "cancelled", False):
         raise HTTPException(status_code=400, detail="账号已注销")
     if "nickname" in payload and payload["nickname"] is not None:
@@ -1089,17 +1181,29 @@ def update_profile(
 @router.post("/user/cancel")
 def cancel_account(
     x_openid: str = Header(default="", alias="X-Openid"),
+    x_wx_openid: str = Header(default="", alias="X-WX-OPENID"),
     openid: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
-    oid = x_openid or openid
-    if not oid:
-        raise HTTPException(status_code=400, detail="缺少 openid")
-    user = _ensure_user(db, oid)
+    oid = _require_openid(x_openid, x_wx_openid, openid)
+    user = _user_by_openid(db, oid)
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    # 作废优惠券、清空地址与积分，并释放 openid 以便重新注册
+    db.query(UserCoupon).filter(UserCoupon.user_id == user.id, UserCoupon.status == "unused").update(
+        {"status": "expired"}, synchronize_session=False
+    )
+    db.query(Address).filter(Address.user_id == user.id).delete(synchronize_session=False)
+    if user.points:
+        add_points(db, user, "账号注销清零", -int(user.points or 0))
     user.cancelled = True
     user.nickname = "已注销用户"
     user.avatar = ""
     user.phone = ""
+    user.birthday = ""
+    user.hobby = ""
+    user.session_key = ""
+    user.openid = f"cancelled_{user.id}_{int(datetime.utcnow().timestamp())}"
     db.commit()
     return OkResponse(message="账号已注销")
 
@@ -1107,10 +1211,11 @@ def cancel_account(
 @router.get("/user/addresses")
 def list_addresses(
     x_openid: str = Header(default="", alias="X-Openid"),
+    x_wx_openid: str = Header(default="", alias="X-WX-OPENID"),
     openid: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
-    user = _ensure_user(db, x_openid or openid or "anonymous")
+    user = _ensure_user(db, _require_openid(x_openid, x_wx_openid, openid))
     rows = (
         db.query(Address)
         .filter(Address.user_id == user.id)
@@ -1138,10 +1243,11 @@ def _address_out(row: Address) -> dict:
 def create_address(
     payload: dict = Body(default={}),
     x_openid: str = Header(default="", alias="X-Openid"),
+    x_wx_openid: str = Header(default="", alias="X-WX-OPENID"),
     openid: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
-    user = _ensure_user(db, x_openid or openid or "anonymous")
+    user = _ensure_user(db, _require_openid(x_openid, x_wx_openid, openid))
     is_default = bool(payload.get("isDefault") or payload.get("is_default"))
     if is_default:
         db.query(Address).filter(Address.user_id == user.id).update({"is_default": False})
@@ -1174,7 +1280,7 @@ def update_address(
     openid: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
-    user = _ensure_user(db, x_openid or openid or "anonymous")
+    user = _ensure_user(db, _require_openid(x_openid, "", openid))
     row = db.query(Address).filter(Address.id == address_id, Address.user_id == user.id).first()
     if not row:
         raise HTTPException(status_code=404, detail="地址不存在")
@@ -1201,7 +1307,7 @@ def delete_address(
     openid: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
-    user = _ensure_user(db, x_openid or openid or "anonymous")
+    user = _ensure_user(db, _require_openid(x_openid, "", openid))
     row = db.query(Address).filter(Address.id == address_id, Address.user_id == user.id).first()
     if row:
         db.delete(row)
@@ -1216,7 +1322,7 @@ def set_default_address(
     openid: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
-    user = _ensure_user(db, x_openid or openid or "anonymous")
+    user = _ensure_user(db, _require_openid(x_openid, "", openid))
     row = db.query(Address).filter(Address.id == address_id, Address.user_id == user.id).first()
     if not row:
         raise HTTPException(status_code=404, detail="地址不存在")
@@ -1287,7 +1393,7 @@ def mall_records(
     db: Session = Depends(get_db),
 ):
     page, page_size, offset = normalize_page(page, page_size)
-    user = _ensure_user(db, x_openid or openid or "anonymous")
+    user = _ensure_user(db, _require_openid(x_openid, "", openid))
     q = (
         db.query(Order)
         .filter(Order.user_id == user.id, Order.type == "mall")
@@ -1340,8 +1446,8 @@ def user_points(
     db: Session = Depends(get_db),
 ):
     page, page_size, offset = normalize_page(page, page_size)
-    oid = x_openid or openid
-    user = _ensure_user(db, oid or "anonymous")
+    oid = _require_openid(x_openid, "", openid)
+    user = _ensure_user(db, oid)
     q = (
         db.query(PointLedger)
         .filter(PointLedger.user_id == user.id)
@@ -1373,8 +1479,8 @@ def user_coupons(
     openid: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
-    oid = x_openid or openid
-    user = _ensure_user(db, oid or "anonymous")
+    oid = _require_openid(x_openid, "", openid)
+    user = _ensure_user(db, oid)
     rows = db.query(UserCoupon).filter(UserCoupon.user_id == user.id).order_by(UserCoupon.id.desc()).all()
     grouped = {"unused": [], "used": [], "expired": []}
     for r in rows:
@@ -1479,11 +1585,12 @@ def checkin_month(
     year: int = Query(...),
     month: int = Query(...),
     x_openid: str = Header(default="", alias="X-Openid"),
+    x_wx_openid: str = Header(default="", alias="X-WX-OPENID"),
     openid: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
-    oid = x_openid or openid
-    user = _ensure_user(db, oid or "anonymous")
+    oid = _require_openid(x_openid, x_wx_openid, openid)
+    user = _ensure_user(db, oid)
     prefix = f"{year}-{month:02d}"
     rows = (
         db.query(CheckinRecord)
@@ -1499,6 +1606,31 @@ def checkin_month(
         milestones.append(
             {"label": "整月满签", "points": cfg["fullMonthBonus"], "days": full_days}
         )
+    # 补签资格：近 7 天内最近漏签日 + 今日是否已补签
+    day_start_utc = (now_cn().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(hours=8)).replace(
+        tzinfo=None
+    )
+    makeup_claimed = (
+        db.query(PointLedger)
+        .filter(
+            PointLedger.user_id == user.id,
+            PointLedger.title == "补签",
+            PointLedger.created_at >= day_start_utc,
+        )
+        .first()
+        is not None
+    )
+    makeup_target = None
+    for delta in range(1, 8):
+        d = (now_cn() - timedelta(days=delta)).strftime("%Y-%m-%d")
+        exists_day = (
+            db.query(CheckinRecord)
+            .filter(CheckinRecord.user_id == user.id, CheckinRecord.date == d)
+            .first()
+        )
+        if not exists_day:
+            makeup_target = d
+            break
     return {
         "dates": [r.date for r in rows],
         "signedDays": len(rows),
@@ -1509,6 +1641,11 @@ def checkin_month(
             "fullMonthBonus": cfg["fullMonthBonus"],
             "milestones": milestones,
             "rules": cfg["rules"],
+        },
+        "makeup": {
+            "claimedToday": makeup_claimed,
+            "available": bool(makeup_target) and not makeup_claimed,
+            "targetDate": makeup_target or "",
         },
     }
 
@@ -1568,7 +1705,7 @@ def video_follow(
     openid: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
-    user = _ensure_user(db, x_openid or openid or "anonymous")
+    user = _ensure_user(db, _require_openid(x_openid, "", openid))
     exists = db.query(VideoFollow).filter(VideoFollow.user_id == user.id).first()
     if not exists:
         db.add(VideoFollow(user_id=user.id))
@@ -1589,7 +1726,7 @@ def video_reserve(
     openid: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
-    user = _ensure_user(db, x_openid or openid or "anonymous")
+    user = _ensure_user(db, _require_openid(x_openid, "", openid))
     live_id = int(payload.get("liveId") or payload.get("live_id") or 0)
     live = db.query(VideoLive).filter(VideoLive.id == live_id, VideoLive.enabled.is_(True)).first()
     if not live:

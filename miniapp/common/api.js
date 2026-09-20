@@ -31,8 +31,14 @@ export const api = {
 	mallGoodsDetail(id) {
 		return request('/api/v1/mall/goods/' + id)
 	},
-	mallRedeem(goodsId) {
-		return request('/api/v1/mall/redeem', { method: 'POST', data: { goodsId } })
+	mallRedeem(goodsId, addressId) {
+		return request('/api/v1/mall/redeem', {
+			method: 'POST',
+			data: { goodsId, addressId }
+		})
+	},
+	loyaltyConfig() {
+		return request('/api/v1/loyalty/config')
 	},
 	mallRecords(params) {
 		return request('/api/v1/mall/records', { data: params || {} })

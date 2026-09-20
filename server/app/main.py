@@ -19,7 +19,11 @@ ADMIN_DIST = BASE_DIR / "static" / "admin"
 MINIAPP_STATIC = BASE_DIR.parent / "miniapp" / "static"
 SERVER_STATIC = BASE_DIR / "static"
 
-app = FastAPI(title=settings.app_name, docs_url="/api/docs", redoc_url="/api/redoc")
+app = FastAPI(
+    title=settings.app_name,
+    docs_url=None if settings.wx_appid else "/api/docs",
+    redoc_url=None if settings.wx_appid else "/api/redoc",
+)
 
 app.add_middleware(
     CORSMiddleware,

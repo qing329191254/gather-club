@@ -197,6 +197,8 @@ class OrderCreateIn(BaseModel):
     room_slot: str = ""
     openid: str = ""
     package_id: str = ""  # 年夜饭套餐 id，服务端以此算价
+    coupon_id: int = 0  # 用户持有券 UserCoupon.id
+    address_id: int = 0  # 积分商城收货地址
 
 
 class RoomSlotIn(BaseModel):

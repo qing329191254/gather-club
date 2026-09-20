@@ -23,6 +23,7 @@
       <el-table-column prop="status_text" label="状态" width="90" />
       <el-table-column label="操作" width="200" fixed="right">
         <template #default="{ row }">
+          <el-button link type="primary" @click="showDetail(row)">详情</el-button>
           <el-dropdown @command="(cmd) => setStatus(row, cmd)">
             <el-button link type="primary">改状态</el-button>
             <template #dropdown>
@@ -50,6 +51,26 @@
         @size-change="onSearch"
       />
     </div>
+
+    <el-drawer v-model="drawer" title="订单详情" size="480px">
+      <el-descriptions v-if="current" :column="1" border size="small">
+        <el-descriptions-item label="订单号">{{ current.id }}</el-descriptions-item>
+        <el-descriptions-item label="类型">{{ current.type }}</el-descriptions-item>
+        <el-descriptions-item label="用户ID">{{ current.user_id || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="门店">{{ current.store_name }}</el-descriptions-item>
+        <el-descriptions-item label="标题">{{ current.title }}</el-descriptions-item>
+        <el-descriptions-item label="规格">{{ current.spec }}</el-descriptions-item>
+        <el-descriptions-item label="金额">{{ current.amount }}</el-descriptions-item>
+        <el-descriptions-item label="联系人">{{ current.contact_name }} {{ current.contact_phone }}</el-descriptions-item>
+        <el-descriptions-item label="人数">{{ current.people || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="用餐">{{ current.room_date || '-' }} {{ current.room_slot || '' }}</el-descriptions-item>
+        <el-descriptions-item label="备注">{{ current.remark || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="状态">{{ current.status_text }}</el-descriptions-item>
+        <el-descriptions-item label="扩展">
+          <pre class="extra">{{ formatExtra(current.extra) }}</pre>
+        </el-descriptions-item>
+      </el-descriptions>
+    </el-drawer>
   </el-card>
 </template>
 
@@ -64,7 +85,23 @@ const route = useRoute()
 const list = ref([])
 const status = ref('')
 const keyword = ref('')
+const drawer = ref(false)
+const current = ref(null)
 const { page, pageSize, total, applyPage, resetPage, pageParams } = usePager()
+
+function formatExtra(extra) {
+  if (!extra || typeof extra !== 'object') return '-'
+  try {
+    return JSON.stringify(extra, null, 2)
+  } catch {
+    return String(extra)
+  }
+}
+
+function showDetail(row) {
+  current.value = row
+  drawer.value = true
+}
 
 function syncFromQuery() {
   status.value = route.query.status ? String(route.query.status) : ''
@@ -115,5 +152,12 @@ onMounted(() => {
   margin-top: 16px;
   display: flex;
   justify-content: flex-end;
+}
+.extra {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 12px;
+  line-height: 1.4;
 }
 </style>

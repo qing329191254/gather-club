@@ -50,7 +50,10 @@
             <el-descriptions-item label="生日">{{ detail.birthday || '-' }}</el-descriptions-item>
             <el-descriptions-item label="兴趣爱好">{{ detail.hobby || '-' }}</el-descriptions-item>
             <el-descriptions-item label="积分">{{ detail.points ?? 0 }}</el-descriptions-item>
-            <el-descriptions-item label="会员">{{ detail.vip_level || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="会员">
+              {{ detail.vip_level || '-' }}
+              <span v-if="detail.vip_manual">（已锁定）</span>
+            </el-descriptions-item>
             <el-descriptions-item label="近1年桌数">{{ detail.table_count ?? 0 }}</el-descriptions-item>
             <el-descriptions-item label="手机已改">{{ detail.phone_edited ? '是' : '否' }}</el-descriptions-item>
             <el-descriptions-item label="已注销">{{ detail.cancelled ? '是' : '否' }}</el-descriptions-item>
@@ -290,11 +293,11 @@ async function adjust(row) {
 
 async function setVip(row) {
   if (!row?.id) return
-  const { value } = await ElMessageBox.prompt('输入等级：V0 / V1 / V2 / V3', '修改会员等级', {
+  const { value } = await ElMessageBox.prompt('输入等级：V0 / V1 / V2 / V3。保存后锁定，不再被桌数自动覆盖。', '修改会员等级', {
     inputValue: row.vip_level || detail.vip_level || 'V0'
   })
-  await http.put(`/users/${row.id}/vip`, null, { params: { vip_level: value } })
-  ElMessage.success('已更新（用户打开会员页时会按近1年桌数自动校正）')
+  await http.put(`/users/${row.id}/vip`, null, { params: { vip_level: value, lock: true } })
+  ElMessage.success('已锁定该等级')
   load()
   if (drawer.value && detail.id === row.id) {
     const res = await http.get(`/users/${row.id}`)

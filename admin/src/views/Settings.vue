@@ -20,6 +20,37 @@
         <el-input v-model="rulesText" type="textarea" :rows="6" placeholder="每行一条规则（积分商城）" />
       </el-form-item>
 
+      <el-divider content-position="left">会员与消费积分</el-divider>
+      <el-form-item label="新用户积分">
+        <el-input-number v-model="loyalty.welcomePoints" :min="0" />
+      </el-form-item>
+      <el-form-item label="默认倍率">
+        <el-input-number v-model="loyalty.earnRateDefault" :min="0" :step="0.1" :precision="2" />
+        <span class="inline-tip">消费金额 × 倍率</span>
+      </el-form-item>
+      <el-form-item label="V3 倍率">
+        <el-input-number v-model="loyalty.earnRateV3" :min="0" :step="0.1" :precision="2" />
+      </el-form-item>
+      <el-form-item label="首单倍率">
+        <el-input-number v-model="loyalty.firstOrderRate" :min="0" :step="0.1" :precision="2" />
+      </el-form-item>
+      <el-form-item label="生日月倍数">
+        <el-input-number v-model="loyalty.birthdayMultiplier" :min="1" :step="0.5" :precision="1" />
+      </el-form-item>
+      <el-form-item label="V1 桌数">
+        <el-input-number v-model="loyalty.vipTables.V1" :min="1" />
+      </el-form-item>
+      <el-form-item label="V2 桌数">
+        <el-input-number v-model="loyalty.vipTables.V2" :min="1" />
+      </el-form-item>
+      <el-form-item label="V3 桌数">
+        <el-input-number v-model="loyalty.vipTables.V3" :min="1" />
+      </el-form-item>
+      <el-form-item label="包房单价">
+        <el-input-number v-model="loyalty.roomPrice" :min="0" :precision="2" />
+        <span class="inline-tip">0 表示免费预约</span>
+      </el-form-item>
+
       <el-divider content-position="left">每日签到</el-divider>
       <p class="section-tip">里程碑按「当月累计签到天数」发放，每档每月只发一次；与小程序签到页展示一致。</p>
       <el-form-item label="每日签到积分">
@@ -90,6 +121,15 @@ const checkinDefaults = () => ({
 const rulesText = ref('')
 const form = reactive(defaults())
 const checkin = reactive(checkinDefaults())
+const loyalty = reactive({
+  welcomePoints: 12,
+  earnRateDefault: 0.5,
+  earnRateV3: 1,
+  firstOrderRate: 0.5,
+  birthdayMultiplier: 2,
+  vipTables: { V1: 1, V2: 2, V3: 5 },
+  roomPrice: 0
+})
 const ready = ref(false)
 const saving = ref(false)
 const dirty = ref(false)
@@ -151,9 +191,10 @@ function applyCheckin(value = {}) {
 
 async function load() {
   ready.value = false
-  const [siteRes, checkinRes] = await Promise.all([
+  const [siteRes, checkinRes, loyaltyRes] = await Promise.all([
     http.get('/config/site'),
-    http.get('/config/checkin')
+    http.get('/config/checkin'),
+    http.get('/config/loyalty')
   ])
   const value = siteRes.value || {}
   Object.assign(form, defaults(), value)
@@ -161,6 +202,14 @@ async function load() {
   if (!form.roomCapacity) form.roomCapacity = { lunch: 4, dinner: 8 }
   rulesText.value = (form.mallRules || []).join('\n')
   applyCheckin(checkinRes.value || {})
+  const lv = loyaltyRes.value || {}
+  loyalty.welcomePoints = lv.welcomePoints ?? 12
+  loyalty.earnRateDefault = lv.earnRateDefault ?? 0.5
+  loyalty.earnRateV3 = lv.earnRateV3 ?? 1
+  loyalty.firstOrderRate = lv.firstOrderRate ?? 0.5
+  loyalty.birthdayMultiplier = lv.birthdayMultiplier ?? 2
+  loyalty.roomPrice = lv.roomPrice ?? 0
+  loyalty.vipTables = Object.assign({ V1: 1, V2: 2, V3: 5 }, lv.vipTables || {})
   dirty.value = false
   ready.value = true
 }
@@ -171,7 +220,8 @@ async function onSave(showToast = true) {
   try {
     await Promise.all([
       http.put('/config/site', { value: buildSiteValue() }),
-      http.put('/config/checkin', { value: buildCheckinValue() })
+      http.put('/config/checkin', { value: buildCheckinValue() }),
+      http.put('/config/loyalty', { value: { ...loyalty, vipTables: { ...loyalty.vipTables } } })
     ])
     dirty.value = false
     lastSavedAt.value = new Date().toLocaleTimeString()
@@ -216,7 +266,14 @@ watch(
     checkin.makeupPoints,
     checkin.fullMonthBonus,
     checkin.rules,
-    JSON.stringify(checkin.milestones)
+    JSON.stringify(checkin.milestones),
+    loyalty.welcomePoints,
+    loyalty.earnRateDefault,
+    loyalty.earnRateV3,
+    loyalty.firstOrderRate,
+    loyalty.birthdayMultiplier,
+    loyalty.roomPrice,
+    JSON.stringify(loyalty.vipTables)
   ],
   () => scheduleSave()
 )

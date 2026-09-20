@@ -88,6 +88,7 @@
 	import TipDialog from '../../components/tip-dialog/tip-dialog.vue'
 	import { getUser, saveLogin, getOpenid, refreshProfile, isLoggedIn, silentLogin, bindPhoneFromDetail } from '../../common/auth.js'
 	import { api } from '../../common/api.js'
+	import { uploadToCloud } from '../../common/cloud.js'
 
 	const PROFILE_KEY = 'gather_profile'
 	const PHONE_EDITED_KEY = 'gather_phone_edited'
@@ -148,10 +149,20 @@
 			saveLocal() {
 				uni.setStorageSync(PROFILE_KEY, this.form)
 			},
-			onChooseAvatar(e) {
+			async onChooseAvatar(e) {
 				const url = e && e.detail && e.detail.avatarUrl
-				if (url) {
+				if (!url) return
+				uni.showLoading({ title: '上传中', mask: true })
+				try {
+					const up = await uploadToCloud(url, 'avatars/' + Date.now() + '.jpg')
+					this.form.avatar = (up && (up.url || up.fileID)) || url
+					this.saveLocal()
+				} catch (err) {
+					// 上传失败时暂存临时地址，保存资料时仍会提交（可能过期）
 					this.form.avatar = url
+					uni.showToast({ title: '头像上传失败，请重试', icon: 'none' })
+				} finally {
+					uni.hideLoading()
 				}
 			},
 			onNickChange(e) {

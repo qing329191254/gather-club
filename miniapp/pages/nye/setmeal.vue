@@ -149,7 +149,7 @@
 <script>
 	import { api } from '../../common/api.js'
 	import { settlePay } from '../../common/pay.js'
-	import { isLoggedIn, silentLogin } from '../../common/auth.js'
+	import { isLoggedIn, silentLogin, getUser } from '../../common/auth.js'
 
 	export default {
 		data() {
@@ -173,7 +173,8 @@
 				viewMonth: 2,
 				draftDate: '',
 				monthMap: {},
-				weeks: ['日', '一', '二', '三', '四', '五', '六']
+				weeks: ['日', '一', '二', '三', '四', '五', '六'],
+				loyalty: null
 			}
 		},
 		computed: {
@@ -191,7 +192,20 @@
 				return this.current ? this.current.price * this.quantity : 0
 			},
 			points() {
-				return Math.round(this.total / 2)
+				const amt = this.total || 0
+				if (amt <= 0) return 0
+				const cfg = this.loyalty || {}
+				const user = getUser() || {}
+				const level = String(user.vipLevel || user.vip_level || 'V0').toUpperCase()
+				let rate = Number(cfg.earnRateDefault != null ? cfg.earnRateDefault : 0.5)
+				if (level === 'V3') rate = Number(cfg.earnRateV3 != null ? cfg.earnRateV3 : 1)
+				const bday = String(user.birthday || '')
+				const now = new Date()
+				const bm = bday.length >= 7 ? parseInt(bday.slice(5, 7), 10) : 0
+				if (bm && bm === now.getMonth() + 1) {
+					rate *= Number(cfg.birthdayMultiplier != null ? cfg.birthdayMultiplier : 2)
+				}
+				return Math.max(0, Math.round(amt * rate))
 			},
 			dateText() {
 				if (this.date) return this.date
@@ -254,6 +268,9 @@
 		},
 		onLoad(query) {
 			const id = (query && query.id) || ''
+			api.loyaltyConfig().then((cfg) => {
+				this.loyalty = cfg || null
+			}).catch(() => {})
 			if (!id) {
 				uni.showToast({ title: '加载失败', icon: 'none' })
 				setTimeout(() => {

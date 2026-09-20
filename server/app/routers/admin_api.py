@@ -4,8 +4,25 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
-from ..cms_data import AGREEMENTS, CHECKIN_CONFIG, HOBBY_OPTIONS, MEMBER_CONFIG, PRIVACY_COLLECT, PRIVACY_SHARE
-from ..commerce import bump_sold_on_paid, sync_user_vip, table_count, add_points, award_order_points
+from ..cms_data import (
+    AGREEMENTS,
+    CHECKIN_CONFIG,
+    HOBBY_OPTIONS,
+    LOYALTY_CONFIG,
+    MEMBER_CONFIG,
+    PRIVACY_COLLECT,
+    PRIVACY_SHARE,
+)
+from ..commerce import (
+    bump_sold_on_paid,
+    sync_user_vip,
+    table_count,
+    add_points,
+    award_order_points,
+    release_room_if_needed,
+    reverse_order_points,
+    reverse_sold_on_refund,
+)
 from ..database import get_db
 from ..deps import create_access_token, get_current_admin, verify_password
 from ..models import (
@@ -614,6 +631,8 @@ def list_orders(
                 "room_date": r.room_date,
                 "room_slot": r.room_slot,
                 "openid": r.openid,
+                "user_id": r.user_id,
+                "extra": loads(r.extra or "{}", {}) or {},
                 "created_at": r.created_at.isoformat() if r.created_at else None,
             }
             for r in rows
@@ -636,35 +655,30 @@ def update_order_status(
         raise HTTPException(404, "订单不存在")
     prev = row.status
     next_status = payload.status
-    if (
-        prev in ("pending", "paid")
-        and next_status == "cancelled"
-        and row.room_date
-        and row.room_slot
-        and row.store_id
-    ):
-        slot = (
-            db.query(RoomSlot)
-            .filter(
-                RoomSlot.store_id == row.store_id,
-                RoomSlot.date == row.room_date,
-                RoomSlot.slot == row.room_slot,
-            )
-            .first()
-        )
-        if slot and slot.booked > 0:
-            slot.booked -= 1
+    user = db.query(AppUser).filter(AppUser.id == row.user_id).first() if row.user_id else None
+
+    # 取消/退款：释放包房、回退销量与积分
+    if prev in ("pending", "paid", "completed") and next_status in ("cancelled", "refunded"):
+        release_room_if_needed(db, row)
+        if prev in ("paid", "completed"):
+            reverse_sold_on_refund(db, row)
+            reverse_order_points(db, row, user)
+            # 退回已使用的优惠券
+            extra = loads(row.extra or "{}", {}) or {}
+            uc_id = int(extra.get("couponId") or 0)
+            if uc_id:
+                uc = db.query(UserCoupon).filter(UserCoupon.id == uc_id).first()
+                if uc and uc.status == "used":
+                    uc.status = "unused"
+
     row.status = next_status
     row.status_text = payload.status_text or STATUS_TEXT.get(next_status, next_status)
     # 后台把待支付标成待核销/已完成时，同样累计销量 / 会员桌数 / 消费积分
     if prev not in ("paid", "completed") and next_status in ("paid", "completed"):
-        user = db.query(AppUser).filter(AppUser.id == row.user_id).first() if row.user_id else None
         bump_sold_on_paid(db, row, user)
         award_order_points(db, row, user)
-    elif row.user_id and next_status in ("paid", "completed", "cancelled", "refunded"):
-        user = db.query(AppUser).filter(AppUser.id == row.user_id).first()
-        if user:
-            sync_user_vip(db, user)
+    elif user and next_status in ("paid", "completed", "cancelled", "refunded"):
+        sync_user_vip(db, user)
     db.commit()
     return OkResponse(data={"id": row.id, "status": row.status, "status_text": row.status_text})
 
@@ -825,6 +839,7 @@ def _user_detail(db: Session, user: AppUser) -> dict:
         "hobby": getattr(user, "hobby", "") or "",
         "points": user.points or 0,
         "vip_level": user.vip_level or "V0",
+        "vip_manual": bool(getattr(user, "vip_manual", False)),
         "table_count": table_count(db, user.id),
         "phone_edited": bool(getattr(user, "phone_edited", False)),
         "cancelled": bool(getattr(user, "cancelled", False)),
@@ -1008,13 +1023,20 @@ def adjust_points(
 def update_vip(
     user_id: int,
     vip_level: str = Query(...),
+    lock: bool = Query(True, description="锁定手动等级，避免被桌数自动覆盖"),
     db: Session = Depends(get_db),
     _: AdminUser = Depends(get_current_admin),
 ):
     user = _user_or_404(db, user_id)
     user.vip_level = vip_level.upper()
+    user.vip_manual = bool(lock)
     db.commit()
-    return {"id": user.id, "vip_level": user.vip_level, "table_count": table_count(db, user.id)}
+    return {
+        "id": user.id,
+        "vip_level": user.vip_level,
+        "vip_manual": user.vip_manual,
+        "table_count": table_count(db, user.id),
+    }
 
 
 # ---- site config ----
@@ -1025,6 +1047,7 @@ CMS_DEFAULTS: dict[str, Any] = {
     "agreements": AGREEMENTS,
     "hobby_options": HOBBY_OPTIONS,
     "checkin": CHECKIN_CONFIG,
+    "loyalty": LOYALTY_CONFIG,
 }
 
 
@@ -1041,8 +1064,9 @@ def _cms_value_empty(key: str, value: Any) -> bool:
         items = value.get("items") or []
         return not any(str(i.get("name") or "").strip() for i in items if isinstance(i, dict))
     if key == "checkin":
-        # 允许 milestones 为空（只保留每日积分），但 dailyPoints 必须存在
         return value.get("dailyPoints") is None and not (value.get("milestones") or [])
+    if key == "loyalty":
+        return value.get("earnRateDefault") is None and value.get("vipTables") is None
     return False
 
 

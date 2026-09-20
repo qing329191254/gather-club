@@ -192,15 +192,21 @@
 					this.monthPoints = res.monthPoints || 0
 					this.signedToday = this.signedDates.indexOf(todayKey()) >= 0
 					this.applyConfig(res.config)
+					const makeup = res.makeup || {}
+					this.makeupClaimed = !!makeup.claimedToday
+					if (makeup.targetDate) {
+						const parts = String(makeup.targetDate).split('-')
+						this.makeupDay = parts.length === 3 ? Number(parts[2]) : 0
+					} else {
+						this.makeupDay = 0
+					}
 					this.buildCalendar(now)
 				} catch (e) {
 					this.buildCalendar(now)
 				}
 			},
 			handleShareEntry() {
-				this.markClaimed()
 				this.successVisible = true
-				this.doCheckin(true)
 			},
 			buildCalendar(now) {
 				const y = now.getFullYear()
@@ -290,7 +296,11 @@
 			},
 			onMakeup() {
 				if (this.makeupClaimed) {
-					uni.showToast({ title: '已领取补签', icon: 'none' })
+					uni.showToast({ title: '今日已补签', icon: 'none' })
+					return
+				}
+				if (!this.makeupDay) {
+					uni.showToast({ title: '暂无可补签日期', icon: 'none' })
 					return
 				}
 				uni.navigateTo({ url: '/pages/checkin/share' })
@@ -298,9 +308,9 @@
 			closeSuccess() {
 				this.successVisible = false
 			},
-			onClaimPoints() {
+			async onClaimPoints() {
 				this.successVisible = false
-				uni.reLaunch({ url: '/pages/video/video' })
+				await this.doCheckin(true)
 			},
 			preventTouchMove() {},
 			goVideo() {

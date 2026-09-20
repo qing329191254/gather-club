@@ -108,16 +108,9 @@
 					this.living = (res && res.living) || null
 					this.lives = (res && res.lives) || []
 				} catch (e) {
-					if (!this.lives.length && !this.living) {
-						this.living = { id: 0, line1: '新锦江4+6+10人', line2: '中餐', points: 10 }
-						this.lives = [
-							{ id: 1, time: '09月20 11:30', line1: '天鹅宾馆下午茶/', line2: '中餐', points: 10 },
-							{ id: 2, time: '09月20 16:00', line1: '外高桥喜来登中餐+', line2: '自助下午茶', points: 10 },
-							{ id: 3, time: '09月21 11:30', line1: '海伦宾馆4/6/8人', line2: '中餐', points: 10 },
-							{ id: 4, time: '09月21 16:00', line1: '虹桥宾馆', line2: '大闸蟹自助', points: 10 },
-							{ id: 5, time: '09月22 11:30', line1: '静安洲际大闸蟹晚市自助', line2: '（新品）', points: 10 }
-						]
-					}
+					this.living = null
+					this.lives = []
+					uni.showToast({ title: '直播列表加载失败', icon: 'none' })
 				}
 			},
 			async onFollow() {

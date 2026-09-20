@@ -49,7 +49,9 @@
 				goods: null,
 				rules: [],
 				stewardVisible: false,
-				goodsId: ''
+				goodsId: '',
+				addresses: [],
+				addressId: 0
 			}
 		},
 		computed: {
@@ -80,6 +82,10 @@
 					}
 					const mall = await api.mallGoods()
 					this.rules = Array.isArray(mall.rules) ? mall.rules : []
+					const addr = await api.addresses()
+					this.addresses = (addr && addr.list) || []
+					const def = this.addresses.find((a) => a.isDefault) || this.addresses[0]
+					this.addressId = def ? def.id : 0
 				} catch (e) {
 					uni.showToast({ title: '加载失败', icon: 'none' })
 				}
@@ -92,24 +98,42 @@
 			},
 			onRedeem() {
 				if (!this.canRedeem) return
+				if (!this.addressId) {
+					uni.showModal({
+						title: '请先添加收货地址',
+						content: '兑换需要选择收货地址',
+						confirmText: '去添加',
+						success: (res) => {
+							if (res.confirm) uni.navigateTo({ url: '/pages/mine/address' })
+						}
+					})
+					return
+				}
+				const addr = this.addresses.find((a) => a.id === this.addressId)
+				const addrText = addr
+					? `${addr.name} ${addr.phone}\n${addr.region || ''}${addr.detail || ''}`
+					: ''
 				uni.showModal({
 					title: '确认兑换',
-					content: `将消耗 ${this.goods.cost} 积分兑换「${this.goods.title || this.goods.name}」`,
+					content: `将消耗 ${this.goods.cost} 积分兑换「${this.goods.title || this.goods.name}」\n${addrText}`,
 					confirmColor: '#e54148',
 					success: async (res) => {
 						if (!res.confirm) return
 						uni.showLoading({ title: '兑换中', mask: true })
 						try {
-							const result = await api.mallRedeem(this.goods.id)
+							const result = await api.mallRedeem(this.goods.id, this.addressId)
 							const user = getUser()
 							user.points = result.balance != null ? result.balance : Math.max(0, user.points - this.goods.cost)
 							saveLogin(user, getOpenid())
 							this.points = user.points
 							uni.hideLoading()
-							uni.showToast({ title: '兑换成功', icon: 'success' })
+							uni.showToast({
+								title: result.redeemCode ? '兑换成功 ' + result.redeemCode : '兑换成功',
+								icon: 'none'
+							})
 							setTimeout(() => {
 								uni.navigateTo({ url: '/pages/mall/records' })
-							}, 500)
+							}, 600)
 						} catch (e) {
 							uni.hideLoading()
 							uni.showToast({ title: (e && e.message) || '兑换失败', icon: 'none' })
