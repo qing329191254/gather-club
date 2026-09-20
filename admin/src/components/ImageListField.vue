@@ -4,33 +4,26 @@
       <div v-for="(url, idx) in list" :key="`${url}-${idx}`" class="item">
         <el-image :src="url" fit="cover" class="thumb" :preview-src-list="list" :initial-index="idx" />
         <div class="badge">{{ idx + 1 }}</div>
-        <div class="mask">
-          <el-button type="primary" size="small" circle :disabled="idx === 0" @click.stop="move(idx, -1)">
-            ↑
-          </el-button>
-          <el-button type="primary" size="small" circle :disabled="idx === list.length - 1" @click.stop="move(idx, 1)">
-            ↓
-          </el-button>
-          <el-button type="danger" size="small" circle @click.stop="remove(idx)">删</el-button>
+        <div class="ops">
+          <el-button size="small" text :disabled="idx === 0" @click="move(idx, -1)">上移</el-button>
+          <el-button size="small" text :disabled="idx === list.length - 1" @click="move(idx, 1)">下移</el-button>
+          <el-button size="small" text type="danger" @click="remove(idx)">删除</el-button>
         </div>
       </div>
 
       <el-upload
         class="add"
-        drag
         :show-file-list="false"
         :http-request="onUpload"
         :disabled="loading"
         accept="image/jpeg,image/png,image/gif,image/webp"
         multiple
       >
-        <div class="add-inner">
-          <div class="add-title">{{ loading ? '上传中…' : '+ 添加图片' }}</div>
-          <div class="add-tip">点击或拖拽，可多选</div>
+        <div class="add-box">
+          <div class="add-title">{{ loading ? '上传中…' : '+ 上传' }}</div>
         </div>
       </el-upload>
     </div>
-    <div v-if="list.length" class="footer-tip">共 {{ list.length }} 张，鼠标移到图片上可排序或删除，点击图片可放大预览</div>
   </div>
 </template>
 
@@ -91,81 +84,63 @@ async function onUpload(option) {
 <style scoped>
 .img-list { width: 100%; }
 .grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px;
 }
 .item {
-  position: relative;
-  border-radius: 10px;
+  width: 140px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
   overflow: hidden;
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
-  aspect-ratio: 16 / 10;
+  background: #fff;
 }
 .thumb {
-  width: 100%;
-  height: 100%;
+  width: 140px;
+  height: 100px;
   display: block;
+  background: #f8fafc;
 }
 .badge {
   position: absolute;
-  top: 6px;
-  left: 6px;
-  min-width: 22px;
-  height: 22px;
+  margin-top: -96px;
+  margin-left: 6px;
+  min-width: 20px;
+  height: 20px;
   padding: 0 6px;
-  border-radius: 11px;
-  background: rgba(15, 23, 42, 0.7);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.65);
   color: #fff;
   font-size: 12px;
-  line-height: 22px;
+  line-height: 20px;
   text-align: center;
+  pointer-events: none;
 }
-.mask {
-  position: absolute;
-  inset: 0;
+.item {
+  position: relative;
+}
+.ops {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 4px;
+  border-top: 1px solid #f1f5f9;
+}
+.add :deep(.el-upload) {
+  display: block;
+}
+.add-box {
+  width: 140px;
+  height: 100px;
+  border: 1px dashed #d1d5db;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  background: rgba(15, 23, 42, 0.45);
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-.item:hover .mask { opacity: 1; }
-.add {
-  aspect-ratio: 16 / 10;
-}
-.add :deep(.el-upload),
-.add :deep(.el-upload-dragger) {
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  border-radius: 10px;
-}
-.add-inner {
-  height: 100%;
-  min-height: 90px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
+  color: #64748b;
+  background: #fafafa;
+  box-sizing: border-box;
 }
 .add-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #334155;
-}
-.add-tip {
-  font-size: 12px;
-  color: #94a3b8;
-}
-.footer-tip {
-  margin-top: 10px;
-  font-size: 12px;
-  color: #94a3b8;
+  font-size: 13px;
 }
 </style>

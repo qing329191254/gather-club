@@ -1,32 +1,26 @@
 <template>
   <div class="img-field">
-    <el-upload
-      class="uploader"
-      drag
-      :show-file-list="false"
-      :http-request="onUpload"
-      :disabled="loading"
-      accept="image/jpeg,image/png,image/gif,image/webp"
-    >
-      <div v-if="inner" class="preview-wrap" @click.stop>
-        <el-image :src="inner" class="preview" fit="cover" :preview-src-list="[inner]" />
-        <div class="preview-actions">
-          <el-button type="primary" size="small" :loading="loading">重新上传</el-button>
-          <el-button size="small" @click.stop="clear">清除</el-button>
-        </div>
-      </div>
-      <div v-else class="empty">
-        <div class="empty-title">{{ loading ? '上传中…' : '点击或拖拽图片到此处上传' }}</div>
-        <div class="empty-tip">支持 JPG / PNG / WEBP，不超过 8MB</div>
-      </div>
-    </el-upload>
-    <el-input
-      v-model="inner"
-      class="url-input"
-      :placeholder="placeholder"
-      clearable
-      @change="emitValue"
-    />
+    <div class="row">
+      <el-input
+        v-model="inner"
+        clearable
+        :placeholder="placeholder"
+        @change="emitValue"
+      />
+      <el-upload
+        :show-file-list="false"
+        :http-request="onUpload"
+        :disabled="loading"
+        accept="image/jpeg,image/png,image/gif,image/webp"
+      >
+        <el-button :loading="loading">上传</el-button>
+      </el-upload>
+    </div>
+    <div v-if="inner" class="preview-box">
+      <el-image :src="inner" class="preview" fit="cover" :preview-src-list="[inner]" />
+      <el-button class="clear-btn" size="small" text type="danger" @click="clear">清除</el-button>
+    </div>
+    <div v-else class="preview-empty">暂无图片，可粘贴链接或点击上传</div>
   </div>
 </template>
 
@@ -38,7 +32,7 @@ import http from '../api/http'
 const props = defineProps({
   modelValue: { type: String, default: '' },
   folder: { type: String, default: 'uploads' },
-  placeholder: { type: String, default: '也可直接粘贴图片链接' }
+  placeholder: { type: String, default: '图片链接' }
 })
 const emit = defineEmits(['update:modelValue'])
 
@@ -86,49 +80,49 @@ async function onUpload(option) {
 .img-field {
   width: 100%;
 }
-.uploader {
-  width: 100%;
-}
-.uploader :deep(.el-upload) {
-  width: 100%;
-}
-.uploader :deep(.el-upload-dragger) {
-  width: 100%;
-  padding: 16px;
-  border-radius: 10px;
-}
-.empty {
-  padding: 28px 12px;
-  text-align: center;
-}
-.empty-title {
-  font-size: 15px;
-  color: #334155;
-  font-weight: 600;
-}
-.empty-tip {
-  margin-top: 8px;
-  font-size: 12px;
-  color: #94a3b8;
-}
-.preview-wrap {
+.row {
   display: flex;
-  flex-direction: column;
+  gap: 8px;
   align-items: center;
-  gap: 10px;
+}
+.row :deep(.el-input) {
+  flex: 1;
+}
+.preview-box {
+  position: relative;
+  margin-top: 10px;
+  width: 160px;
+  height: 160px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f8fafc;
 }
 .preview {
   width: 100%;
-  max-width: 280px;
-  height: 140px;
-  border-radius: 8px;
-  background: #f5f5f5;
+  height: 100%;
+  display: block;
 }
-.preview-actions {
-  display: flex;
-  gap: 8px;
+.clear-btn {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  background: rgba(255, 255, 255, 0.92) !important;
 }
-.url-input {
+.preview-empty {
   margin-top: 10px;
+  width: 160px;
+  height: 100px;
+  border: 1px dashed #e5e7eb;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 12px;
+  text-align: center;
+  padding: 8px;
+  box-sizing: border-box;
+  background: #fafafa;
 }
 </style>
