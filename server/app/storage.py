@@ -1,4 +1,4 @@
-"""微信云托管对象存储：通过开放接口上传，返回可访问 URL；失败时回退本地 static/uploads。"""
+"""微信云托管对象存储：服务端直传，仅走云存储（不落本地盘）。"""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ import re
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 from urllib.parse import quote
 
 import httpx
@@ -23,21 +22,14 @@ CLOUDBASE_TOKEN_PATHS = (
     "/.tencentcloudbase/wx/access_token",
 )
 
-# server/static/uploads
-UPLOAD_ROOT = Path(__file__).resolve().parent.parent / "static" / "uploads"
-
 
 def storage_configured() -> bool:
     s = get_settings()
-    if not (s.wx_cloud_env or "").strip():
-        return False
-    if wx_configured():
-        return True
-    return any(Path(p).is_file() for p in CLOUDBASE_TOKEN_PATHS)
+    return bool((s.wx_cloud_env or "").strip() and (wx_configured() or _read_cloudbase_token()))
 
 
 def public_url_for_path(path: str) -> str:
-    """把对象路径转成公网访问地址（需存储权限为所有用户可读）。"""
+    """对象路径 → 公网 CDN（存储需对所有用户可读）。"""
     settings = get_settings()
     clean = path.lstrip("/")
     domain = (settings.cos_cdn_domain or "").strip().rstrip("/")
@@ -52,7 +44,6 @@ def public_url_for_path(path: str) -> str:
 
 
 def file_id_to_url(file_id: str, path: str = "") -> str:
-    """cloud://fileID 尽量转成 https；失败则用 path 拼 CDN。"""
     if not file_id:
         return public_url_for_path(path) if path else ""
     if file_id.startswith("http://") or file_id.startswith("https://"):
@@ -70,51 +61,6 @@ def _safe_ext(filename: str) -> str:
     return ".jpg"
 
 
-def _read_cloudbase_token() -> str:
-    for p in CLOUDBASE_TOKEN_PATHS:
-        try:
-            raw = Path(p).read_text(encoding="utf-8").strip()
-            if raw:
-                return raw
-        except OSError:
-            continue
-    return ""
-
-
-async def _wx_api_token() -> tuple[str, str]:
-    """返回 (token, query_param_name)。优先容器内云托管令牌。"""
-    cloud_token = _read_cloudbase_token()
-    if cloud_token:
-        return cloud_token, "cloudbase_access_token"
-    token = await get_access_token()
-    return token, "access_token"
-
-
-async def prepare_upload(path: str) -> dict:
-    """向微信申请上传凭证。"""
-    if not storage_configured():
-        raise HTTPException(status_code=500, detail="未配置云托管对象存储环境变量")
-    settings = get_settings()
-    token, token_key = await _wx_api_token()
-    url = f"https://api.weixin.qq.com/tcb/uploadfile?{token_key}={token}"
-    async with httpx.AsyncClient(timeout=20.0) as client:
-        resp = await client.post(url, json={"env": settings.wx_cloud_env, "path": path})
-        try:
-            data = resp.json()
-        except Exception as exc:  # noqa: BLE001
-            raise HTTPException(
-                status_code=502,
-                detail=f"申请上传凭证失败: 微信接口返回非 JSON ({resp.status_code})",
-            ) from exc
-    errcode = int(data.get("errcode") or 0)
-    if errcode:
-        raise HTTPException(
-            status_code=400,
-            detail=f"申请上传凭证失败: {data.get('errmsg') or errcode}",
-        )
-    return data
-
-
 def _guess_content_type(filename: str) -> str:
     ext = _safe_ext(filename)
     return {
@@ -129,8 +75,77 @@ def _guess_content_type(filename: str) -> str:
     }.get(ext, "application/octet-stream")
 
 
-async def upload_bytes_cloud(content: bytes, filename: str, folder: str = "uploads") -> dict:
-    """服务端直传云托管对象存储。"""
+def _read_cloudbase_token() -> str:
+    for p in CLOUDBASE_TOKEN_PATHS:
+        try:
+            raw = Path(p).read_text(encoding="utf-8").strip()
+            if raw:
+                return raw
+        except OSError:
+            continue
+    return ""
+
+
+async def _token_candidates() -> list[tuple[str, str]]:
+    """
+    返回可用令牌列表 [(token, query_key), ...]。
+    优先 AppSecret 换取的 access_token（无需白名单）；
+    再试容器内 cloudbase_access_token（需在云托管配置 /tcb/uploadfile 白名单）。
+    """
+    out: list[tuple[str, str]] = []
+    if wx_configured():
+        try:
+            out.append((await get_access_token(), "access_token"))
+        except HTTPException as exc:
+            logger.warning("get access_token failed: %s", exc.detail)
+    cloud = _read_cloudbase_token()
+    if cloud:
+        out.append((cloud, "cloudbase_access_token"))
+    return out
+
+
+async def prepare_upload(path: str) -> dict:
+    """向微信申请上传凭证。"""
+    settings = get_settings()
+    env = (settings.wx_cloud_env or "").strip()
+    if not env:
+        raise HTTPException(
+            status_code=500,
+            detail="未配置 WX_CLOUD_ENV（云托管环境 ID）",
+        )
+
+    candidates = await _token_candidates()
+    if not candidates:
+        raise HTTPException(
+            status_code=500,
+            detail="无法上传：请在云托管配置 WX_APPID + WX_SECRET，或开启云调用令牌并白名单 /tcb/uploadfile",
+        )
+
+    errors: list[str] = []
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        for token, token_key in candidates:
+            url = f"https://api.weixin.qq.com/tcb/uploadfile?{token_key}={token}"
+            resp = await client.post(url, json={"env": env, "path": path})
+            try:
+                data = resp.json()
+            except Exception:  # noqa: BLE001
+                errors.append(f"{token_key}: 非 JSON ({resp.status_code})")
+                continue
+            errcode = int(data.get("errcode") or 0)
+            if errcode == 0:
+                return data
+            msg = str(data.get("errmsg") or errcode)
+            errors.append(f"{token_key}: {msg}")
+            logger.warning("tcb/uploadfile failed via %s: %s", token_key, msg)
+
+    hint = "；".join(errors)
+    if any("unauthorized" in e.lower() or "api unauthorized" in e.lower() for e in errors):
+        hint += "。若用云托管令牌，请到控制台「云调用 → 微信令牌权限」添加 /tcb/uploadfile"
+    raise HTTPException(status_code=400, detail=f"申请上传凭证失败: {hint}")
+
+
+async def upload_bytes(content: bytes, filename: str, folder: str = "uploads") -> dict:
+    """服务端直传云托管对象存储，返回 url / fileId / path。"""
     if not content:
         raise HTTPException(status_code=400, detail="空文件")
     if len(content) > 8 * 1024 * 1024:
@@ -145,72 +160,44 @@ async def upload_bytes_cloud(content: bytes, filename: str, folder: str = "uploa
     if not upload_url:
         raise HTTPException(status_code=400, detail="未返回上传地址")
 
-    # COS 要求字段顺序固定，file 必须在最后
+    # COS：字段顺序固定，file 必须最后；文本字段用 (None, value)
     name = Path(filename).name or "file.jpg"
     ctype = _guess_content_type(name)
+    cos_file_id = meta.get("cos_file_id") or ""
+    if not cos_file_id:
+        raise HTTPException(status_code=400, detail="未返回 cos_file_id，无法上传")
+
     files = [
         ("key", (None, path)),
         ("Signature", (None, meta.get("authorization") or "")),
         ("x-cos-security-token", (None, meta.get("token") or "")),
-        ("x-cos-meta-fileid", (None, meta.get("cos_file_id") or meta.get("file_id") or "")),
+        ("x-cos-meta-fileid", (None, cos_file_id)),
         ("file", (name, content, ctype)),
     ]
 
     async with httpx.AsyncClient(timeout=60.0) as client:
         resp = await client.post(upload_url, files=files)
 
+    # COS 成功多为 204
     if resp.status_code >= 400:
         raise HTTPException(
             status_code=400,
-            detail=f"上传到对象存储失败: HTTP {resp.status_code} {resp.text[:200]}",
+            detail=f"上传到对象存储失败: HTTP {resp.status_code} {(resp.text or '')[:200]}",
         )
 
     file_id = meta.get("file_id") or ""
-    url = file_id_to_url(file_id, path)
+    url = file_id_to_url(file_id, path) or public_url_for_path(path)
     if not url:
-        url = public_url_for_path(path)
-    return {"url": url, "fileId": file_id, "path": path, "storage": "cloud"}
+        raise HTTPException(status_code=500, detail="上传成功但未能生成访问地址，请检查 COS_CDN_DOMAIN")
+    return {"url": url, "fileId": file_id, "path": path}
 
 
-def upload_bytes_local(content: bytes, filename: str, folder: str = "uploads", base_url: str = "") -> dict:
-    """本地落盘到 static/uploads，返回可访问路径。"""
-    if not content:
-        raise HTTPException(status_code=400, detail="空文件")
-    if len(content) > 8 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="文件不能超过 8MB")
-
-    folder = (folder or "uploads").strip("/").replace("..", "")
-    day = datetime.utcnow().strftime("%Y%m%d")
-    rel = f"{folder}/{day}/{uuid.uuid4().hex}{_safe_ext(filename)}"
-    dest = UPLOAD_ROOT / rel
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_bytes(content)
-
-    settings = get_settings()
-    public = (getattr(settings, "public_base_url", "") or base_url or "").rstrip("/")
-    url = f"{public}/uploads/{rel}" if public else f"/uploads/{rel}"
-    return {"url": url, "fileId": "", "path": rel, "storage": "local"}
-
-
-async def upload_bytes(content: bytes, filename: str, folder: str = "uploads", base_url: str = "") -> dict:
-    """优先云存储，失败或未配置时回退本地。"""
-    if storage_configured():
-        try:
-            return await upload_bytes_cloud(content, filename, folder=folder)
-        except HTTPException as exc:
-            logger.warning("cloud upload failed, fallback local: %s", exc.detail)
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("cloud upload error, fallback local: %s", exc)
-    return upload_bytes_local(content, filename, folder=folder, base_url=base_url)
-
-
-async def upload_file(file: UploadFile, folder: str = "uploads", base_url: str = "") -> dict:
+async def upload_file(file: UploadFile, folder: str = "uploads") -> dict:
     content = await file.read()
-    return await upload_bytes(content, file.filename or "file.jpg", folder=folder, base_url=base_url)
+    return await upload_bytes(content, file.filename or "file.jpg", folder=folder)
 
 
 async def resolve_file_urls(file_ids: list[str], max_age: int = 86400) -> dict[str, str]:
-    """批量把 cloud:// fileId 换成临时/可用下载链接。"""
     ids = [f for f in file_ids if f and str(f).startswith("cloud://")]
     if not ids:
         return {}
@@ -218,7 +205,11 @@ async def resolve_file_urls(file_ids: list[str], max_age: int = 86400) -> dict[s
         return {fid: file_id_to_url(fid) for fid in ids}
 
     settings = get_settings()
-    token, token_key = await _wx_api_token()
+    candidates = await _token_candidates()
+    if not candidates:
+        return {fid: file_id_to_url(fid) for fid in ids}
+
+    token, token_key = candidates[0]
     url = f"https://api.weixin.qq.com/tcb/batchdownloadfile?{token_key}={token}"
     payload = {
         "env": settings.wx_cloud_env,
