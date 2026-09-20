@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from typing import Optional
+import calendar
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request
 from fastapi.responses import Response
@@ -20,6 +21,7 @@ from ..commerce import (
     award_order_points,
     bump_sold_on_paid,
     display_sold_text,
+    get_checkin_config,
     nye_recent_buy,
     sync_user_vip,
     table_count,
@@ -1400,7 +1402,8 @@ def checkin(
     oid = _require_openid(x_openid, x_wx_openid, openid)
     user = _ensure_user(db, oid)
     today = today_cn()
-    points = 2
+    cfg = get_checkin_config(db)
+    points = int(cfg["makeupPoints"] if makeup else cfg["dailyPoints"])
 
     if makeup:
         # 每日仅一次补签：填补近 7 天内最近一个未签日期
@@ -1436,7 +1439,8 @@ def checkin(
                 ok=False, message="暂无可补签日期", data={"points": 0, "balance": user.points}
             )
         db.add(CheckinRecord(user_id=user.id, date=target, points=points, is_makeup=True))
-        add_points(db, user, "补签", points)
+        if points > 0:
+            add_points(db, user, "补签", points)
         y, m = int(today[:4]), int(today[5:7])
         signed = (
             db.query(CheckinRecord)
@@ -1456,7 +1460,8 @@ def checkin(
     if exists:
         return OkResponse(ok=False, message="今日已签到", data={"points": 0, "balance": user.points})
     db.add(CheckinRecord(user_id=user.id, date=today, points=points, is_makeup=False))
-    add_points(db, user, "每日签到", points)
+    if points > 0:
+        add_points(db, user, "每日签到", points)
     y, m = int(today[:4]), int(today[5:7])
     signed = (
         db.query(CheckinRecord)
@@ -1485,10 +1490,26 @@ def checkin_month(
         .filter(CheckinRecord.user_id == user.id, CheckinRecord.date.like(f"{prefix}%"))
         .all()
     )
+    cfg = get_checkin_config(db)
+    full_days = calendar.monthrange(year, month)[1]
+    milestones = [
+        {"label": m["label"], "points": m["points"], "days": m["days"]} for m in cfg["milestones"]
+    ]
+    if cfg["fullMonthBonus"] > 0:
+        milestones.append(
+            {"label": "整月满签", "points": cfg["fullMonthBonus"], "days": full_days}
+        )
     return {
         "dates": [r.date for r in rows],
         "signedDays": len(rows),
         "monthPoints": sum(r.points for r in rows),
+        "config": {
+            "dailyPoints": cfg["dailyPoints"],
+            "makeupPoints": cfg["makeupPoints"],
+            "fullMonthBonus": cfg["fullMonthBonus"],
+            "milestones": milestones,
+            "rules": cfg["rules"],
+        },
     }
 
 

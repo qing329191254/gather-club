@@ -4,7 +4,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
-from ..cms_data import AGREEMENTS, HOBBY_OPTIONS, MEMBER_CONFIG, PRIVACY_COLLECT, PRIVACY_SHARE
+from ..cms_data import AGREEMENTS, CHECKIN_CONFIG, HOBBY_OPTIONS, MEMBER_CONFIG, PRIVACY_COLLECT, PRIVACY_SHARE
 from ..commerce import bump_sold_on_paid, sync_user_vip, table_count, add_points, award_order_points
 from ..database import get_db
 from ..deps import create_access_token, get_current_admin, verify_password
@@ -1024,6 +1024,7 @@ CMS_DEFAULTS: dict[str, Any] = {
     "member": MEMBER_CONFIG,
     "agreements": AGREEMENTS,
     "hobby_options": HOBBY_OPTIONS,
+    "checkin": CHECKIN_CONFIG,
 }
 
 
@@ -1039,6 +1040,9 @@ def _cms_value_empty(key: str, value: Any) -> bool:
     if key == "hobby_options":
         items = value.get("items") or []
         return not any(str(i.get("name") or "").strip() for i in items if isinstance(i, dict))
+    if key == "checkin":
+        # 允许 milestones 为空（只保留每日积分），但 dailyPoints 必须存在
+        return value.get("dailyPoints") is None and not (value.get("milestones") or [])
     return False
 
 

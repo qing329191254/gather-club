@@ -598,6 +598,19 @@ HOBBY_OPTIONS = {
     ]
 }
 
+# 签到规则：每日积分 + 当月累计天数里程碑（与小程序签到页一致）
+CHECKIN_CONFIG = {
+    "dailyPoints": 2,
+    "makeupPoints": 2,
+    "fullMonthBonus": 30,
+    "milestones": [
+        {"days": 5, "points": 2, "label": "签到5天"},
+        {"days": 15, "points": 15, "label": "签到15天"},
+        {"days": 25, "points": 25, "label": "签到25天"},
+    ],
+    "rules": "每日签到可领取积分，当月累计签到可解锁额外奖励。漏签可用补签机会补回，每日仅一次。",
+}
+
 
 def default_nye_packages(price: float, cover: str) -> list[dict]:
     p = price or 2388

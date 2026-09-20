@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from .cms_data import (
     AGREEMENTS,
+    CHECKIN_CONFIG,
     HOBBY_OPTIONS,
     MEMBER_CONFIG,
     PRIVACY_COLLECT,
@@ -420,6 +421,7 @@ def seed_all(db: Session) -> None:
         ("member", MEMBER_CONFIG),
         ("agreements", AGREEMENTS),
         ("hobby_options", HOBBY_OPTIONS),
+        ("checkin", CHECKIN_CONFIG),
     ):
         cur = get_config(db, key)
         if not cur:
@@ -437,6 +439,9 @@ def seed_all(db: Session) -> None:
         elif key == "hobby_options":
             items = (cur.get("items") or []) if isinstance(cur, dict) else []
             if not any(isinstance(i, dict) and str(i.get("name") or "").strip() for i in items):
+                set_config(db, key, default)
+        elif key == "checkin":
+            if not isinstance(cur, dict) or cur.get("dailyPoints") is None:
                 set_config(db, key, default)
 
     refresh_demo_covers(db)

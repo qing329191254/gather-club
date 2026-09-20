@@ -140,6 +140,8 @@
 					{ label: '签到25天', points: 25 },
 					{ label: '整月满签', points: 30 }
 				],
+				dailyPoints: 2,
+				rulesText: '每日签到可领取积分，当月累计签到可解锁额外奖励。漏签可用补签机会补回，每日仅一次。',
 				dayNum: '',
 				dateLabel: '',
 				monthTitle: '',
@@ -169,6 +171,17 @@
 			async ensureLogin() {
 				if (!isLoggedIn()) await silentLogin()
 			},
+			applyConfig(cfg) {
+				if (!cfg || typeof cfg !== 'object') return
+				if (cfg.dailyPoints != null) this.dailyPoints = Number(cfg.dailyPoints) || 0
+				if (cfg.rules) this.rulesText = cfg.rules
+				if (Array.isArray(cfg.milestones) && cfg.milestones.length) {
+					this.milestones = cfg.milestones.map((m) => ({
+						label: m.label || ('签到' + (m.days || '') + '天'),
+						points: Number(m.points) || 0
+					}))
+				}
+			},
 			async loadMonth() {
 				await this.ensureLogin()
 				const now = new Date()
@@ -178,6 +191,7 @@
 					this.signedDays = res.signedDays || this.signedDates.length
 					this.monthPoints = res.monthPoints || 0
 					this.signedToday = this.signedDates.indexOf(todayKey()) >= 0
+					this.applyConfig(res.config)
 					this.buildCalendar(now)
 				} catch (e) {
 					this.buildCalendar(now)
@@ -232,7 +246,7 @@
 			onRules() {
 				uni.showModal({
 					title: '签到规则',
-					content: '每日签到可领取积分，连续签到可解锁额外奖励。漏签可用补签机会补回，每日仅一次。',
+					content: this.rulesText || '每日签到可领取积分，当月累计签到可解锁额外奖励。漏签可用补签机会补回，每日仅一次。',
 					showCancel: false
 				})
 			},
@@ -264,7 +278,10 @@
 						user.points = data.balance
 						saveLogin(user, getOpenid())
 					}
-					uni.showToast({ title: '签到成功 +' + (data.points || 2), icon: 'success' })
+					uni.showToast({
+						title: '签到成功 +' + (data.points != null ? data.points : this.dailyPoints),
+						icon: 'success'
+					})
 					this.loadMonth()
 					await refreshProfile()
 				} catch (e) {

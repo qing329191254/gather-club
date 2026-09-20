@@ -9,17 +9,52 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from .models import AppUser, GatherProduct, NyeStore, Order, PointLedger
-from .utils import dumps, loads
+from .utils import dumps, get_config, loads
 
 TABLE_ORDER_TYPES = ("room", "nye", "recommend", "gather")
 TABLE_COUNTED_STATUSES = ("paid", "completed")
 
-# 签到里程碑奖励（与小程序签到页一致）
-CHECKIN_MILESTONES = (
-    (5, 2, "签到5天奖励"),
-    (15, 15, "签到15天奖励"),
-    (25, 25, "签到25天奖励"),
-)
+
+def get_checkin_config(db: Session) -> dict:
+    """读取签到配置，缺省字段用内置默认补齐。"""
+    from .cms_data import CHECKIN_CONFIG
+
+    raw = get_config(db, "checkin") or {}
+    if not isinstance(raw, dict):
+        raw = {}
+    daily = int(raw.get("dailyPoints") if raw.get("dailyPoints") is not None else CHECKIN_CONFIG["dailyPoints"])
+    makeup = int(raw.get("makeupPoints") if raw.get("makeupPoints") is not None else daily)
+    full_bonus = int(
+        raw.get("fullMonthBonus")
+        if raw.get("fullMonthBonus") is not None
+        else CHECKIN_CONFIG["fullMonthBonus"]
+    )
+    rules = str(raw.get("rules") or CHECKIN_CONFIG["rules"] or "").strip()
+    items = raw.get("milestones")
+    if not isinstance(items, list) or not items:
+        items = CHECKIN_CONFIG["milestones"]
+    milestones = []
+    for i, item in enumerate(items):
+        if not isinstance(item, dict):
+            continue
+        try:
+            days = int(item.get("days") or 0)
+            pts = int(item.get("points") or 0)
+        except (TypeError, ValueError):
+            continue
+        if days <= 0 or pts < 0:
+            continue
+        label = str(item.get("label") or f"签到{days}天").strip() or f"签到{days}天"
+        milestones.append({"days": days, "points": pts, "label": label})
+    milestones.sort(key=lambda x: x["days"])
+    return {
+        "dailyPoints": max(0, daily),
+        "makeupPoints": max(0, makeup),
+        "fullMonthBonus": max(0, full_bonus),
+        "milestones": milestones,
+        "rules": rules
+        or "每日签到可领取积分，当月累计签到可解锁额外奖励。漏签可用补签机会补回，每日仅一次。",
+    }
 
 
 def add_points(db: Session, user: AppUser, title: str, value: int) -> int:
@@ -77,13 +112,14 @@ def award_checkin_milestones(db: Session, user: AppUser, year: int, month: int, 
     awarded = []
     if not user:
         return awarded
+    cfg = get_checkin_config(db)
     prefix = f"{year}-{month:02d}"
     full_days = calendar.monthrange(year, month)[1]
-    milestones = list(CHECKIN_MILESTONES)
-    if signed_days >= full_days:
-        milestones.append((full_days, 30, "整月满签奖励"))
+    milestones = [(m["days"], m["points"], f"{m['label']}奖励") for m in cfg["milestones"]]
+    if cfg["fullMonthBonus"] > 0 and signed_days >= full_days:
+        milestones.append((full_days, cfg["fullMonthBonus"], "整月满签奖励"))
     for need, pts, title in milestones:
-        if signed_days < need:
+        if signed_days < need or pts <= 0:
             continue
         month_title = f"{title}({prefix})"
         exists = (
