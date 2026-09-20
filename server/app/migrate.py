@@ -111,4 +111,45 @@ def ensure_schema() -> None:
                         """
                     )
                 )
+            # 统一已支付文案为「待核销」
+            conn.execute(
+                text(
+                    """
+                    UPDATE orders SET status_text = '待核销'
+                    WHERE status = 'paid' AND (status_text IS NULL OR status_text = '' OR status_text = '已支付')
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    UPDATE orders SET status_text = '待支付'
+                    WHERE status = 'pending' AND (status_text IS NULL OR status_text = '')
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    UPDATE orders SET status_text = '已取消'
+                    WHERE status = 'cancelled' AND (status_text IS NULL OR status_text = '')
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    UPDATE orders SET status_text = '已完成'
+                    WHERE status = 'completed' AND (status_text IS NULL OR status_text = '')
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    UPDATE orders SET status_text = '已退款'
+                    WHERE status = 'refunded' AND (status_text IS NULL OR status_text = '')
+                    """
+                )
+            )
         # recommend_items / addresses created by create_all

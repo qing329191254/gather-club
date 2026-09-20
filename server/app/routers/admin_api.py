@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from sqlalchemy.orm import Session
 
 from ..cms_data import AGREEMENTS, MEMBER_CONFIG, PRIVACY_COLLECT, PRIVACY_SHARE
-from ..commerce import bump_sold_on_paid, sync_user_vip, table_count, add_points
+from ..commerce import bump_sold_on_paid, sync_user_vip, table_count, add_points, award_order_points
 from ..database import get_db
 from ..deps import create_access_token, get_current_admin, verify_password
 from ..models import (
@@ -654,11 +654,12 @@ def update_order_status(
             slot.booked -= 1
     row.status = next_status
     row.status_text = payload.status_text or STATUS_TEXT.get(next_status, next_status)
-    # 后台把待支付标成已支付时，同样累计销量 / 会员桌数
+    # 后台把待支付标成待核销/已完成时，同样累计销量 / 会员桌数 / 消费积分
     if prev not in ("paid", "completed") and next_status in ("paid", "completed"):
         user = db.query(AppUser).filter(AppUser.id == row.user_id).first() if row.user_id else None
         bump_sold_on_paid(db, row, user)
-    elif row.user_id and next_status in ("paid", "completed", "cancelled"):
+        award_order_points(db, row, user)
+    elif row.user_id and next_status in ("paid", "completed", "cancelled", "refunded"):
         user = db.query(AppUser).filter(AppUser.id == row.user_id).first()
         if user:
             sync_user_vip(db, user)

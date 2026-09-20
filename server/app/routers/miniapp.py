@@ -203,7 +203,7 @@ def _order_out(row: Order) -> dict:
 def _mark_order_paid(db: Session, order: Order, extra_patch: Optional[dict] = None) -> Order:
     already_paid = order.status in ("paid", "completed")
     order.status = "paid"
-    order.status_text = "待核销"
+    order.status_text = STATUS_TEXT.get("paid", "待核销")
     extra = loads(order.extra or "{}", {})
     if extra_patch:
         extra.update(extra_patch)
@@ -747,13 +747,22 @@ def list_orders(
     x_openid: str = Header(default="", alias="X-Openid"),
     x_wx_openid: str = Header(default="", alias="X-WX-OPENID"),
     openid: str = Query(default=""),
+    status: str = Query(default=""),
     page: int = Query(1),
     page_size: int = Query(20),
     db: Session = Depends(get_db),
 ):
     page, page_size, offset = normalize_page(page, page_size)
     oid = _require_openid(x_openid, x_wx_openid, openid)
-    q = db.query(Order).filter(Order.openid == oid).order_by(Order.created_at.desc())
+    q = db.query(Order).filter(Order.openid == oid)
+    st = (status or "").strip()
+    if st:
+        if st == "closed":
+            # 小程序「已关闭」：已取消 + 已退款
+            q = q.filter(Order.status.in_(("cancelled", "refunded")))
+        else:
+            q = q.filter(Order.status == st)
+    q = q.order_by(Order.created_at.desc())
     total = q.count()
     rows = q.offset(offset).limit(page_size).all()
     return page_payload([_order_out(r) for r in rows], total, page, page_size)
@@ -962,7 +971,7 @@ def mall_redeem(
         price=0,
         amount=0,
         status="paid",
-        status_text="待核销",
+        status_text=STATUS_TEXT["paid"],
     )
     db.add(order)
     db.commit()

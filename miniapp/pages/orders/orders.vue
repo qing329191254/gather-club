@@ -1,5 +1,17 @@
 <template>
 	<view class="page">
+		<view class="tabs">
+			<view
+				v-for="tab in tabs"
+				:key="tab.key"
+				class="tab"
+				:class="{ on: currentTab === tab.key }"
+				@tap="switchTab(tab.key)"
+			>
+				<text>{{ tab.name }}</text>
+			</view>
+		</view>
+
 		<view
 			v-for="order in orders"
 			:key="order.id"
@@ -11,7 +23,7 @@
 					<view class="store-bar" />
 					<text class="store-name">{{ order.storeName }}</text>
 				</view>
-				<text class="order-status">{{ order.statusText }}</text>
+				<text class="order-status" :class="'st-' + order.status">{{ order.statusText }}</text>
 			</view>
 
 			<view class="order-body">
@@ -26,22 +38,18 @@
 					</view>
 					<view class="info-bottom">
 						<view class="spacer" />
-						<text class="price">¥{{ order.price }}</text>
+						<text class="price">¥{{ order.amount != null ? order.amount : order.price }}</text>
 					</view>
 				</view>
 			</view>
 
-			<view
-				v-if="order.status === 'pending' || (order.status === 'paid' && order.roomDate)"
-				class="order-actions"
-				@tap.stop
-			>
+			<view v-if="order.status === 'pending'" class="order-actions" @tap.stop>
 				<view class="btn ghost" @tap="onCancel(order)">取消订单</view>
-				<view v-if="order.status === 'pending'" class="btn solid" @tap="onPay(order)">立即支付</view>
+				<view class="btn solid" @tap="onPay(order)">立即支付</view>
 			</view>
 		</view>
 
-		<view v-if="!orders.length" class="empty">暂无订单</view>
+		<view v-if="!orders.length && !loading" class="empty">暂无订单</view>
 
 		<view class="end-line">
 			<view class="end-rule" />
@@ -59,6 +67,14 @@
 	export default {
 		data() {
 			return {
+				tabs: [
+					{ key: '', name: '全部' },
+					{ key: 'pending', name: '待支付' },
+					{ key: 'paid', name: '待核销' },
+					{ key: 'completed', name: '已完成' },
+					{ key: 'closed', name: '已关闭' }
+				],
+				currentTab: '',
 				orders: [],
 				page: 1,
 				pageSize: 20,
@@ -73,6 +89,11 @@
 			this.loadMoreOrders()
 		},
 		methods: {
+			switchTab(key) {
+				if (this.currentTab === key) return
+				this.currentTab = key
+				this.reloadOrders()
+			},
 			mapOrder(row) {
 				return {
 					id: row.id,
@@ -104,7 +125,9 @@
 					if (!isLoggedIn()) {
 						await silentLogin()
 					}
-					const res = await api.orders({ page: this.page, page_size: this.pageSize })
+					const params = { page: this.page, page_size: this.pageSize }
+					if (this.currentTab) params.status = this.currentTab
+					const res = await api.orders(params)
 					const rows = (res.list || []).map((row) => this.mapOrder(row))
 					this.orders = reset || this.page === 1 ? rows : this.orders.concat(rows)
 					this.hasMore = !!res.has_more
@@ -192,8 +215,47 @@
 	.page {
 		min-height: 100vh;
 		box-sizing: border-box;
-		padding: 24rpx 24rpx calc(40rpx + env(safe-area-inset-bottom));
+		padding: 0 24rpx calc(40rpx + env(safe-area-inset-bottom));
 		background: #f5f5f5;
+	}
+
+	.tabs {
+		display: flex;
+		align-items: center;
+		margin: 0 -24rpx 8rpx;
+		padding: 0 8rpx;
+		background: #fff;
+		position: sticky;
+		top: 0;
+		z-index: 5;
+	}
+
+	.tab {
+		flex: 1;
+		height: 84rpx;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 28rpx;
+		color: #666;
+		position: relative;
+	}
+
+	.tab.on {
+		color: #e54148;
+		font-weight: 600;
+	}
+
+	.tab.on::after {
+		content: '';
+		position: absolute;
+		left: 50%;
+		bottom: 10rpx;
+		width: 40rpx;
+		height: 6rpx;
+		margin-left: -20rpx;
+		border-radius: 6rpx;
+		background: #e54148;
 	}
 
 	.empty {
@@ -207,7 +269,8 @@
 		background: #ffffff;
 		border-radius: 16rpx;
 		padding: 28rpx 24rpx 28rpx;
-		margin-bottom: 24rpx;
+		margin-top: 24rpx;
+		margin-bottom: 0;
 	}
 
 	.order-head {
@@ -247,6 +310,19 @@
 		font-size: 26rpx;
 		color: #e54148;
 		flex-shrink: 0;
+	}
+
+	.order-status.st-completed {
+		color: #16a34a;
+	}
+
+	.order-status.st-cancelled,
+	.order-status.st-refunded {
+		color: #999999;
+	}
+
+	.order-status.st-paid {
+		color: #d97706;
 	}
 
 	.order-body {

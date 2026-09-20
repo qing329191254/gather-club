@@ -59,7 +59,7 @@ def set_config(db: Session, key: str, value: Any) -> SiteConfig:
 
 STATUS_TEXT = {
     "pending": "待支付",
-    "paid": "已支付",
+    "paid": "待核销",
     "cancelled": "已取消",
     "completed": "已完成",
     "refunded": "已退款",

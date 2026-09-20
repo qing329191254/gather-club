@@ -3,9 +3,10 @@
     <div class="toolbar">
       <el-select v-model="status" clearable placeholder="状态" style="width: 140px" @change="onSearch">
         <el-option label="待支付" value="pending" />
-        <el-option label="已支付" value="paid" />
-        <el-option label="已取消" value="cancelled" />
+        <el-option label="待核销" value="paid" />
         <el-option label="已完成" value="completed" />
+        <el-option label="已取消" value="cancelled" />
+        <el-option label="已退款" value="refunded" />
       </el-select>
       <el-input v-model="keyword" placeholder="订单号/手机号/门店" style="width: 240px" clearable @keyup.enter="onSearch" />
       <el-button type="primary" @click="onSearch">查询</el-button>
@@ -27,9 +28,10 @@
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item command="pending">待支付</el-dropdown-item>
-                <el-dropdown-item command="paid">已支付</el-dropdown-item>
+                <el-dropdown-item command="paid">待核销</el-dropdown-item>
                 <el-dropdown-item command="completed">已完成</el-dropdown-item>
                 <el-dropdown-item command="cancelled">已取消</el-dropdown-item>
+                <el-dropdown-item command="refunded">已退款</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
