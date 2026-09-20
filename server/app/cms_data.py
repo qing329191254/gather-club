@@ -569,21 +569,21 @@ MEMBER_CONFIG = {
 }
 
 RECOMMEND_BANNERS = [
-    "/static/recommend/hero.jpg",
-    "/static/recommend/hero2.jpg",
-    "/static/recommend/hero3.jpg",
+    "https://picsum.photos/seed/gather-rec-b1/1200/500",
+    "https://picsum.photos/seed/gather-rec-b2/1200/500",
+    "https://picsum.photos/seed/gather-rec-b3/1200/500",
 ]
 
 RECOMMEND_ITEMS = [
-    {"name": "太仓锦江国际酒店", "cover": "/static/recommend/taicang.png", "price": 249, "sort": 1},
-    {"name": "苏州知音温德姆至尊酒店", "cover": "/static/recommend/wyndham.png", "price": 324, "sort": 2},
-    {"name": "3天2晚(含2早1正)|苏州同里湖大饭店", "cover": "/static/recommend/tongli.png", "price": 599, "sort": 3},
-    {"name": "苏州金陵南林饭店", "cover": "/static/recommend/nanlin.png", "price": 229, "sort": 4},
-    {"name": "江阴城发金茂嘉悦酒店", "cover": "/static/recommend/jiangyin.png", "price": 399, "sort": 5},
-    {"name": "3天2晚(含2早2正)|常州远洲酒店", "cover": "/static/recommend/changzhou.png", "price": 459, "sort": 6},
-    {"name": "无锡希尔顿逸林酒店", "cover": "/static/recommend/item3.png", "price": 369, "sort": 7},
-    {"name": "南通新城吾悦精选酒店", "cover": "/static/recommend/item4.png", "price": 289, "sort": 8},
-    {"name": "常熟虞城希尔顿欢朋酒店", "cover": "/static/recommend/item5.png", "price": 319, "sort": 9},
+    {"name": "太仓锦江国际酒店", "cover": "https://picsum.photos/seed/gather-rec-1/800/600", "price": 249, "sort": 1},
+    {"name": "苏州知音温德姆至尊酒店", "cover": "https://picsum.photos/seed/gather-rec-2/800/600", "price": 324, "sort": 2},
+    {"name": "3天2晚(含2早1正)|苏州同里湖大饭店", "cover": "https://picsum.photos/seed/gather-rec-3/800/600", "price": 599, "sort": 3},
+    {"name": "苏州金陵南林饭店", "cover": "https://picsum.photos/seed/gather-rec-4/800/600", "price": 229, "sort": 4},
+    {"name": "江阴城发金茂嘉悦酒店", "cover": "https://picsum.photos/seed/gather-rec-5/800/600", "price": 399, "sort": 5},
+    {"name": "3天2晚(含2早2正)|常州远洲酒店", "cover": "https://picsum.photos/seed/gather-rec-6/800/600", "price": 459, "sort": 6},
+    {"name": "无锡希尔顿逸林酒店", "cover": "https://picsum.photos/seed/gather-rec-7/800/600", "price": 369, "sort": 7},
+    {"name": "南通新城吾悦精选酒店", "cover": "https://picsum.photos/seed/gather-rec-8/800/600", "price": 289, "sort": 8},
+    {"name": "常熟虞城希尔顿欢朋酒店", "cover": "https://picsum.photos/seed/gather-rec-9/800/600", "price": 319, "sort": 9},
 ]
 
 
@@ -593,10 +593,10 @@ def default_nye_packages(price: float, cover: str) -> list[dict]:
     return [
         {"id": 1, "name": "喜气羊羊宴 (10-12人) 午市大厅", "meal": "喜气羊羊宴", "time": "10:00-14:00", "price": p, "people": 12, "cover": c, "disabled": False},
         {"id": 2, "name": "喜气羊羊宴 (10-12人) 晚市大厅", "meal": "喜气羊羊宴", "time": "17:00-21:00", "price": p + 200, "people": 12, "cover": c, "disabled": False},
-        {"id": 3, "name": "喜气羊羊宴 (8-10人) 午市包厢", "meal": "喜气羊羊宴", "time": "10:00-14:00", "price": p + 300, "people": 10, "cover": "/static/nye/shibo.jpg", "disabled": False},
-        {"id": 4, "name": "团圆家宴 (8-10人) 晚市大厅", "meal": "团圆家宴", "time": "17:00-21:00", "price": p + 100, "people": 10, "cover": "/static/nye/yaxin.jpg", "disabled": False},
-        {"id": 5, "name": "团圆家宴 (6-8人) 午市包厢", "meal": "团圆家宴", "time": "10:00-14:00", "price": p - 400, "people": 8, "cover": "/static/nye/yaxin.jpg", "disabled": False},
-        {"id": 6, "name": "名羊四海宴 (12-14人) 午市大厅", "meal": "名羊四海宴", "time": "10:00-14:00", "price": p + 1100, "people": 14, "cover": "/static/nye/xinzhuang.jpg", "disabled": False},
-        {"id": 7, "name": "名羊四海宴 (16人) 晚市大厅", "meal": "名羊四海宴", "time": "17:00-21:00", "price": p + 2100, "people": 16, "cover": "/static/nye/xinzhuang.jpg", "disabled": True},
-        {"id": 8, "name": "名羊四海宴 (16人) 晚市包厢", "meal": "名羊四海宴", "time": "17:00-21:00", "price": p + 2100, "people": 16, "cover": "/static/nye/xinzhuang.jpg", "disabled": True},
+        {"id": 3, "name": "喜气羊羊宴 (8-10人) 午市包厢", "meal": "喜气羊羊宴", "time": "10:00-14:00", "price": p + 300, "people": 10, "cover": c, "disabled": False},
+        {"id": 4, "name": "团圆家宴 (8-10人) 晚市大厅", "meal": "团圆家宴", "time": "17:00-21:00", "price": p + 100, "people": 10, "cover": c, "disabled": False},
+        {"id": 5, "name": "团圆家宴 (6-8人) 午市包厢", "meal": "团圆家宴", "time": "10:00-14:00", "price": p - 400, "people": 8, "cover": c, "disabled": False},
+        {"id": 6, "name": "名羊四海宴 (12-14人) 午市大厅", "meal": "名羊四海宴", "time": "10:00-14:00", "price": p + 1100, "people": 14, "cover": c, "disabled": False},
+        {"id": 7, "name": "名羊四海宴 (16人) 晚市大厅", "meal": "名羊四海宴", "time": "17:00-21:00", "price": p + 2100, "people": 16, "cover": c, "disabled": True},
+        {"id": 8, "name": "名羊四海宴 (16人) 晚市包厢", "meal": "名羊四海宴", "time": "17:00-21:00", "price": p + 2100, "people": 16, "cover": c, "disabled": True},
     ]

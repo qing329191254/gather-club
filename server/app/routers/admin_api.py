@@ -59,6 +59,20 @@ async def storage_status(_: AdminUser = Depends(get_current_admin)):
     return await diagnose_storage()
 
 
+@router.post("/assets/bootstrap")
+async def assets_bootstrap(
+    force: bool = Query(False),
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    """把站点/会员/视频号本地品牌图上传到云存储并回写配置。"""
+    from ..asset_bootstrap import bootstrap_brand_assets
+    from ..seed import refresh_demo_covers
+
+    refresh_demo_covers(db)
+    return await bootstrap_brand_assets(db, force=force)
+
+
 @router.post("/upload")
 async def admin_upload(
     file: UploadFile = File(...),

@@ -32,20 +32,31 @@ app.add_middleware(
 app.include_router(miniapp.router)
 app.include_router(admin_api.router)
 
-# 必须在 catch-all 的 /admin 路由之前挂载，否则静态文件会被 SPA 吞掉
-if MINIAPP_STATIC.exists():
-    app.mount("/static", StaticFiles(directory=str(MINIAPP_STATIC)), name="miniapp-static")
-elif SERVER_STATIC.exists():
+# 云托管只部署 server/，品牌/会员/视频号图已拷入 static/；优先挂载这里
+if SERVER_STATIC.exists():
     app.mount("/static", StaticFiles(directory=str(SERVER_STATIC)), name="server-static")
+elif MINIAPP_STATIC.exists():
+    app.mount("/static", StaticFiles(directory=str(MINIAPP_STATIC)), name="miniapp-static")
 
 
 @app.on_event("startup")
-def on_startup() -> None:
+async def on_startup() -> None:
     Base.metadata.create_all(bind=engine)
     ensure_schema()
     db = SessionLocal()
     try:
         seed_all(db)
+        try:
+            import logging
+
+            from .asset_bootstrap import bootstrap_brand_assets
+
+            result = await bootstrap_brand_assets(db, force=False)
+            logging.getLogger(__name__).info("brand asset bootstrap: %s", result)
+        except Exception:  # noqa: BLE001
+            import logging
+
+            logging.getLogger(__name__).exception("brand asset bootstrap skipped")
     finally:
         db.close()
 
