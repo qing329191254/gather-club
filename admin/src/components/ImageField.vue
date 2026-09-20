@@ -20,7 +20,6 @@
       <el-image :src="inner" class="preview" fit="cover" :preview-src-list="[inner]" />
       <el-button class="clear-btn" size="small" text type="danger" @click="clear">清除</el-button>
     </div>
-    <div v-else class="preview-empty">暂无图片，可粘贴链接或点击上传</div>
   </div>
 </template>
 
@@ -114,21 +113,5 @@ async function onUpload(option) {
   right: 4px;
   bottom: 4px;
   background: rgba(255, 255, 255, 0.92) !important;
-}
-.preview-empty {
-  margin-top: 10px;
-  width: 160px;
-  height: 100px;
-  border: 1px dashed #e5e7eb;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #94a3b8;
-  font-size: 12px;
-  text-align: center;
-  padding: 8px;
-  box-sizing: border-box;
-  background: #fafafa;
 }
 </style>
