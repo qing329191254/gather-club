@@ -64,7 +64,8 @@
 		isLoggedIn,
 		needPhoneLoginPrompt,
 		silentLogin,
-		refreshProfile
+		refreshProfile,
+		bindPhoneFromDetail
 	} from '../../common/auth.js'
 	import { resolveVip } from '../../common/vip-levels.js'
 
@@ -124,14 +125,21 @@
 			onPhoneCancel() {
 				this.phoneLoginVisible = false
 			},
-			onPhoneConfirm() {
-				silentLogin().then(() => {
-					this.phoneLoginVisible = false
-					this.refreshUser()
-					const app = getApp()
-					if (app.globalData) app.globalData.authVersion = Date.now()
-					uni.showToast({ title: '登录成功', icon: 'success' })
-				})
+			onPhoneConfirm(detail) {
+				uni.showLoading({ title: '登录中', mask: true })
+				bindPhoneFromDetail(detail)
+					.then(() => {
+						uni.hideLoading()
+						this.phoneLoginVisible = false
+						this.refreshUser()
+						const app = getApp()
+						if (app.globalData) app.globalData.authVersion = Date.now()
+						uni.showToast({ title: '登录成功', icon: 'success' })
+					})
+					.catch((e) => {
+						uni.hideLoading()
+						uni.showToast({ title: (e && e.message) || '登录失败', icon: 'none' })
+					})
 			},
 			ensureLogin() {
 				if (isLoggedIn()) return true

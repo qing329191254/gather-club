@@ -148,12 +148,16 @@
 				}
 			},
 			onPrivacyAgree() {
-				silentLogin().then(() => {
-					this.privacyVisible = false
-					const app = getApp()
-					if (app.globalData) app.globalData.authVersion = Date.now()
-					uni.showToast({ title: '登录成功', icon: 'success' })
-				})
+				silentLogin()
+					.then(() => {
+						this.privacyVisible = false
+						const app = getApp()
+						if (app.globalData) app.globalData.authVersion = Date.now()
+						uni.showToast({ title: '登录成功', icon: 'success' })
+					})
+					.catch((e) => {
+						uni.showToast({ title: (e && e.message) || '登录失败', icon: 'none' })
+					})
 			},
 			onPrivacyDisagree() {
 				setPrivacyStatus('declined')

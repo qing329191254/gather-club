@@ -7,6 +7,9 @@ export const api = {
 	wxLogin(payload) {
 		return request('/api/v1/auth/wx-login', { method: 'POST', data: payload || {} })
 	},
+	bindPhone(payload) {
+		return request('/api/v1/auth/bind-phone', { method: 'POST', data: payload || {} })
+	},
 	home() {
 		return request('/api/v1/home')
 	},

@@ -99,24 +99,16 @@ function mapServerUser(raw, openid) {
 
 /** 静默登录：wx.login 拿 code，换云托管用户 */
 export function silentLogin(extra) {
-	return new Promise((resolve) => {
+	return new Promise((resolve, reject) => {
 		initCloud()
-		const finishLocal = (patch) => {
-			const base = getUser()
-			const user = Object.assign({}, base, {
-				nickname: (patch && patch.nickname) || base.nickname || '微信用户',
-				avatar: (patch && patch.avatar) || base.avatar || '',
-				phone: (patch && patch.phone) || base.phone || '',
-				points: base.points || 0,
-				vip: base.vip || 'V0会员'
-			}, extra || {})
-			resolve(saveLogin(user, user.openid))
-		}
-
 		uni.login({
 			provider: 'weixin',
 			success: (loginRes) => {
 				const code = (loginRes && loginRes.code) || ''
+				if (!code) {
+					reject(new Error('未获取到登录 code'))
+					return
+				}
 				api
 					.wxLogin({
 						code,
@@ -129,9 +121,68 @@ export function silentLogin(extra) {
 						const user = Object.assign({}, mapServerUser(res.user, openid), extra || {})
 						resolve(saveLogin(user, openid))
 					})
-					.catch(() => finishLocal(extra || {}))
+					.catch((err) => {
+						const existing = getAuth()
+						if (existing && existing.loggedIn && existing.openid) {
+							resolve(existing)
+							return
+						}
+						reject(err)
+					})
 			},
-			fail: () => finishLocal(extra || {})
+			fail: (err) => {
+				const existing = getAuth()
+				if (existing && existing.loggedIn && existing.openid) {
+					resolve(existing)
+					return
+				}
+				reject(err || new Error('微信登录失败'))
+			}
+		})
+	})
+}
+
+/** 绑定手机号：wx.login + getPhoneNumber 授权数据换号 */
+export function bindPhoneFromDetail(detail) {
+	const d = detail || {}
+	const errMsg = String(d.errMsg || '')
+	if (errMsg && errMsg.indexOf(':ok') === -1 && errMsg.indexOf('ok') === -1) {
+		return Promise.reject(new Error(d.errMsg || '用户未授权手机号'))
+	}
+
+	const phoneCode = d.code || ''
+	const encryptedData = d.encryptedData || ''
+	const iv = d.iv || ''
+
+	// 开发者工具可能直接回传 phoneNumber（无 code）
+	if (!phoneCode && !(encryptedData && iv)) {
+		if (d.phoneNumber && /^1\d{10}$/.test(String(d.phoneNumber))) {
+			return silentLogin({ phone: String(d.phoneNumber) }).then(() => getAuth())
+		}
+		return Promise.reject(new Error('未获取到手机号授权数据'))
+	}
+
+	return new Promise((resolve, reject) => {
+		initCloud()
+		uni.login({
+			provider: 'weixin',
+			success: (loginRes) => {
+				const loginCode = (loginRes && loginRes.code) || ''
+				api
+					.bindPhone({
+						code: phoneCode,
+						encryptedData,
+						iv,
+						loginCode
+					})
+					.then((res) => {
+						const openid = res.openid || getOpenid()
+						const user = mapServerUser(res.user, openid)
+						resolve(saveLogin(user, openid))
+					})
+					.catch(reject)
+			},
+			fail: () => reject(new Error('微信登录失败'))
 		})
 	})
 }

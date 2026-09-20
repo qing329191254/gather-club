@@ -9,8 +9,13 @@
 			<text class="desc">为了给您提供更好的服务，请授权您的手机号</text>
 			<view class="actions">
 				<view class="btn ghost" @tap="onCancel">取消</view>
-				<!-- 真机可换 open-type="getPhoneNumber"；演示环境用确认完成登录 -->
-				<button class="btn solid phone-btn" @tap="onConfirm">确认</button>
+				<button
+					class="btn solid phone-btn"
+					open-type="getPhoneNumber"
+					@getphonenumber="onGetPhoneNumber"
+				>
+					确认
+				</button>
 			</view>
 		</view>
 	</view>
@@ -29,8 +34,8 @@
 			onCancel() {
 				this.$emit('cancel')
 			},
-			onConfirm() {
-				this.$emit('confirm')
+			onGetPhoneNumber(e) {
+				this.$emit('confirm', (e && e.detail) || {})
 			}
 		}
 	}
@@ -79,35 +84,30 @@
 	.actions {
 		width: 100%;
 		display: flex;
-		justify-content: space-between;
+		flex-direction: row;
 		gap: 20rpx;
 	}
 
 	.btn {
 		flex: 1;
-		height: 76rpx;
-		border-radius: 999rpx;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 28rpx;
-		font-weight: 600;
-		box-sizing: border-box;
-		margin: 0;
-		padding: 0;
-		line-height: 76rpx;
+		height: 80rpx;
+		line-height: 80rpx;
+		text-align: center;
+		border-radius: 12rpx;
+		font-size: 30rpx;
+		font-weight: 500;
 	}
 
-	.btn.ghost {
-		border: 2rpx solid #d8d8d8;
-		color: #888888;
-		background: #ffffff;
+	.ghost {
+		background: #f3f3f3;
+		color: #666;
 	}
 
-	.btn.solid,
 	.phone-btn {
 		background: #e23636;
-		color: #ffffff;
+		color: #fff;
+		padding: 0;
+		margin: 0;
 		border: none;
 	}
 

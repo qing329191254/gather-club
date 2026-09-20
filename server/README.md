@@ -38,9 +38,13 @@ npm run build
 DATABASE_URL=mysql+pymysql://root:密码@内网地址:3306/gather?charset=utf8mb4
 JWT_SECRET=请换成长随机串
 ADMIN_PASSWORD=请改掉默认密码
+WX_APPID=wxc85b8624dd75e61c
+WX_SECRET=你的小程序AppSecret
 ```
 
 4. 小程序调用：`wx.cloud.callContainer`，路径如 `/api/v1/home`
+
+未配置 `WX_APPID` / `WX_SECRET` 时，登录走本地演示 openid；配置后会调用微信 `code2session`，手机号走 `getPhoneNumber` 服务端换号。
 
 ## 目录说明
 

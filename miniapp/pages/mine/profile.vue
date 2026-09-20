@@ -105,7 +105,7 @@
 <script>
 	import DatePicker from '../../components/date-picker/date-picker.vue'
 	import TipDialog from '../../components/tip-dialog/tip-dialog.vue'
-	import { getUser, saveLogin, getOpenid, refreshProfile, isLoggedIn, silentLogin } from '../../common/auth.js'
+	import { getUser, saveLogin, getOpenid, refreshProfile, isLoggedIn, silentLogin, bindPhoneFromDetail } from '../../common/auth.js'
 	import { api } from '../../common/api.js'
 
 	const PROFILE_KEY = 'gather_profile'
@@ -237,18 +237,21 @@
 			},
 			onPhoneTipConfirm(detail) {
 				this.phoneTipVisible = false
-				const d = detail || {}
-				const errMsg = String(d.errMsg || '')
-				const ok = !errMsg || errMsg.indexOf(':ok') !== -1
-				if (!ok) {
-					return
-				}
-				if (d.phoneNumber && /^1\d{10}$/.test(String(d.phoneNumber))) {
-					this.form.phone = String(d.phoneNumber)
-				}
-				uni.setStorageSync(PHONE_EDITED_KEY, 1)
-				this.saveLocal()
-				uni.showToast({ title: '修改成功', icon: 'success' })
+				uni.showLoading({ title: '绑定中', mask: true })
+				bindPhoneFromDetail(detail)
+					.then((auth) => {
+						uni.hideLoading()
+						const user = (auth && auth.user) || getUser()
+						this.form.phone = user.phone || this.form.phone
+						uni.setStorageSync(PHONE_EDITED_KEY, 1)
+						this.phoneEditLabel = '已绑定'
+						this.saveLocal()
+						uni.showToast({ title: '修改成功', icon: 'success' })
+					})
+					.catch((e) => {
+						uni.hideLoading()
+						uni.showToast({ title: (e && e.message) || '绑定失败', icon: 'none' })
+					})
 			},
 			onHobby() {
 				uni.navigateTo({ url: '/pages/mine/hobbies' })

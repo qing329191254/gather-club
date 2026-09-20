@@ -12,9 +12,11 @@
 			uni.hideTabBar({ fail() {} })
 			initCloud()
 			if (isLoggedIn()) {
-				silentLogin().then(() => {
-					this.globalData.authVersion = Date.now()
-				})
+				silentLogin()
+					.then(() => {
+						this.globalData.authVersion = Date.now()
+					})
+					.catch(() => {})
 			}
 		},
 		onShow() {

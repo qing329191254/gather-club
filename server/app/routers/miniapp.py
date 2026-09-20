@@ -24,8 +24,9 @@ from ..models import (
     VideoLive,
     VideoReserve,
 )
-from ..schemas import OrderCreateIn, OkResponse, WxLoginIn
+from ..schemas import OrderCreateIn, OkResponse, WxLoginIn, WxPhoneIn
 from ..utils import STATUS_TEXT, get_config, loads
+from ..wx import code2session, phone_from_code, phone_from_encrypted, resolve_demo_openid, wx_configured
 
 router = APIRouter(prefix="/api/v1", tags=["miniapp"])
 
@@ -39,12 +40,32 @@ def _user_by_openid(db: Session, openid: str) -> Optional[AppUser]:
 def _ensure_user(db: Session, openid: str, nickname: str = "微信用户", avatar: str = "", phone: str = "") -> AppUser:
     user = _user_by_openid(db, openid)
     if user:
+        if getattr(user, "cancelled", False):
+            user.cancelled = False
+            user.nickname = nickname or "微信用户"
+            db.commit()
+            db.refresh(user)
         return user
     user = AppUser(openid=openid, nickname=nickname or "微信用户", avatar=avatar or "", phone=phone or "", points=12)
     db.add(user)
     db.commit()
     db.refresh(user)
     return user
+
+
+def _user_out(user: AppUser) -> dict:
+    return {
+        "id": user.id,
+        "nickname": user.nickname,
+        "avatar": user.avatar,
+        "phone": user.phone,
+        "birthday": getattr(user, "birthday", "") or "",
+        "hobby": getattr(user, "hobby", "") or "",
+        "phoneEdited": bool(getattr(user, "phone_edited", False)),
+        "points": user.points,
+        "vipLevel": user.vip_level,
+        "vip": f"{user.vip_level}会员",
+    }
 
 
 def _product_out(row: GatherProduct) -> dict:
@@ -140,35 +161,80 @@ def health():
 
 
 @router.post("/auth/wx-login")
-def wx_login(payload: WxLoginIn, db: Session = Depends(get_db)):
-    # 云托管正式环境可换成 code2session；本地/演示用 code 或固定 openid
-    openid = payload.code.strip() if payload.code else f"demo_{int(datetime.utcnow().timestamp())}"
-    if len(openid) < 8:
-        openid = f"demo_{openid or 'guest'}"
+async def wx_login(payload: WxLoginIn, db: Session = Depends(get_db)):
+    if wx_configured():
+        session = await code2session(payload.code)
+    else:
+        session = resolve_demo_openid(payload.code)
+
+    openid = session["openid"]
     user = _ensure_user(db, openid, payload.nickname, payload.avatar, payload.phone)
+    if session.get("session_key"):
+        user.session_key = session["session_key"]
+    if session.get("unionid"):
+        user.unionid = session["unionid"]
     if payload.nickname:
         user.nickname = payload.nickname
     if payload.avatar:
         user.avatar = payload.avatar
-    if payload.phone:
+    # 明文手机号仅演示环境可直接写入；正式环境走 /auth/bind-phone
+    if payload.phone and not wx_configured():
         user.phone = payload.phone
     db.commit()
     db.refresh(user)
-    return {
-        "openid": user.openid,
-        "user": {
-            "id": user.id,
-            "nickname": user.nickname,
-            "avatar": user.avatar,
-            "phone": user.phone,
-            "birthday": getattr(user, "birthday", "") or "",
-            "hobby": getattr(user, "hobby", "") or "",
-            "phoneEdited": bool(getattr(user, "phone_edited", False)),
-            "points": user.points,
-            "vipLevel": user.vip_level,
-            "vip": f"{user.vip_level}会员",
-        },
-    }
+    return {"openid": user.openid, "user": _user_out(user)}
+
+
+@router.post("/auth/bind-phone")
+async def bind_phone(
+    payload: WxPhoneIn,
+    x_openid: str = Header(default="", alias="X-Openid"),
+    openid: str = Query(default=""),
+    db: Session = Depends(get_db),
+):
+    oid = x_openid or openid
+    if payload.loginCode:
+        if wx_configured():
+            session = await code2session(payload.loginCode)
+        else:
+            session = resolve_demo_openid(payload.loginCode)
+        oid = session["openid"]
+        user = _ensure_user(db, oid)
+        if session.get("session_key"):
+            user.session_key = session["session_key"]
+        if session.get("unionid"):
+            user.unionid = session["unionid"]
+        db.commit()
+        db.refresh(user)
+    else:
+        if not oid:
+            raise HTTPException(status_code=400, detail="缺少 openid，请先登录")
+        user = _ensure_user(db, oid)
+
+    if getattr(user, "cancelled", False):
+        raise HTTPException(status_code=400, detail="账号已注销")
+    if user.phone_edited and user.phone:
+        return {"openid": user.openid, "user": _user_out(user), "message": "手机号已绑定"}
+
+    if payload.code:
+        if not wx_configured():
+            raise HTTPException(status_code=400, detail="未配置 WX_APPID / WX_SECRET，无法换取手机号")
+        phone = await phone_from_code(payload.code)
+    elif payload.encryptedData and payload.iv:
+        if not user.session_key:
+            raise HTTPException(status_code=400, detail="会话已过期，请重新登录后再授权手机号")
+        phone = phone_from_encrypted(user.session_key, payload.encryptedData, payload.iv)
+    else:
+        raise HTTPException(status_code=400, detail="缺少手机号授权数据")
+
+    if user.phone and user.phone != phone and user.phone_edited:
+        raise HTTPException(status_code=400, detail="手机号仅可修改一次")
+
+    user.phone = phone
+    user.phone_edited = True
+    db.commit()
+    db.refresh(user)
+    return {"openid": user.openid, "user": _user_out(user), "message": "绑定成功"}
 
 
 @router.get("/home")
@@ -580,11 +646,16 @@ def update_profile(
         user.hobby = str(payload["hobby"])
     if "phone" in payload and payload["phone"]:
         phone = str(payload["phone"]).strip()
-        if user.phone_edited and phone != user.phone:
-            raise HTTPException(status_code=400, detail="手机号仅可修改一次")
-        if phone != user.phone:
-            user.phone = phone
-            user.phone_edited = True
+        # 正式环境：仅允许回写已绑定的同一号码，改号必须走 /auth/bind-phone
+        if wx_configured():
+            if phone != (user.phone or ""):
+                raise HTTPException(status_code=400, detail="请通过微信授权绑定手机号")
+        else:
+            if user.phone_edited and phone != user.phone:
+                raise HTTPException(status_code=400, detail="手机号仅可修改一次")
+            if phone != user.phone:
+                user.phone = phone
+                user.phone_edited = True
     db.commit()
     db.refresh(user)
     return _profile_out(user)

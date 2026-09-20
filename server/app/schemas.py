@@ -217,6 +217,13 @@ class WxLoginIn(BaseModel):
     phone: str = ""
 
 
+class WxPhoneIn(BaseModel):
+    code: str = ""  # 新版 getPhoneNumber 返回的 code
+    encryptedData: str = ""
+    iv: str = ""
+    loginCode: str = ""  # 可选：顺带用 wx.login code 刷新 session
+
+
 class ConfigIn(BaseModel):
     value: Any
 

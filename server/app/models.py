@@ -134,6 +134,7 @@ class AppUser(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     openid: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     unionid: Mapped[str] = mapped_column(String(64), default="", index=True)
+    session_key: Mapped[str] = mapped_column(String(128), default="")
     nickname: Mapped[str] = mapped_column(String(64), default="微信用户")
     avatar: Mapped[str] = mapped_column(String(512), default="")
     phone: Mapped[str] = mapped_column(String(32), default="")
