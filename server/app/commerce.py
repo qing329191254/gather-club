@@ -298,9 +298,11 @@ def room_date_is_past(order: Order) -> bool:
     return bool(day) and day < today_cn()
 
 
-def mark_refund_pending(db: Session, order: Order, reason: str) -> None:
+def mark_refund_pending(db: Session, order: Order, reason: str, extra_patch: Optional[dict] = None) -> None:
     """钱已扣但订单不能成交，留给后台退款。不记销量、不发积分。"""
     extra = loads(order.extra or "{}", {}) or {}
+    if extra_patch:
+        extra.update(extra_patch)
     extra["refundReason"] = reason
     extra["paidAfterClose"] = True
     order.extra = dumps(extra)

@@ -237,14 +237,16 @@ def _order_out(row: Order) -> dict:
         "price": row.price,
         "amount": row.amount,
         "status": row.status,
-        "statusText": row.status_text,
+        "statusText": "待发货" if row.type == "mall" and row.status == "paid" else row.status_text,
         "contactName": row.contact_name,
         "contactPhone": row.contact_phone,
         "people": row.people,
         "remark": row.remark,
         "roomDate": row.room_date,
         "roomSlot": row.room_slot,
-        "verifyCode": (row.verify_code or "") if row.status == "paid" else "",
+        "verifyCode": ""
+        if row.type == "mall"
+        else ((row.verify_code or "") if row.status == "paid" else ""),
         "extra": loads(row.extra or "{}", {}) or {},
         "createdAt": row.created_at.isoformat() if row.created_at else None,
     }
@@ -311,9 +313,15 @@ def _release_stale_room_holds(db: Session) -> None:
 def _resolve_order_price(db: Session, payload: OrderCreateIn) -> tuple[float, float, str, str, str]:
     """Return (unit_price, amount, title, cover, spec) from catalog. Ignores client amounts for paid types."""
     qty = max(1, int(payload.quantity or 1))
+    if qty > 20:
+        raise HTTPException(status_code=400, detail="数量超出范围")
     otype = (payload.type or "").strip()
+    if otype == "room":
+        qty = 1
 
     if otype == "room":
+        if not ((payload.store_id or "").strip() and (payload.room_date or "").strip() and (payload.room_slot or "").strip()):
+            raise HTTPException(status_code=400, detail="请选择门店、日期和时段")
         unit = float(get_loyalty_config(db).get("roomPrice") or 0)
         title = payload.title or "包房预约"
         cover = payload.cover or ""
@@ -370,10 +378,12 @@ def _resolve_order_price(db: Session, payload: OrderCreateIn) -> tuple[float, fl
                 if str(p.get("id")) == pid and not p.get("disabled"):
                     pkg = p
                     break
-        if not pkg and payload.spec:
+            if not pkg:
+                raise HTTPException(status_code=400, detail="套餐不存在或已下架")
+        elif payload.spec:
             for p in packages:
                 name = str(p.get("name") or "")
-                if name and payload.spec.startswith(name) and not p.get("disabled"):
+                if name and str(payload.spec).startswith(name) and not p.get("disabled"):
                     pkg = p
                     break
         if not pkg:
@@ -384,17 +394,14 @@ def _resolve_order_price(db: Session, payload: OrderCreateIn) -> tuple[float, fl
         unit = float(pkg.get("price") or 0)
         if unit <= 0:
             raise HTTPException(status_code=400, detail="套餐价格异常")
-        title = payload.title or f"{store.name}-年夜饭"
-        cover = pkg.get("cover") or store.cover or payload.cover or ""
-        spec = payload.spec or str(pkg.get("name") or "")
+        title = f"{store.name}-年夜饭"
+        cover = pkg.get("cover") or store.cover or ""
+        spec = str(pkg.get("name") or "")
+        if (payload.room_date or "").strip():
+            spec = f"{spec} · {payload.room_date.strip()}" if spec else payload.room_date.strip()
         return unit, round(unit * qty, 2), title, cover, spec
 
-    # Unknown paid type: reject client zero / free-ride
-    unit = float(payload.price or 0)
-    amount = float(payload.amount or payload.price or 0)
-    if amount <= 0:
-        raise HTTPException(status_code=400, detail="订单金额无效")
-    return unit, amount, payload.title or "", payload.cover or "", payload.spec or ""
+    raise HTTPException(status_code=400, detail="订单类型无效")
 
 
 @router.get("/health")
@@ -848,7 +855,18 @@ def create_order(
     user = _ensure_user(db, openid)
     order_id = f"o{int(datetime.utcnow().timestamp() * 1000)}"
     qty = max(1, int(payload.quantity or 1))
+    if (payload.type or "").strip() == "room":
+        qty = 1
     unit_price, amount, title, cover, spec = _resolve_order_price(db, payload)
+    room_date = (payload.room_date or "").strip()
+    room_slot = (payload.room_slot or "").strip()
+    if room_date or room_slot:
+        if not room_date or not room_slot:
+            raise HTTPException(status_code=400, detail="请选择用餐日期和时段")
+        if room_slot not in ("lunch", "dinner"):
+            raise HTTPException(status_code=400, detail="用餐时段无效")
+        if room_date < today_cn():
+            raise HTTPException(status_code=400, detail="用餐日期已过，请重新选择")
 
     extra = {}
     order_store_id = payload.store_id
@@ -887,8 +905,8 @@ def create_order(
         contact_phone=payload.contact_phone,
         people=payload.people,
         remark=payload.remark,
-        room_date=payload.room_date,
-        room_slot=payload.room_slot,
+        room_date=room_date,
+        room_slot=room_slot,
         extra=dumps(extra),
     )
     db.add(order)
@@ -992,14 +1010,14 @@ async def pay_notify(request: Request, db: Session = Depends(get_db)):
         "prepay_id": loads(order.extra or "{}", {}).get("prepay_id"),
     }
     if room_date_is_past(order):
-        mark_refund_pending(db, order, "用餐日期已过")
+        mark_refund_pending(db, order, "用餐日期已过", patch)
         return Response(content=notify_ok_xml(), media_type="application/xml")
     try:
         if order.room_date and order.room_slot and order.store_id:
             _hold_room_slot(db, order)
         _mark_order_paid(db, order, patch)
     except HTTPException:
-        mark_refund_pending(db, order, "该时段包房已满")
+        mark_refund_pending(db, order, "该时段包房已满", patch)
     return Response(content=notify_ok_xml(), media_type="application/xml")
 
 
@@ -1045,7 +1063,15 @@ def mall_redeem(
     user = _ensure_user(db, oid)
     goods_id = int(payload.get("goodsId") or payload.get("goods_id") or 0)
     address_id = int(payload.get("addressId") or payload.get("address_id") or 0)
-    row = db.query(MallGoods).filter(MallGoods.id == goods_id, MallGoods.enabled.is_(True)).first()
+    user = db.query(AppUser).filter(AppUser.id == user.id).with_for_update().first()
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
+    row = (
+        db.query(MallGoods)
+        .filter(MallGoods.id == goods_id, MallGoods.enabled.is_(True))
+        .with_for_update()
+        .first()
+    )
     if not row:
         raise HTTPException(status_code=404, detail="商品不存在")
     if row.stock <= 0:
@@ -1073,7 +1099,7 @@ def mall_redeem(
         price=0,
         amount=0,
         status="paid",
-        status_text=STATUS_TEXT["paid"],
+        status_text="待发货",
         contact_name=addr.name or "",
         contact_phone=addr.phone or "",
         remark=f"{region} {addr.detail or ''}".strip(),
@@ -1091,11 +1117,6 @@ def mall_redeem(
         ),
     )
     db.add(order)
-    db.flush()
-    code = ensure_order_verify_code(db, order)
-    extra = loads(order.extra or "{}", {}) or {}
-    extra["redeemCode"] = code
-    order.extra = dumps(extra)
     db.commit()
     db.refresh(user)
     extra = loads(order.extra or "{}", {}) or {}
@@ -1391,6 +1412,9 @@ def claim_coupon(
     db: Session = Depends(get_db),
 ):
     user = _ensure_user(db, _require_openid(x_openid, x_wx_openid, openid))
+    user = db.query(AppUser).filter(AppUser.id == user.id).with_for_update().first()
+    if not user:
+        raise HTTPException(status_code=401, detail="请先登录")
     coupon_id = payload.get("couponId") or payload.get("coupon_id")
     # 月份一律服务端按上海时区计算，忽略客户端伪造
     month_key = month_cn()
@@ -1402,6 +1426,9 @@ def claim_coupon(
     except (TypeError, ValueError):
         raise HTTPException(status_code=400, detail="优惠券无效")
     if not coupon:
+        raise HTTPException(status_code=404, detail="暂无可领优惠券")
+    coupon = db.query(Coupon).filter(Coupon.id == coupon.id).with_for_update().first()
+    if not coupon or not coupon.enabled:
         raise HTTPException(status_code=404, detail="暂无可领优惠券")
     exists = (
         db.query(UserCoupon)

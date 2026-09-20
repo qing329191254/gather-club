@@ -44,7 +44,7 @@
 				</view>
 			</view>
 
-			<view v-if="order.status === 'paid' && order.verifyCode" class="order-actions" @tap.stop>
+			<view v-if="order.status === 'paid' && order.type !== 'mall' && order.verifyCode" class="order-actions" @tap.stop>
 				<view class="btn solid" @tap="onShowCode(order)">去核销</view>
 			</view>
 

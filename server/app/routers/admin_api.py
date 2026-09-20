@@ -664,7 +664,7 @@ def list_orders(
                 "price": r.price,
                 "amount": r.amount,
                 "status": r.status,
-                "status_text": r.status_text,
+                "status_text": "待发货" if r.type == "mall" and r.status == "paid" else r.status_text,
                 "contact_name": r.contact_name,
                 "contact_phone": r.contact_phone,
                 "people": r.people,

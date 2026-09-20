@@ -139,6 +139,8 @@ def alloc_verify_code(db: Session) -> str:
 
 
 def ensure_order_verify_code(db: Session, order) -> str:
+    if getattr(order, "type", "") == "mall":
+        return ""
     code = (getattr(order, "verify_code", "") or "").strip()
     if code:
         return code
