@@ -102,6 +102,7 @@ STATUS_TEXT = {
     "cancelled": "已取消",
     "completed": "已完成",
     "refunded": "已退款",
+    "refund_pending": "待退款",
 }
 
 

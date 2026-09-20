@@ -21,13 +21,18 @@ from ..commerce import (
     award_order_points,
     bump_sold_on_paid,
     display_sold_text,
+    find_nye_store,
     get_checkin_config,
     get_loyalty_config,
+    hold_room_slot,
+    mark_refund_pending,
     nye_recent_buy,
     order_earn_points,
     release_room_if_needed,
+    release_stale_room_holds,
     reverse_order_points,
     reverse_sold_on_refund,
+    room_date_is_past,
     sync_user_vip,
     table_count,
 )
@@ -79,8 +84,6 @@ from ..utils import (
 from ..wx import code2session, phone_from_code, phone_from_encrypted, resolve_demo_openid, wx_configured
 
 router = APIRouter(prefix="/api/v1", tags=["miniapp"])
-
-ROOM_HOLD_MINUTES = 30
 
 
 def _client_openid(
@@ -199,8 +202,10 @@ def _nye_packages_for(row: NyeStore) -> list:
 
 def _nye_out(row: NyeStore, db: Optional[Session] = None) -> dict:
     recent = nye_recent_buy(db, row) if db is not None else (loads(row.recent_buy, {}) or {})
+    linked = (getattr(row, "store_id", None) or "").strip() or row.id
     return {
         "id": row.id,
+        "storeId": linked,
         "name": row.name,
         "cover": row.cover,
         "price": row.price,
@@ -296,63 +301,11 @@ def _release_room_slot(db: Session, order: Order) -> None:
 
 
 def _hold_room_slot(db: Session, order: Order) -> bool:
-    """支付前锁 1 间。同一门店的包房预约和带日期的下单共用这份库存。"""
-    if not (order.room_date and order.room_slot and order.store_id):
-        return False
-    extra = loads(order.extra or "{}", {}) or {}
-    if extra.get("roomHeld"):
-        return False
-    info = _slot_info(db, order.store_id, order.room_date, order.room_slot)
-    if info["full"] or info["remain"] < 1:
-        raise HTTPException(status_code=400, detail="该时段包房已满，请换日期或时段")
-    row = (
-        db.query(RoomSlot)
-        .filter(
-            RoomSlot.store_id == order.store_id,
-            RoomSlot.date == order.room_date,
-            RoomSlot.slot == order.room_slot,
-        )
-        .with_for_update()
-        .first()
-    )
-    if not row:
-        row = RoomSlot(
-            store_id=order.store_id,
-            date=order.room_date,
-            slot=order.room_slot,
-            capacity=info["capacity"],
-            booked=0,
-        )
-        db.add(row)
-        db.flush()
-    if row.booked >= row.capacity:
-        raise HTTPException(status_code=400, detail="该时段包房已满，请换日期或时段")
-    row.booked += 1
-    extra["roomHeld"] = True
-    extra["roomReleased"] = False
-    order.extra = dumps(extra)
-    return True
+    return hold_room_slot(db, order)
 
 
 def _release_stale_room_holds(db: Session) -> None:
-    """Cancel abandoned pending room orders and free inventory."""
-    cutoff = datetime.utcnow() - timedelta(minutes=ROOM_HOLD_MINUTES)
-    stale = (
-        db.query(Order)
-        .filter(
-            Order.type == "room",
-            Order.status == "pending",
-            Order.created_at < cutoff,
-        )
-        .all()
-    )
-    if not stale:
-        return
-    for order in stale:
-        _release_room_slot(db, order)
-        order.status = "cancelled"
-        order.status_text = STATUS_TEXT["cancelled"]
-    db.commit()
+    release_stale_room_holds(db)
 
 
 def _resolve_order_price(db: Session, payload: OrderCreateIn) -> tuple[float, float, str, str, str]:
@@ -406,11 +359,7 @@ def _resolve_order_price(db: Session, payload: OrderCreateIn) -> tuple[float, fl
         return unit, round(unit * qty, 2), row.name, row.cover or "", payload.spec or "订酒店"
 
     if otype == "nye":
-        store = (
-            db.query(NyeStore)
-            .filter(NyeStore.id == payload.store_id, NyeStore.enabled.is_(True))
-            .first()
-        )
+        store = find_nye_store(db, payload.store_id or "", enabled_only=True)
         if not store:
             raise HTTPException(status_code=404, detail="门店不存在或已下架")
         packages = _nye_packages_for(store)
@@ -655,9 +604,9 @@ def nye_list(db: Session = Depends(get_db)):
 
 @router.get("/nye/{nye_id}")
 def nye_detail(nye_id: str, db: Session = Depends(get_db)):
-    row = db.query(NyeStore).filter(NyeStore.id == nye_id, NyeStore.enabled.is_(True)).first()
+    row = find_nye_store(db, nye_id, enabled_only=True)
     if not row:
-        raise HTTPException(status_code=404, detail="门店不存在")
+        raise HTTPException(status_code=404, detail="该门店暂未开放预约")
     detail = _nye_out(row, db)
     detail["packages"] = _nye_packages_for(row)
     return detail
@@ -866,12 +815,13 @@ def list_orders(
 ):
     page, page_size, offset = normalize_page(page, page_size)
     oid = _require_openid(x_openid, x_wx_openid, openid)
+    _release_stale_room_holds(db)
     q = db.query(Order).filter(Order.openid == oid)
     st = (status or "").strip()
     if st:
         if st == "closed":
-            # 小程序「已关闭」：已取消 + 已退款
-            q = q.filter(Order.status.in_(("cancelled", "refunded")))
+            # 小程序「已关闭」：已取消、待退款、已退款
+            q = q.filter(Order.status.in_(("cancelled", "refund_pending", "refunded")))
         else:
             q = q.filter(Order.status == st)
     q = q.order_by(Order.created_at.desc())
@@ -901,9 +851,18 @@ def create_order(
     unit_price, amount, title, cover, spec = _resolve_order_price(db, payload)
 
     extra = {}
-    if payload.room_date and payload.room_slot and payload.store_id:
+    order_store_id = payload.store_id
+    if (payload.type or "") == "nye":
+        nye = find_nye_store(db, payload.store_id or "", enabled_only=True)
+        if nye:
+            order_store_id = nye.id
+            linked = (getattr(nye, "store_id", None) or "").strip() or nye.id
+            if payload.room_date and payload.room_slot:
+                extra["roomStoreId"] = linked
+    slot_key = extra.get("roomStoreId") or order_store_id
+    if payload.room_date and payload.room_slot and slot_key:
         _release_stale_room_holds(db)
-        info = _slot_info(db, payload.store_id, payload.room_date, payload.room_slot)
+        info = _slot_info(db, slot_key, payload.room_date, payload.room_slot)
         if info["full"] or info["remain"] < 1:
             raise HTTPException(status_code=400, detail="该时段包房已满，请换日期或时段")
         # 先只校验，支付发起时才占库存，避免未付款就把同一家店的包房订走
@@ -914,7 +873,7 @@ def create_order(
         user_id=user.id,
         openid=openid,
         type=payload.type,
-        store_id=payload.store_id,
+        store_id=order_store_id,
         store_name=payload.store_name,
         title=title,
         spec=spec,
@@ -955,6 +914,19 @@ async def pay_order(
         raise HTTPException(status_code=403, detail="无权支付该订单")
     if order.status != "pending":
         raise HTTPException(status_code=400, detail="订单状态不可支付")
+
+    _release_stale_room_holds(db)
+    db.refresh(order)
+    if order.status != "pending":
+        if room_date_is_past(order):
+            raise HTTPException(status_code=400, detail="用餐日期已过，请重新下单")
+        raise HTTPException(status_code=400, detail="订单已关闭，请重新下单")
+    if room_date_is_past(order):
+        release_room_if_needed(db, order)
+        order.status = "cancelled"
+        order.status_text = STATUS_TEXT["cancelled"]
+        db.commit()
+        raise HTTPException(status_code=400, detail="用餐日期已过，请重新下单")
 
     amount = float(order.amount or order.price or 0)
     if amount <= 0:
@@ -1002,22 +974,32 @@ async def pay_notify(request: Request, db: Session = Depends(get_db)):
         return Response(content=notify_fail_xml("RESULT"), media_type="application/xml")
     out_trade_no = data.get("out_trade_no") or ""
     order = db.query(Order).filter(Order.id == out_trade_no).first()
-    if order and order.status == "pending":
-        expected = int(round(float(order.amount or order.price or 0) * 100))
-        try:
-            paid_fee = int(data.get("total_fee") or 0)
-        except (TypeError, ValueError):
-            paid_fee = 0
-        if expected > 0 and paid_fee != expected:
-            return Response(content=notify_fail_xml("FEE"), media_type="application/xml")
-        _mark_order_paid(
-            db,
-            order,
-            {
-                "transaction_id": data.get("transaction_id") or "",
-                "prepay_id": loads(order.extra or "{}", {}).get("prepay_id"),
-            },
-        )
+    if not order or order.status in ("paid", "completed", "refunded", "refund_pending"):
+        return Response(content=notify_ok_xml(), media_type="application/xml")
+    _release_stale_room_holds(db)
+    db.refresh(order)
+    if order.status not in ("pending", "cancelled"):
+        return Response(content=notify_ok_xml(), media_type="application/xml")
+    expected = int(round(float(order.amount or order.price or 0) * 100))
+    try:
+        paid_fee = int(data.get("total_fee") or 0)
+    except (TypeError, ValueError):
+        paid_fee = 0
+    if expected > 0 and paid_fee != expected:
+        return Response(content=notify_fail_xml("FEE"), media_type="application/xml")
+    patch = {
+        "transaction_id": data.get("transaction_id") or "",
+        "prepay_id": loads(order.extra or "{}", {}).get("prepay_id"),
+    }
+    if room_date_is_past(order):
+        mark_refund_pending(db, order, "用餐日期已过")
+        return Response(content=notify_ok_xml(), media_type="application/xml")
+    try:
+        if order.room_date and order.room_slot and order.store_id:
+            _hold_room_slot(db, order)
+        _mark_order_paid(db, order, patch)
+    except HTTPException:
+        mark_refund_pending(db, order, "该时段包房已满")
     return Response(content=notify_ok_xml(), media_type="application/xml")
 
 

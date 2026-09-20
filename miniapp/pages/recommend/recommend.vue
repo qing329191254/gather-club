@@ -30,7 +30,7 @@
 			</swiper>
 		</view>
 
-		<view class="sheet">
+		<view class="sheet" :style="{ marginTop: sheetTop + 'px' }">
 			<view
 				v-for="item in list"
 				:key="item.id"
@@ -53,7 +53,7 @@
 				</view>
 			</view>
 
-			<view class="end-line">
+			<view v-if="loaded" class="end-line">
 				<view class="end-rule" />
 				<text class="end-text">没有更多了</text>
 				<view class="end-rule" />
@@ -72,9 +72,11 @@
 			return {
 				statusBarHeight: 20,
 				heroHeight: 280,
+				sheetTop: 240,
 				navSolid: false,
 				banners: [],
-				list: []
+				list: [],
+				loaded: false
 			}
 		},
 		onLoad() {
@@ -83,10 +85,13 @@
 			const width = sys.windowWidth || 375
 			// 测试头图 750x500
 			this.heroHeight = Math.round(width * (500 / 750))
+			const rpx = width / 750
+			this.sheetTop = this.heroHeight - Math.round(36 * rpx)
 			this.loadList()
 		},
 		onPageScroll(e) {
-			this.navSolid = e.scrollTop > 160
+			const next = !!(e && e.scrollTop > 160)
+			if (next !== this.navSolid) this.navSolid = next
 		},
 		methods: {
 			loadList() {
@@ -99,6 +104,9 @@
 						this.banners = []
 						this.list = []
 						uni.showToast({ title: '加载失败', icon: 'none' })
+					})
+					.finally(() => {
+						this.loaded = true
 					})
 			},
 			goBack() {
@@ -214,9 +222,13 @@
 	}
 
 	.hero-wrap {
+		position: fixed;
+		left: 0;
+		top: 0;
 		width: 100%;
 		overflow: hidden;
 		background: #1a1a2e;
+		z-index: 1;
 	}
 
 	.hero-swiper {
@@ -230,12 +242,13 @@
 	}
 
 	.sheet {
-		margin-top: -36rpx;
 		position: relative;
 		z-index: 2;
+		min-height: calc(100vh - 200rpx);
 		background: #f5f5f5;
 		border-radius: 28rpx 28rpx 0 0;
 		padding: 24rpx 20rpx 8rpx;
+		box-sizing: border-box;
 	}
 
 	.card {

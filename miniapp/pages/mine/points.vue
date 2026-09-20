@@ -22,7 +22,7 @@
 			</view>
 		</view>
 
-		<view class="end">{{ loading ? '加载中…' : (hasMore ? '上拉加载更多' : '没有更多了') }}</view>
+		<view v-if="loaded" class="end">{{ loading ? '加载中…' : (hasMore ? '上拉加载更多' : '没有更多了') }}</view>
 	</view>
 </template>
 
@@ -38,7 +38,8 @@
 				page: 1,
 				pageSize: 20,
 				hasMore: true,
-				loading: false
+				loading: false,
+				loaded: false
 			}
 		},
 		onShow() {
@@ -76,6 +77,7 @@
 					if (reset) this.list = []
 				} finally {
 					this.loading = false
+					this.loaded = true
 				}
 			},
 			async loadPoints() {

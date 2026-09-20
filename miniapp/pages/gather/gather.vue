@@ -29,7 +29,7 @@
 		</view>
 		<view class="head-space" :style="{ height: headHeight + 'px' }" />
 
-		<view v-if="!list.length" class="state">暂无活动</view>
+		<view v-if="loaded && !list.length" class="state">暂无活动</view>
 		<view v-else class="waterfall">
 			<view v-for="(col, ci) in columns" :key="ci" class="col">
 				<view v-for="item in col" :key="item.id" class="card" @tap="onItem(item)">
@@ -83,7 +83,8 @@
 				currentTab: '',
 				tabs: [],
 				products: [],
-				stewardVisible: false
+				stewardVisible: false,
+				loaded: false
 			}
 		},
 		computed: {
@@ -156,6 +157,9 @@
 					})
 					.catch(() => {
 						uni.showToast({ title: '加载失败', icon: 'none' })
+					})
+					.finally(() => {
+						this.loaded = true
 					})
 			},
 			switchTab(key) {

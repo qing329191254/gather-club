@@ -313,6 +313,7 @@ def seed_all(db: Session) -> None:
                 NyeStore(
                     **{
                         **payload,
+                        "store_id": payload.get("store_id") or payload.get("id") or "",
                         "banners": dumps(payload.get("banners", [])),
                         "detail_images": dumps(payload.get("detail_images", [])),
                         "recent_buy": dumps(payload.get("recent_buy", {})),

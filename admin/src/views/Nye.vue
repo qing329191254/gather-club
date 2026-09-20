@@ -10,7 +10,10 @@
           <span v-else class="muted">暂无</span>
         </template>
       </el-table-column>
-      <el-table-column prop="name" label="名称" min-width="220" show-overflow-tooltip />
+      <el-table-column prop="name" label="名称" min-width="180" show-overflow-tooltip />
+      <el-table-column label="首页门店" min-width="140" show-overflow-tooltip>
+        <template #default="{ row }">{{ storeName(row.store_id || row.id) }}</template>
+      </el-table-column>
       <el-table-column prop="price" label="价格" width="90" />
       <el-table-column label="套餐数" width="90">
         <template #default="{ row }">
@@ -39,6 +42,12 @@
     <!-- 门店基础信息（不含套餐） -->
     <el-dialog v-model="visible" :title="editing ? '编辑专题门店' : '新增专题门店'" width="720px" top="6vh">
       <el-form label-width="100px">
+        <el-form-item label="首页门店" required>
+          <el-select v-model="form.store_id" filterable placeholder="和首页、去哪聚是同一家店" style="width: 100%">
+            <el-option v-for="s in stores" :key="s.id" :label="s.name" :value="s.id" />
+          </el-select>
+          <div class="hint block">首页「预约」和去哪聚「关联门店」都进入这张详情。包房库存也按这家门店计算，一家店只建一张。</div>
+        </el-form-item>
         <el-form-item label="名称" required>
           <el-input v-model="form.name" placeholder="门店或宴席名称" />
         </el-form-item>
@@ -181,6 +190,7 @@ import ImageListField from '../components/ImageListField.vue'
 const { busy, run } = useLock()
 
 const list = ref([])
+const stores = ref([])
 const visible = ref(false)
 const editing = ref(false)
 const banners = ref([])
@@ -197,6 +207,7 @@ let pkgSeq = 1
 
 const empty = () => ({
   id: '',
+  store_id: '',
   name: '',
   cover: '',
   price: 0,
@@ -268,12 +279,20 @@ function removePackage(idx) {
 }
 
 async function load() {
-  list.value = await http.get('/nye')
+  const [rows, storeList] = await Promise.all([http.get('/nye'), http.get('/stores')])
+  list.value = rows || []
+  stores.value = storeList || []
+}
+
+function storeName(id) {
+  const row = stores.value.find((s) => s.id === id)
+  return row ? row.name : '未绑定'
 }
 
 function openEdit(row) {
   editing.value = !!row
   Object.assign(form, empty(), row || {})
+  if (!form.store_id && stores.value.some((s) => s.id === form.id)) form.store_id = form.id
   banners.value = [...(form.banners || [])]
   detailImages.value = [...(form.detail_images || [])]
   visible.value = true
@@ -296,6 +315,10 @@ async function onSave() {
   return run('save', async () => {
   if (!form.name?.trim()) {
     ElMessage.warning('请填写名称')
+    return
+  }
+  if (!form.store_id) {
+    ElMessage.warning('请选择对应的首页门店')
     return
   }
   const existing = editing.value ? list.value.find((r) => r.id === form.id) : null
@@ -352,6 +375,7 @@ onMounted(load)
 <style scoped>
 .toolbar { margin-bottom: 12px; }
 .hint { margin-left: 8px; color: #94a3b8; font-size: 12px; }
+.hint.block { display: block; margin: 6px 0 0; line-height: 1.5; }
 .muted { color: #94a3b8; font-size: 12px; }
 .num { width: 168px; }
 .pkg-head {

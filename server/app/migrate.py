@@ -33,6 +33,14 @@ def ensure_schema() -> None:
                 conn.execute(text("UPDATE nye_stores SET packages = '[]' WHERE packages IS NULL"))
             if "sold_count" not in cols:
                 conn.execute(text("ALTER TABLE nye_stores ADD COLUMN sold_count INTEGER DEFAULT 0"))
+            if "store_id" not in cols:
+                conn.execute(text("ALTER TABLE nye_stores ADD COLUMN store_id VARCHAR(64) DEFAULT ''"))
+                conn.execute(
+                    text(
+                        "UPDATE nye_stores SET store_id = id "
+                        "WHERE store_id IS NULL OR store_id = ''"
+                    )
+                )
         if "gather_products" in tables:
             cols = {c["name"] for c in inspector.get_columns("gather_products")}
             if "sold_count" not in cols:

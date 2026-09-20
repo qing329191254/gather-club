@@ -106,6 +106,8 @@ class NyeStore(Base):
     __tablename__ = "nye_stores"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    # 对应首页门店 Store.id。首页预约、去哪聚关联门店、包房库存都用这个编号。
+    store_id: Mapped[str] = mapped_column(String(64), default="")
     name: Mapped[str] = mapped_column(String(255))
     cover: Mapped[str] = mapped_column(String(512), default="")
     price: Mapped[float] = mapped_column(Float, default=0)

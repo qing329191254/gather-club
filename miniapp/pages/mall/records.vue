@@ -1,7 +1,7 @@
 <template>
 	<app-loading />
 	<view class="page">
-		<view v-if="!list.length" class="empty">
+		<view v-if="loaded && !loading && !list.length" class="empty">
 			<image class="empty-img" src="/static/mall/empty-exchange.png" mode="aspectFit" />
 			<text class="empty-text">暂无兑换内容</text>
 		</view>
@@ -30,7 +30,8 @@
 				page: 1,
 				pageSize: 20,
 				hasMore: true,
-				loading: false
+				loading: false,
+				loaded: false
 			}
 		},
 		onShow() {
@@ -60,6 +61,7 @@
 					if (reset) this.list = []
 				} finally {
 					this.loading = false
+					this.loaded = true
 				}
 			},
 			async loadRecords() {

@@ -99,6 +99,7 @@ class GatherProductOut(GatherProductIn, ORMModel):
 
 class NyeStoreIn(BaseModel):
     id: str
+    store_id: Optional[str] = None
     name: str
     cover: str = ""
     price: float = 0

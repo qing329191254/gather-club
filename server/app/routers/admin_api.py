@@ -19,7 +19,9 @@ from ..commerce import (
     table_count,
     add_points,
     award_order_points,
+    hold_room_slot,
     release_room_if_needed,
+    release_stale_room_holds,
     reverse_order_points,
     reverse_sold_on_refund,
 )
@@ -132,6 +134,7 @@ def me(admin: AdminUser = Depends(get_current_admin)):
 
 @router.get("/dashboard")
 def dashboard(db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
+    release_stale_room_holds(db)
     return {
         "stores": db.query(Store).count(),
         "users": db.query(AppUser).count(),
@@ -393,6 +396,7 @@ def list_nye(db: Session = Depends(get_db), _: AdminUser = Depends(get_current_a
     return [
         {
             "id": r.id,
+            "store_id": (getattr(r, "store_id", None) or "").strip() or r.id,
             "name": r.name,
             "cover": r.cover,
             "price": r.price,
@@ -415,13 +419,32 @@ def list_nye(db: Session = Depends(get_db), _: AdminUser = Depends(get_current_a
     ]
 
 
+def _bind_nye_store(db: Session, nye_id: str, store_id: Optional[str]) -> str:
+    """一家首页门店只对应一张专题详情。旧数据编号本身就是门店编号时允许原样保存。"""
+    linked = (store_id or "").strip()
+    if not linked:
+        raise HTTPException(400, "请选择对应的首页门店")
+    if not db.query(Store).filter(Store.id == linked).first() and linked != nye_id:
+        raise HTTPException(400, "首页门店不存在")
+    other = (
+        db.query(NyeStore)
+        .filter(NyeStore.store_id == linked, NyeStore.id != nye_id)
+        .first()
+    )
+    if other:
+        raise HTTPException(400, "该首页门店已经有专题详情")
+    return linked
+
+
 @router.post("/nye")
 def create_nye(payload: NyeStoreIn, db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
     if db.query(NyeStore).filter(NyeStore.id == payload.id).first():
         raise HTTPException(400, "ID 已存在")
     data = payload.model_dump()
+    linked = _bind_nye_store(db, data["id"], data.get("store_id"))
     row = NyeStore(
         id=data["id"],
+        store_id=linked,
         name=data["name"],
         cover=data["cover"],
         price=data["price"],
@@ -451,6 +474,12 @@ def update_nye(nye_id: str, payload: NyeStoreIn, db: Session = Depends(get_db), 
     if not row:
         raise HTTPException(404, "不存在")
     data = payload.model_dump()
+    incoming = data.get("store_id")
+    if incoming is None:
+        linked = (getattr(row, "store_id", None) or "").strip() or row.id
+    else:
+        linked = _bind_nye_store(db, row.id, incoming)
+    row.store_id = linked
     row.name = data["name"]
     row.cover = data["cover"]
     row.price = data["price"]
@@ -606,6 +635,7 @@ def list_orders(
     db: Session = Depends(get_db),
     _: AdminUser = Depends(get_current_admin),
 ):
+    release_stale_room_holds(db)
     page, page_size, offset = normalize_page(page, page_size)
     q = db.query(Order).order_by(Order.created_at.desc())
     if status:
@@ -669,7 +699,7 @@ def update_order_status(
     user = db.query(AppUser).filter(AppUser.id == row.user_id).first() if row.user_id else None
 
     # 取消/退款：释放包房、回退销量与积分
-    if prev in ("pending", "paid", "completed") and next_status in ("cancelled", "refunded"):
+    if prev in ("pending", "paid", "completed", "refund_pending") and next_status in ("cancelled", "refunded"):
         release_room_if_needed(db, row)
         if prev in ("paid", "completed"):
             reverse_sold_on_refund(db, row)
@@ -681,6 +711,10 @@ def update_order_status(
                 uc = db.query(UserCoupon).filter(UserCoupon.id == uc_id).first()
                 if uc and uc.status == "used":
                     uc.status = "unused"
+
+    if prev not in ("paid", "completed") and next_status in ("paid", "completed"):
+        if row.room_date and row.room_slot and row.store_id:
+            hold_room_slot(db, row)
 
     row.status = next_status
     row.status_text = payload.status_text or STATUS_TEXT.get(next_status, next_status)
@@ -838,6 +872,7 @@ def list_rooms(
     db: Session = Depends(get_db),
     _: AdminUser = Depends(get_current_admin),
 ):
+    release_stale_room_holds(db)
     page, page_size, offset = normalize_page(page, page_size)
     q = db.query(RoomSlot).order_by(RoomSlot.date.desc(), RoomSlot.store_id.asc())
     if store_id:

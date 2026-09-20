@@ -54,11 +54,11 @@
 			</view>
 		</view>
 
-		<view v-if="!orders.length && !loading" class="empty">暂无订单</view>
+		<view v-if="loaded && !orders.length && !loading" class="empty">暂无订单</view>
 
 		<view class="end-line">
 			<view class="end-rule" />
-			<text class="end-text">{{ loading ? '加载中…' : (hasMore ? '上拉加载更多' : '没有更多了') }}</text>
+			<text class="end-text">{{ !loaded || loading ? '加载中…' : (hasMore ? '上拉加载更多' : '没有更多了') }}</text>
 			<view class="end-rule" />
 		</view>
 		<verify-code-modal
@@ -93,6 +93,7 @@
 				pageSize: 20,
 				hasMore: true,
 				loading: false,
+				loaded: false,
 				verifyVisible: false,
 				verifyCode: '',
 				verifyExpire: '',
@@ -154,6 +155,7 @@
 					uni.showToast({ title: '订单加载失败', icon: 'none' })
 				} finally {
 					this.loading = false
+					this.loaded = true
 				}
 			},
 			async loadOrders() {
@@ -363,6 +365,7 @@
 	}
 
 	.order-status.st-cancelled,
+	.order-status.st-refund_pending,
 	.order-status.st-refunded {
 		color: #999999;
 	}

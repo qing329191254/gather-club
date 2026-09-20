@@ -291,6 +291,7 @@
 					}
 					this.detail = {
 						id: res.id,
+						storeId: res.storeId || res.id,
 						name: res.name,
 						cover: res.cover,
 						price: res.price,
@@ -332,7 +333,7 @@
 				return key >= start && key <= end
 			},
 			async loadMonthMap() {
-				const storeId = (this.detail && this.detail.id) || ''
+				const storeId = (this.detail && (this.detail.storeId || this.detail.id)) || ''
 				if (!storeId) {
 					this.monthMap = {}
 					return
@@ -397,7 +398,7 @@
 			async continuePay() {
 				if (this.isTapBusy('pay')) return
 				return this.tapGuard('pay', async () => {
-				const storeId = (this.detail && this.detail.id) || ''
+				const storeId = (this.detail && (this.detail.storeId || this.detail.id)) || ''
 				const storeName = (this.detail && this.detail.name) || '天天俱乐部'
 				const cur = this.current
 				if (!cur) return

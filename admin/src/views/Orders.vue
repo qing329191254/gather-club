@@ -6,6 +6,7 @@
         <el-option label="待核销" value="paid" />
         <el-option label="已完成" value="completed" />
         <el-option label="已取消" value="cancelled" />
+        <el-option label="待退款" value="refund_pending" />
         <el-option label="已退款" value="refunded" />
       </el-select>
       <el-input v-model="keyword" placeholder="订单号/手机号/门店" style="width: 240px" clearable @keyup.enter="onSearch" />
@@ -36,6 +37,7 @@
                 <el-dropdown-item command="paid">待核销</el-dropdown-item>
                 <el-dropdown-item command="completed">已完成</el-dropdown-item>
                 <el-dropdown-item command="cancelled">已取消</el-dropdown-item>
+                <el-dropdown-item command="refund_pending">待退款</el-dropdown-item>
                 <el-dropdown-item command="refunded">已退款</el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -69,6 +71,9 @@
         <el-descriptions-item label="用餐">{{ current.room_date || '-' }} {{ slotLabel(current.room_slot) }}</el-descriptions-item>
         <el-descriptions-item label="备注">{{ current.remark || '-' }}</el-descriptions-item>
         <el-descriptions-item label="状态">{{ current.status_text }}</el-descriptions-item>
+        <el-descriptions-item v-if="current.extra && current.extra.refundReason" label="退款原因">
+          {{ current.extra.refundReason }}。请先在微信商户平台退款，再把状态改为已退款。
+        </el-descriptions-item>
       </el-descriptions>
     </el-drawer>
   </el-card>

@@ -5,7 +5,7 @@
 		@tap="onClose"
 		@touchmove.stop.prevent="preventMove"
 	>
-		<view class="card" @tap.stop @touchmove.stop.prevent="preventMove">
+		<view class="card" v-if="cardReady" @tap.stop @touchmove.stop.prevent="preventMove">
 			<view class="close" @tap="onClose">
 				<text class="x">×</text>
 			</view>
@@ -57,7 +57,8 @@
 		},
 		data() {
 			return {
-				stores: []
+				stores: [],
+				storesReady: false
 			}
 		},
 		computed: {
@@ -68,7 +69,14 @@
 			shownPlaces() {
 				if (this.places) return this.places
 				return this.stores
+			},
+			cardReady() {
+				if (this.places) return true
+				return this.storesReady
 			}
+		},
+		created() {
+			this.loadStores()
 		},
 		watch: {
 			visible(value) {
@@ -81,11 +89,14 @@
 				this.$emit('close')
 			},
 			async loadStores() {
-				if (this.places || this.stores.length) return
+				if (this.places || this.storesReady) return
 				try {
 					const res = await api.stores()
 					this.stores = (res && res.list) || []
-				} catch (e) {}
+				} catch (e) {
+					this.stores = []
+				}
+				this.storesReady = true
 			}
 		}
 	}

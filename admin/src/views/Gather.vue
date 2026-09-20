@@ -183,6 +183,7 @@
           >
             <el-option v-for="s in stores" :key="s.id" :label="s.name" :value="s.id" />
           </el-select>
+          <div class="hint block">和首页这家店进同一张专题详情。专题门店里要先选上同一家首页门店。</div>
         </el-form-item>
         <el-form-item label="角标文案">
           <el-input v-model="productForm.tag" placeholder="例如：招牌、家宴，可选" />
@@ -232,6 +233,7 @@ const tabs = ref([])
 const regions = ref([])
 const products = ref([])
 const stores = ref([])
+const nyeStores = ref([])
 const tabVisible = ref(false)
 const regionVisible = ref(false)
 const regionEditing = ref(false)
@@ -282,14 +284,16 @@ async function loadProducts() {
 }
 
 async function load() {
-  const [tabList, regionList, storeList] = await Promise.all([
+  const [tabList, regionList, storeList, nyeList] = await Promise.all([
     http.get('/gather/tabs'),
     http.get('/gather/regions'),
-    http.get('/stores')
+    http.get('/stores'),
+    http.get('/nye')
   ])
   tabs.value = tabList
   regions.value = regionList || []
   stores.value = storeList || []
+  nyeStores.value = nyeList || []
   await loadProducts()
 }
 
@@ -403,6 +407,14 @@ async function saveProduct() {
     region: productForm.region || '',
     detail_id: productForm.detail_id || '',
     tags: tagsText.value ? tagsText.value.split(/[,，]/).map((s) => s.trim()).filter(Boolean) : []
+  }
+  if (payload.detail_id) {
+    const linked = nyeStores.value.some(
+      (n) => n.enabled !== false && (n.store_id || n.id) === payload.detail_id
+    )
+    if (!linked) {
+      ElMessage.warning('这家门店还没有专题详情，首页和去哪聚都打不开预约')
+    }
   }
   if (productEditing.value) await http.put(`/gather/products/${productForm.id}`, payload)
   else await http.post('/gather/products', payload)

@@ -14,7 +14,7 @@
 			</view>
 		</view>
 
-		<view v-if="!currentList.length" class="empty">
+		<view v-if="loaded && !currentList.length" class="empty">
 			<image class="empty-img" src="/static/common/coupon-tickets.png" mode="aspectFit" />
 			<text class="empty-text">暂无优惠券</text>
 		</view>
@@ -63,7 +63,8 @@
 				},
 				verifyVisible: false,
 				verifyCode: '',
-				verifyExpire: ''
+				verifyExpire: '',
+				loaded: false
 			}
 		},
 		computed: {
@@ -76,8 +77,8 @@
 		},
 		methods: {
 			async loadCoupons() {
-				if (!isLoggedIn()) await silentLogin()
 				try {
+					if (!isLoggedIn()) await silentLogin()
 					const res = await api.coupons()
 					this.coupons = {
 						unused: res.unused || [],
@@ -85,6 +86,7 @@
 						expired: res.expired || []
 					}
 				} catch (e) {}
+				this.loaded = true
 			},
 			expireText(expire) {
 				const raw = String(expire || '').trim()

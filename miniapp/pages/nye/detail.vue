@@ -162,8 +162,8 @@
 						recentBuy: res.recentBuy || {}
 					}
 				})
-				.catch(() => {
-					uni.showToast({ title: '加载失败', icon: 'none' })
+				.catch((err) => {
+					uni.showToast({ title: (err && err.message) || '加载失败', icon: 'none' })
 					setTimeout(() => {
 						uni.navigateBack({ fail() { uni.navigateTo({ url: '/pages/nye/nye' }) } })
 					}, 400)

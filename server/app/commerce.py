@@ -6,10 +6,14 @@ import calendar
 from datetime import datetime, timedelta
 from typing import Optional
 
+from fastapi import HTTPException
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from .models import AppUser, GatherProduct, NyeStore, Order, PointLedger, RoomSlot
-from .utils import dumps, get_config, loads, today_cn
+from .utils import STATUS_TEXT, dumps, get_config, loads, today_cn
+
+ROOM_HOLD_MINUTES = 30
 
 TABLE_ORDER_TYPES = ("room", "nye", "recommend", "gather")
 TABLE_COUNTED_STATUSES = ("paid", "completed")
@@ -182,6 +186,30 @@ def reverse_order_points(db: Session, order: Order, user: Optional[AppUser]) -> 
     return gained
 
 
+def find_nye_store(db: Session, key: str, enabled_only: bool = False) -> Optional[NyeStore]:
+    """专题详情可以用自己的编号，也可以用绑定的首页门店编号打开。"""
+    key = (key or "").strip()
+    if not key:
+        return None
+    q = db.query(NyeStore).filter(NyeStore.id == key)
+    if enabled_only:
+        q = q.filter(NyeStore.enabled.is_(True))
+    row = q.first()
+    if row:
+        return row
+    q = db.query(NyeStore).filter(NyeStore.store_id == key)
+    if enabled_only:
+        q = q.filter(NyeStore.enabled.is_(True))
+    return q.order_by(NyeStore.sort.asc(), NyeStore.id.asc()).first()
+
+
+def room_inventory_id(order: Order) -> str:
+    """包房库存按首页门店编号占用，和后台包房库存是同一行。"""
+    extra = loads(order.extra or "{}", {}) or {}
+    linked = str(extra.get("roomStoreId") or "").strip()
+    return linked or (order.store_id or "")
+
+
 def reverse_sold_on_refund(db: Session, order: Order) -> None:
     extra = loads(order.extra or "{}", {}) or {}
     if extra.get("soldReversed") or not extra.get("soldBumped"):
@@ -192,7 +220,7 @@ def reverse_sold_on_refund(db: Session, order: Order) -> None:
         if product:
             product.sold_count = max(0, int(getattr(product, "sold_count", 0) or 0) - qty)
     elif order.type == "nye" and order.store_id:
-        store = db.query(NyeStore).filter(NyeStore.id == order.store_id).first()
+        store = find_nye_store(db, order.store_id)
         if store:
             store.sold_count = max(0, int(getattr(store, "sold_count", 0) or 0) - qty)
     extra["soldReversed"] = True
@@ -201,7 +229,8 @@ def reverse_sold_on_refund(db: Session, order: Order) -> None:
 
 def release_room_if_needed(db: Session, order: Order) -> None:
     """只释放已经占上的库存。未支付的新单 roomHeld 为 false，不能误减。"""
-    if not (order.room_date and order.room_slot and order.store_id):
+    inv = room_inventory_id(order)
+    if not (order.room_date and order.room_slot and inv):
         return
     extra = loads(order.extra or "{}", {}) or {}
     if extra.get("roomReleased"):
@@ -211,7 +240,7 @@ def release_room_if_needed(db: Session, order: Order) -> None:
     slot = (
         db.query(RoomSlot)
         .filter(
-            RoomSlot.store_id == order.store_id,
+            RoomSlot.store_id == inv,
             RoomSlot.date == order.room_date,
             RoomSlot.slot == order.room_slot,
         )
@@ -222,6 +251,86 @@ def release_room_if_needed(db: Session, order: Order) -> None:
     extra["roomHeld"] = False
     extra["roomReleased"] = True
     order.extra = dumps(extra)
+
+
+def hold_room_slot(db: Session, order: Order) -> bool:
+    """支付前锁 1 间。包房预约和带日期的专题下单共用首页门店的库存。"""
+    inv = room_inventory_id(order)
+    if not (order.room_date and order.room_slot and inv):
+        return False
+    extra = loads(order.extra or "{}", {}) or {}
+    if extra.get("roomHeld"):
+        return False
+    site = get_config(db, "site", {}) or {}
+    capacity_map = site.get("roomCapacity") or {"lunch": 4, "dinner": 8}
+    row = (
+        db.query(RoomSlot)
+        .filter(
+            RoomSlot.store_id == inv,
+            RoomSlot.date == order.room_date,
+            RoomSlot.slot == order.room_slot,
+        )
+        .with_for_update()
+        .first()
+    )
+    if not row:
+        row = RoomSlot(
+            store_id=inv,
+            date=order.room_date,
+            slot=order.room_slot,
+            capacity=int(capacity_map.get(order.room_slot, 4) or 4),
+            booked=0,
+        )
+        db.add(row)
+        db.flush()
+    if row.booked >= row.capacity:
+        raise HTTPException(status_code=400, detail="该时段包房已满，请换日期或时段")
+    row.booked += 1
+    extra["roomHeld"] = True
+    extra["roomReleased"] = False
+    extra["roomStoreId"] = inv
+    order.extra = dumps(extra)
+    return True
+
+
+def room_date_is_past(order: Order) -> bool:
+    day = (order.room_date or "").strip()
+    return bool(day) and day < today_cn()
+
+
+def mark_refund_pending(db: Session, order: Order, reason: str) -> None:
+    """钱已扣但订单不能成交，留给后台退款。不记销量、不发积分。"""
+    extra = loads(order.extra or "{}", {}) or {}
+    extra["refundReason"] = reason
+    extra["paidAfterClose"] = True
+    order.extra = dumps(extra)
+    order.status = "refund_pending"
+    order.status_text = STATUS_TEXT["refund_pending"]
+    db.commit()
+
+
+def release_stale_room_holds(db: Session) -> None:
+    """超过 30 分钟仍待支付，或用餐日期已过：取消订单并放开已锁包房。"""
+    cutoff = datetime.utcnow() - timedelta(minutes=ROOM_HOLD_MINUTES)
+    today = today_cn()
+    stale = (
+        db.query(Order)
+        .filter(
+            Order.status == "pending",
+            or_(
+                Order.created_at < cutoff,
+                and_(Order.room_date != "", Order.room_date < today),
+            ),
+        )
+        .all()
+    )
+    if not stale:
+        return
+    for order in stale:
+        release_room_if_needed(db, order)
+        order.status = "cancelled"
+        order.status_text = STATUS_TEXT["cancelled"]
+    db.commit()
 
 
 def award_checkin_milestones(db: Session, user: AppUser, year: int, month: int, signed_days: int) -> list[int]:
@@ -329,11 +438,15 @@ def _relative_buy_text(created_at: Optional[datetime], qty: int) -> str:
 
 def nye_recent_buy(db: Session, store: NyeStore) -> dict:
     since = datetime.utcnow() - timedelta(days=7)
+    ids = [store.id]
+    linked = (getattr(store, "store_id", None) or "").strip()
+    if linked and linked not in ids:
+        ids.append(linked)
     q = (
         db.query(Order)
         .filter(
             Order.type == "nye",
-            Order.store_id == store.id,
+            Order.store_id.in_(ids),
             Order.status.in_(TABLE_COUNTED_STATUSES),
             Order.created_at >= since,
         )
@@ -373,7 +486,7 @@ def bump_sold_on_paid(db: Session, order: Order, user: Optional[AppUser] = None)
         if product:
             product.sold_count = int(getattr(product, "sold_count", 0) or 0) + qty
     elif order.type == "nye" and order.store_id:
-        store = db.query(NyeStore).filter(NyeStore.id == order.store_id).first()
+        store = find_nye_store(db, order.store_id)
         if store:
             store.sold_count = int(getattr(store, "sold_count", 0) or 0) + qty
             store.recent_buy = dumps(nye_recent_buy(db, store))

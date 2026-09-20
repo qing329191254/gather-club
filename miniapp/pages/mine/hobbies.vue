@@ -50,7 +50,7 @@
 		},
 		data() {
 			return {
-				loading: false,
+				loading: true,
 				selected: [],
 				options: [],
 				rewardVisible: false,

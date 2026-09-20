@@ -1,7 +1,7 @@
 <template>
 	<app-loading />
 	<view class="page">
-		<view v-if="!list.length" class="empty">
+		<view v-if="loaded && !list.length" class="empty">
 			<view class="empty-illust">
 				<view class="pin">
 					<view class="pin-head" />
@@ -39,7 +39,8 @@
 	export default {
 		data() {
 			return {
-				list: []
+				list: [],
+				loaded: false
 			}
 		},
 		onShow() {
@@ -47,13 +48,14 @@
 		},
 		methods: {
 			async loadList() {
-				if (!isLoggedIn()) await silentLogin()
 				try {
+					if (!isLoggedIn()) await silentLogin()
 					const res = await api.addresses()
 					this.list = res.list || []
 				} catch (e) {
 					this.list = []
 				}
+				this.loaded = true
 			},
 			onImport() {
 				if (typeof uni.chooseAddress !== 'function') {
