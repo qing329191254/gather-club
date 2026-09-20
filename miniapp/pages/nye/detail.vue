@@ -97,7 +97,6 @@
 </template>
 
 <script>
-	import { findNyeDetail } from '../../common/nye-data.js'
 	import { api } from '../../common/api.js'
 
 	export default {
@@ -128,12 +127,24 @@
 			const sys = uni.getSystemInfoSync()
 			this.statusBarHeight = sys.statusBarHeight || 20
 			this.heroHeight = Math.round((sys.windowWidth || 375) * (500 / 750))
-			this.nyeId = (query && query.id) || 'gongkang'
-			this.detail = findNyeDetail(this.nyeId)
+			this.nyeId = (query && query.id) || ''
+			if (!this.nyeId) {
+				uni.showToast({ title: '加载失败', icon: 'none' })
+				setTimeout(() => {
+					uni.navigateBack({ fail() { uni.navigateTo({ url: '/pages/nye/nye' }) } })
+				}, 400)
+				return
+			}
 			api
 				.nyeDetail(this.nyeId)
 				.then((res) => {
-					if (!res) return
+					if (!res) {
+						uni.showToast({ title: '加载失败', icon: 'none' })
+						setTimeout(() => {
+							uni.navigateBack({ fail() { uni.navigateTo({ url: '/pages/nye/nye' }) } })
+						}, 400)
+						return
+					}
 					this.detail = {
 						id: res.id,
 						name: res.name,
@@ -150,7 +161,12 @@
 						recentBuy: res.recentBuy || {}
 					}
 				})
-				.catch(() => {})
+				.catch(() => {
+					uni.showToast({ title: '加载失败', icon: 'none' })
+					setTimeout(() => {
+						uni.navigateBack({ fail() { uni.navigateTo({ url: '/pages/nye/nye' }) } })
+					}, 400)
+				})
 		},
 		onPageScroll(e) {
 			this.navSolid = e.scrollTop > 120

@@ -52,19 +52,15 @@
 </template>
 
 <script>
-	import { mallGoods, mallPoints } from '../../common/mall-goods.js'
 	import { api } from '../../common/api.js'
 	import { getUser, refreshProfile, silentLogin, isLoggedIn } from '../../common/auth.js'
 
 	export default {
 		data() {
 			return {
-				points: mallPoints,
+				points: 0,
 				goods: []
 			}
-		},
-		onLoad() {
-			this.goods = mallGoods
 		},
 		onShow() {
 			this.loadData()
@@ -79,8 +75,11 @@
 				this.points = getUser().points || 0
 				try {
 					const res = await api.mallGoods()
-					if (res.list && res.list.length) this.goods = res.list
-				} catch (e) {}
+					this.goods = Array.isArray(res.list) ? res.list : []
+				} catch (e) {
+					this.goods = []
+					uni.showToast({ title: '加载失败', icon: 'none' })
+				}
 			},
 			onRules() {
 				uni.navigateTo({ url: '/pages/mall/rules' })

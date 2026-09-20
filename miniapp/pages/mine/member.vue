@@ -177,7 +177,6 @@
 </template>
 
 <script>
-	import { memberLevels, monthCoupon } from '../../common/member-levels.js'
 	import { setVipLevelsFromServer } from '../../common/vip-levels.js'
 	import StewardDialog from '../../components/steward-dialog/steward-dialog.vue'
 	import { api } from '../../common/api.js'
@@ -193,6 +192,28 @@
 		return `${now.getFullYear()}-${m}`
 	}
 
+	const EMPTY_LEVEL = {
+		id: '',
+		pageBg: '#0b1423',
+		pageBgImage: '',
+		cardBgImage: '',
+		levelColor: '#fff',
+		needColor: '#999',
+		barColor: '#ccc',
+		needText: '',
+		progressLabel: '',
+		doneText: '',
+		need: 0,
+		crownIcon: '',
+		secLine: 'rgba(255,255,255,0.3)',
+		benefits: [],
+		benefitBg: 'transparent',
+		benefitBorder: 'transparent',
+		couponBg: 'transparent',
+		couponBorder: 'transparent',
+		couponDeco: 'transparent'
+	}
+
 	export default {
 		components: {
 			StewardDialog
@@ -200,14 +221,14 @@
 		data() {
 			return {
 				rulesLabel: '规则 >',
-				levels: memberLevels,
+				levels: [],
 				activeIndex: 0,
 				userLevelIndex: 0,
 				progress: 0,
 				avatar: '',
 				statusBarHeight: 20,
 				navBarHeight: 44,
-				coupon: monthCoupon,
+				coupon: { title: '', tip: '', tag: '' },
 				couponClaimed: false,
 				stewardVisible: false,
 				groupVisible: false,
@@ -216,7 +237,7 @@
 		},
 		computed: {
 			current() {
-				return this.levels[this.activeIndex] || this.levels[0]
+				return this.levels[this.activeIndex] || this.levels[0] || EMPTY_LEVEL
 			},
 			unlocked() {
 				return this.activeIndex <= this.userLevelIndex
@@ -272,9 +293,14 @@
 						setVipLevelsFromServer(cfg.levels)
 					}
 					if (cfg && cfg.monthCoupon) {
-						this.coupon = Object.assign({}, monthCoupon, cfg.monthCoupon)
+						this.coupon = Object.assign({ title: '', tip: '', tag: '' }, cfg.monthCoupon)
 					}
-				} catch (e) {}
+					if (!this.levels.length) {
+						uni.showToast({ title: '加载失败', icon: 'none' })
+					}
+				} catch (e) {
+					uni.showToast({ title: '加载失败', icon: 'none' })
+				}
 				try {
 					if (!isLoggedIn()) await silentLogin()
 					const profile = await api.profile()

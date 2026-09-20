@@ -65,7 +65,6 @@
 </template>
 
 <script>
-	import { nyeList } from '../../common/nye-data.js'
 	import { api } from '../../common/api.js'
 
 	export default {
@@ -74,11 +73,7 @@
 				statusBarHeight: 20,
 				heroHeight: 280,
 				navSolid: false,
-				banners: [
-					'/static/nye/hero.jpg',
-					'/static/nye/hero2.jpg',
-					'/static/nye/hero3.jpg'
-				],
+				banners: [],
 				list: []
 			}
 		},
@@ -87,13 +82,22 @@
 			this.statusBarHeight = sys.statusBarHeight || 20
 			const width = sys.windowWidth || 375
 			this.heroHeight = Math.round(width * (500 / 750))
-			this.list = nyeList
 			api
 				.nyeList()
 				.then((res) => {
-					if (res.list && res.list.length) this.list = res.list
+					if (Array.isArray(res.list)) this.list = res.list
+					if (Array.isArray(res.banners) && res.banners.length) {
+						this.banners = res.banners
+					} else if (this.list.length) {
+						this.banners = this.list
+							.slice(0, 3)
+							.map((item) => item.cover)
+							.filter(Boolean)
+					}
 				})
-				.catch(() => {})
+				.catch(() => {
+					uni.showToast({ title: '加载失败', icon: 'none' })
+				})
 		},
 		onPageScroll(e) {
 			this.navSolid = e.scrollTop > 160

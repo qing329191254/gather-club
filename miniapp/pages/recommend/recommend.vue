@@ -72,11 +72,7 @@
 				statusBarHeight: 20,
 				heroHeight: 280,
 				navSolid: false,
-				banners: [
-					'/static/recommend/hero.jpg',
-					'/static/recommend/hero2.jpg',
-					'/static/recommend/hero3.jpg'
-				],
+				banners: [],
 				list: []
 			}
 		},
@@ -95,10 +91,14 @@
 			loadList() {
 				api.recommend()
 					.then((res) => {
-						if (res && res.banners && res.banners.length) this.banners = res.banners
-						if (res && res.list && res.list.length) this.list = res.list
+						this.banners = Array.isArray(res && res.banners) ? res.banners : []
+						this.list = Array.isArray(res && res.list) ? res.list : []
 					})
-					.catch(() => {})
+					.catch(() => {
+						this.banners = []
+						this.list = []
+						uni.showToast({ title: '加载失败', icon: 'none' })
+					})
 			},
 			goBack() {
 				uni.navigateBack({ fail() { uni.switchTab({ url: '/pages/index/index' }) } })

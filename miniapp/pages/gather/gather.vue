@@ -67,8 +67,6 @@
 </template>
 
 <script>
-	import { gatherRegions } from '../../common/regions.js'
-	import { gatherTabs, gatherProducts } from '../../common/gather-data.js'
 	import { api } from '../../common/api.js'
 
 	export default {
@@ -78,11 +76,11 @@
 				headHeight: 120,
 				city: '全部',
 				cityId: 'all',
-				regions: gatherRegions,
+				regions: [{ id: 'all', name: '全部' }],
 				regionVisible: false,
-				currentTab: gatherTabs[0] ? gatherTabs[0].key : 'day',
-				tabs: gatherTabs,
-				products: gatherProducts,
+				currentTab: '',
+				tabs: [],
+				products: [],
 				stewardVisible: false
 			}
 		},
@@ -129,32 +127,34 @@
 				api
 					.gather()
 					.then((res) => {
-						if (res.tabs && res.tabs.length) {
+						if (Array.isArray(res.tabs)) {
 							this.tabs = res.tabs.map((t) => ({
 								key: t.key,
 								name: t.name,
 								showSold: t.showSold
 							}))
-							if (!this.tabs.some((t) => t.key === this.currentTab)) {
+							if (this.tabs.length && (!this.currentTab || !this.tabs.some((t) => t.key === this.currentTab))) {
 								this.currentTab = this.tabs[0].key
 							}
 						}
-						if (res.regions && res.regions.length) {
-							this.regions = res.regions
+						if (Array.isArray(res.regions)) {
+							this.regions = res.regions.length ? res.regions : [{ id: 'all', name: '全部' }]
 							const hit = this.regions.find((r) => r.id === this.cityId || r.name === this.city)
 							if (hit) {
 								this.cityId = hit.id
 								this.city = hit.name
-							} else {
+							} else if (this.regions.length) {
 								this.cityId = this.regions[0].id
 								this.city = this.regions[0].name
 							}
 						}
-						if (res.products && res.products.length) {
+						if (Array.isArray(res.products)) {
 							this.products = res.products
 						}
 					})
-					.catch(() => {})
+					.catch(() => {
+						uni.showToast({ title: '加载失败', icon: 'none' })
+					})
 			},
 			switchTab(key) {
 				if (this.currentTab === key) return

@@ -16,9 +16,7 @@
 				</view>
 			</view>
 
-			<text class="lead">
-				欢迎使用天天俱乐部积分体系。积分可用于商城礼品兑换、活动参与等，具体规则如下。
-			</text>
+			<text class="lead">{{ intro }}</text>
 
 			<view v-for="(sec, i) in sections" :key="i" class="section">
 				<view class="sec-head">
@@ -46,60 +44,31 @@
 	export default {
 		data() {
 			return {
-				sections: [
-					{
-						title: '如何获取积分',
-						paras: [
-							'每日签到可获得基础积分，连续签到可解锁额外奖励。',
-							'完成门店预约、参与活动、关注并观看视频号直播等，可按活动规则获得积分。',
-							'具体单次可获积分以活动页面或系统提示为准。'
-						]
-					},
-					{
-						title: '积分用途',
-						paras: [
-							'积分可在「积分商城」兑换指定礼品、饮品、桌台券等。',
-							'部分活动可能支持积分抵扣或积分兑换专属权益。',
-							'兑换成功后，请按商品说明到对应门店核销或领取。'
-						]
-					},
-					{
-						title: '积分有效期',
-						paras: [
-							'积分自到账之日起生效，默认长期有效，如有调整将提前公告。',
-							'活动限时积分可能设置单独有效期，过期自动失效且不予补发。'
-						]
-					},
-					{
-						title: '兑换与核销',
-						paras: [
-							'兑换前请确认积分余额充足，兑换成功即扣除相应积分。',
-							'除商品本身质量问题或门店原因外，已兑换订单一般不支持退换。',
-							'核销时请出示兑换凭证，并遵守门店营业时间与使用限制。'
-						]
-					},
-					{
-						title: '其他说明',
-						paras: [
-							'积分不可转让、不可兑现现金，不可与其他优惠叠加时以页面说明为准。',
-							'如发现作弊刷分、虚假交易等行为，平台有权冻结积分并取消相关权益。',
-							'规则如有更新，以本小程序最新公示内容为准。'
-						]
-					}
-				]
+				intro: '',
+				sections: []
 			}
 		},
 		onLoad() {
-			const apply = (lines) => {
-				if (!lines || !lines.length) return
+			const apply = (lines, intro) => {
+				if (intro) this.intro = intro
+				if (!lines || !lines.length) return false
 				this.sections = [{ title: '积分规则', paras: lines }]
+				return true
 			}
-			api.site()
-				.then((site) => apply(site && site.mallRules))
-				.catch(() => {})
-			api.mallGoods()
-				.then((res) => apply(res && res.rules))
-				.catch(() => {})
+			Promise.all([
+				api.site().catch(() => null),
+				api.mallGoods().catch(() => null)
+			])
+				.then(([site, mall]) => {
+					const fromSite = apply(site && site.mallRules, site && site.mallRulesIntro)
+					const fromMall = apply(mall && mall.rules, mall && mall.rulesIntro)
+					if (!fromSite && !fromMall) {
+						uni.showToast({ title: '加载失败', icon: 'none' })
+					}
+				})
+				.catch(() => {
+					uni.showToast({ title: '加载失败', icon: 'none' })
+				})
 		}
 	}
 </script>

@@ -126,22 +126,11 @@
 <script>
 	import {
 		SLOTS,
-		formatDate,
-		getAvailability,
-		getMonthAvailability
+		formatDate
 	} from '../../common/room-inventory.js'
-	import { prependOrder } from '../../common/orders-store.js'
 	import { api } from '../../common/api.js'
 	import { isLoggedIn, silentLogin } from '../../common/auth.js'
 	import { settlePay } from '../../common/pay.js'
-
-	const FALLBACK_STORES = [
-		{ id: 'shibo', name: '天天俱乐部上海世博店', cover: '/static/stores/shibo.png', address: '上海市浦东新区长清路92号 中邻上钢里3楼' },
-		{ id: 'xinzhuang', name: '天天俱乐部上海莘庄店', cover: '/static/stores/xinzhuang.png', address: '上海市闵行区都市路5001号5楼' },
-		{ id: 'yaxin', name: '天天俱乐部上海亚新店', cover: '/static/stores/yaxin.png', address: '上海市普陀区长寿路401号3号楼2楼' },
-		{ id: 'gongkang', name: '天天俱乐部上海共康店', cover: '/static/stores/gongkang.png', address: '上海市宝山区共和新路5000弄绿地新都会1号楼二楼' },
-		{ id: 'ningbo', name: '宁波天天俱乐部天一店', cover: '/static/stores/ningbo.png', address: '浙江省宁波市海曙区中山路220号第二百货商店7楼' }
-	]
 
 	export default {
 		data() {
@@ -173,15 +162,14 @@
 				this.tick
 				if (!this.date) return null
 				const fromMonth = this.monthMap && this.monthMap[this.date] && this.monthMap[this.date][this.slot]
-				if (fromMonth) return fromMonth
-				return getAvailability(this.storeId, this.date, this.slot)
+				return fromMonth || null
 			},
 			canSubmit() {
 				return !!(this.date && this.currentAvail && !this.currentAvail.full)
 			},
 			barStatus() {
 				if (!this.date) return '请先选日期'
-				if (!this.currentAvail) return '—'
+				if (!this.currentAvail) return '加载中'
 				if (this.currentAvail.full) return '已满'
 				return `剩余 ${this.currentAvail.remain} 间`
 			},
@@ -256,26 +244,23 @@
 						if (res && res.list && res.list.length) this.stores = res.list
 					} catch (e) {}
 				}
-				if (!this.stores.length) this.stores = FALLBACK_STORES
-				if (!this.stores.find((s) => s.id === this.storeId)) {
+				if (!this.stores.length) {
+					uni.showToast({ title: '加载失败', icon: 'none' })
+				} else if (!this.stores.find((s) => s.id === this.storeId)) {
 					this.storeId = this.stores[0].id
 				}
 				this.loadRemoteMonth()
 			},
-			fallbackMonth() {
-				this.monthMap = getMonthAvailability(this.storeId, this.viewYear, this.viewMonth)
-				this.tick++
-			},
 			async loadRemoteMonth() {
 				try {
 					const res = await api.roomMonth(this.storeId, this.viewYear, this.viewMonth)
-					if (res && typeof res === 'object' && Object.keys(res).length) {
-						this.monthMap = res
-						this.tick++
-						return
-					}
-				} catch (e) {}
-				this.fallbackMonth()
+					this.monthMap = res && typeof res === 'object' ? res : {}
+					this.tick++
+				} catch (e) {
+					this.monthMap = {}
+					this.tick++
+					uni.showToast({ title: '加载失败', icon: 'none' })
+				}
 			},
 			slotInfo(key) {
 				this.tick
@@ -284,7 +269,7 @@
 				}
 				const fromMonth = this.monthMap && this.monthMap[this.date] && this.monthMap[this.date][key]
 				if (fromMonth) return fromMonth
-				return getAvailability(this.storeId, this.date, key)
+				return { remain: 0, full: false, statusText: '加载中' }
 			},
 			pickSlot(item) {
 				this.slot = item.key

@@ -18,22 +18,25 @@
 	export default {
 		data() {
 			return {
-				list: [
-					{ type: 'privacy', name: '天天俱乐部用户隐私协议' },
-					{ type: 'cancel', name: '注销账号协议' }
-				]
+				list: []
 			}
 		},
 		onLoad() {
 			api.agreements()
 				.then((data) => {
-					if (!data) return
+					if (!data) {
+						uni.showToast({ title: '加载失败', icon: 'none' })
+						return
+					}
 					const next = []
 					if (data.privacy) next.push({ type: 'privacy', name: data.privacy.title || data.privacy.navTitle || '用户隐私协议' })
 					if (data.cancel) next.push({ type: 'cancel', name: data.cancel.title || data.cancel.navTitle || '注销账号协议' })
-					if (next.length) this.list = next
+					this.list = next
+					if (!next.length) uni.showToast({ title: '加载失败', icon: 'none' })
 				})
-				.catch(() => {})
+				.catch(() => {
+					uni.showToast({ title: '加载失败', icon: 'none' })
+				})
 		},
 		methods: {
 			openAgreement(item) {

@@ -39,16 +39,15 @@
 </template>
 
 <script>
-	import { findMallGoods, mallPoints, mallRules } from '../../common/mall-goods.js'
 	import { api } from '../../common/api.js'
 	import { getUser, refreshProfile, silentLogin, isLoggedIn, saveLogin, getOpenid } from '../../common/auth.js'
 
 	export default {
 		data() {
 			return {
-				points: mallPoints,
+				points: 0,
 				goods: null,
-				rules: mallRules,
+				rules: [],
 				stewardVisible: false,
 				goodsId: ''
 			}
@@ -59,12 +58,7 @@
 			}
 		},
 		onLoad(query) {
-			this.goodsId = query.id
-			const goods = findMallGoods(query.id)
-			this.goods = goods
-			if (goods) {
-				uni.setNavigationBarTitle({ title: goods.title })
-			}
+			this.goodsId = query.id || ''
 			this.loadDetail()
 		},
 		onShow() {
@@ -80,10 +74,15 @@
 					if (res) {
 						this.goods = res
 						uni.setNavigationBarTitle({ title: res.title || res.name })
+					} else {
+						uni.showToast({ title: '加载失败', icon: 'none' })
+						return
 					}
 					const mall = await api.mallGoods()
-					if (mall.rules && mall.rules.length) this.rules = mall.rules
-				} catch (e) {}
+					this.rules = Array.isArray(mall.rules) ? mall.rules : []
+				} catch (e) {
+					uni.showToast({ title: '加载失败', icon: 'none' })
+				}
 			},
 			openSteward() {
 				this.stewardVisible = true

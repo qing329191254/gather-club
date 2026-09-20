@@ -19,7 +19,6 @@
 </template>
 
 <script>
-	import { getAgreement } from '../../common/agreements.js'
 	import { api } from '../../common/api.js'
 
 	export default {
@@ -35,14 +34,12 @@
 		},
 		onLoad(query) {
 			const type = (query && query.type) || 'privacy'
-			const local = getAgreement(type)
-			if (local) {
-				this.doc = local
-				uni.setNavigationBarTitle({ title: local.navTitle || '协议' })
-			}
 			api.agreement(type)
 				.then((doc) => {
-					if (!doc) return
+					if (!doc) {
+						uni.showToast({ title: '协议不存在', icon: 'none' })
+						return
+					}
 					this.doc = {
 						title: doc.title || '',
 						intro: doc.intro || '',
@@ -53,7 +50,7 @@
 					uni.setNavigationBarTitle({ title: this.doc.navTitle || '协议' })
 				})
 				.catch(() => {
-					if (!local) uni.showToast({ title: '协议不存在', icon: 'none' })
+					uni.showToast({ title: '协议不存在', icon: 'none' })
 				})
 		}
 	}

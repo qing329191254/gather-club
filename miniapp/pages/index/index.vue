@@ -212,10 +212,8 @@
 						this.stewardProps = stewardPropsFromSite(res.site)
 					})
 					.catch(() => {
-						this.banners = [
-							{ id: 1, image: '/static/banners/hotel.png', link: '/pages/recommend/recommend' },
-							{ id: 2, image: '/static/banners/nye.png', link: '/pages/nye/nye' }
-						]
+						this.banners = []
+						this.stores = []
 						uni.showToast({ title: '首页数据加载失败', icon: 'none' })
 					})
 			},

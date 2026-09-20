@@ -147,9 +147,6 @@
 </template>
 
 <script>
-	import { findNyeDetail, isNyeOpenDate, nyePackages } from '../../common/nye-data.js'
-	import { getAvailability, lockRooms } from '../../common/room-inventory.js'
-	import { prependOrder } from '../../common/orders-store.js'
 	import { api } from '../../common/api.js'
 	import { settlePay } from '../../common/pay.js'
 	import { isLoggedIn, silentLogin } from '../../common/auth.js'
@@ -166,7 +163,7 @@
 				date: '',
 				dateDeferred: false,
 				name: '',
-				phone: '13881794601',
+				phone: '',
 				remark: '',
 				stewardVisible: false,
 				couponVisible: false,
@@ -175,6 +172,7 @@
 				viewYear: 2027,
 				viewMonth: 2,
 				draftDate: '',
+				monthMap: {},
 				weeks: ['日', '一', '二', '三', '四', '五', '六']
 			}
 		},
@@ -204,8 +202,8 @@
 				const year = this.viewYear
 				const month = this.viewMonth
 				const price = this.current ? this.current.price : 0
-				const storeId = (this.detail && this.detail.id) || 'gongkang'
 				const slot = this.roomSlot
+				const map = this.monthMap || {}
 				const firstWeek = new Date(year, month - 1, 1).getDay()
 				const daysInMonth = new Date(year, month, 0).getDate()
 				const prevDays = new Date(year, month - 1, 0).getDate()
@@ -220,13 +218,16 @@
 				}
 				for (let d = 1; d <= daysInMonth; d++) {
 					const key = year + '-' + this.pad2(month) + '-' + this.pad2(d)
-					const open = isNyeOpenDate(key)
+					const open = this.isNyeOpenDate(key)
 					let full = false
 					let remainText = ''
 					if (open) {
-						const avail = getAvailability(storeId, key, slot)
-						full = avail.full
-						remainText = full ? '已满' : '剩' + avail.remain
+						const dayInfo = map[key]
+						const avail = dayInfo && dayInfo[slot]
+						if (avail) {
+							full = !!avail.full
+							remainText = full ? '已满' : '剩' + (avail.remain || 0)
+						}
 					}
 					cells.push({
 						key,
@@ -252,18 +253,24 @@
 			}
 		},
 		onLoad(query) {
-			const detail = findNyeDetail(query.id)
-			this.detail = detail
-			this.packages = nyePackages(detail)
-			const first = this.packages.find((item) => !item.disabled)
-			if (first) {
-				this.specId = first.id
-				this.people = first.people
+			const id = (query && query.id) || ''
+			if (!id) {
+				uni.showToast({ title: '加载失败', icon: 'none' })
+				setTimeout(() => {
+					uni.navigateBack({ fail() {} })
+				}, 400)
+				return
 			}
 			api
-				.nyeDetail(query.id || 'gongkang')
+				.nyeDetail(id)
 				.then((res) => {
-					if (!res) return
+					if (!res) {
+						uni.showToast({ title: '加载失败', icon: 'none' })
+						setTimeout(() => {
+							uni.navigateBack({ fail() {} })
+						}, 400)
+						return
+					}
 					this.detail = {
 						id: res.id,
 						name: res.name,
@@ -274,18 +281,52 @@
 						lat: res.lat,
 						lng: res.lng,
 						banners: res.banners || [],
-						detailImages: res.detailImages || []
+						detailImages: res.detailImages || [],
+						openStart: res.openStart || '',
+						openEnd: res.openEnd || ''
 					}
-					this.packages = res.packages && res.packages.length ? res.packages : nyePackages(this.detail)
+					this.packages = Array.isArray(res.packages) ? res.packages : []
 					const ok = this.packages.find((item) => !item.disabled)
 					if (ok) {
 						this.specId = ok.id
 						this.people = ok.people
 					}
+					if (this.detail.openStart) {
+						const parts = String(this.detail.openStart).split('-')
+						if (parts.length >= 2) {
+							this.viewYear = Number(parts[0]) || this.viewYear
+							this.viewMonth = Number(parts[1]) || this.viewMonth
+						}
+					}
 				})
-				.catch(() => {})
+				.catch(() => {
+					uni.showToast({ title: '加载失败', icon: 'none' })
+					setTimeout(() => {
+						uni.navigateBack({ fail() {} })
+					}, 400)
+				})
 		},
 		methods: {
+			isNyeOpenDate(key) {
+				const start = (this.detail && this.detail.openStart) || ''
+				const end = (this.detail && this.detail.openEnd) || ''
+				if (!key || !start || !end) return false
+				return key >= start && key <= end
+			},
+			async loadMonthMap() {
+				const storeId = (this.detail && this.detail.id) || ''
+				if (!storeId) {
+					this.monthMap = {}
+					return
+				}
+				try {
+					const res = await api.roomMonth(storeId, this.viewYear, this.viewMonth)
+					this.monthMap = res && typeof res === 'object' ? res : {}
+				} catch (e) {
+					this.monthMap = {}
+					uni.showToast({ title: '加载失败', icon: 'none' })
+				}
+			},
 			pickSpec(item) {
 				if (item.disabled) {
 					uni.showToast({ title: '当前规格已售罄～', icon: 'none' })
@@ -336,12 +377,11 @@
 				this.continuePay()
 			},
 			async continuePay() {
-				const storeId = (this.detail && this.detail.id) || 'gongkang'
+				const storeId = (this.detail && this.detail.id) || ''
 				const storeName = (this.detail && this.detail.name) || '天天俱乐部'
 				const cur = this.current
 				if (!cur) return
 
-				// 已选日期时校验并锁定包房；稍后选日期则仅生成订单不锁库存
 				if (this.date) {
 					try {
 						const avail = await api.roomAvailability(storeId, this.date, this.roomSlot)
@@ -350,11 +390,8 @@
 							return
 						}
 					} catch (e) {
-						const avail = getAvailability(storeId, this.date, this.roomSlot)
-						if (avail.full) {
-							uni.showToast({ title: '该日期包房已满，请换一天', icon: 'none' })
-							return
-						}
+						uni.showToast({ title: '库存校验失败', icon: 'none' })
+						return
 					}
 				}
 
@@ -422,11 +459,18 @@
 					this.viewYear = Number(parts[0])
 					this.viewMonth = Number(parts[1])
 					this.draftDate = this.date
+				} else if (this.detail && this.detail.openStart) {
+					const parts = String(this.detail.openStart).split('-')
+					this.viewYear = Number(parts[0]) || this.viewYear
+					this.viewMonth = Number(parts[1]) || this.viewMonth
+					this.draftDate = this.detail.openStart
 				} else {
-					this.viewYear = 2027
-					this.viewMonth = 2
-					this.draftDate = '2027-02-05'
+					const now = new Date()
+					this.viewYear = now.getFullYear()
+					this.viewMonth = now.getMonth() + 1
+					this.draftDate = ''
 				}
+				this.loadMonthMap()
 				this.calendarVisible = true
 			},
 			closeCalendar() {
@@ -449,6 +493,7 @@
 				}
 				this.viewYear = year
 				this.viewMonth = month
+				this.loadMonthMap()
 			},
 			pickDate(cell) {
 				if (!cell.open || cell.full) {
