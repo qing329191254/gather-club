@@ -10,7 +10,7 @@ from .config import get_settings
 from .database import Base, SessionLocal, engine
 from .migrate import ensure_schema
 from .routers import admin_api, miniapp
-from .seed import seed_all
+from .seed import enforce_production_secrets, seed_all
 
 settings = get_settings()
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -50,6 +50,7 @@ async def on_startup() -> None:
     db = SessionLocal()
     try:
         seed_all(db)
+        enforce_production_secrets(db)
         try:
             import logging
 

@@ -14,8 +14,9 @@ from .cms_data import (
     PRIVACY_SHARE,
     default_nye_packages,
 )
-from .config import get_settings
-from .deps import hash_password
+from .config import DEFAULT_ADMIN_PASSWORD, DEFAULT_JWT_SECRET, get_settings
+from .deps import hash_password, verify_password
+from .wx import wx_configured
 from .models import (
     AdminUser,
     Banner,
@@ -450,3 +451,19 @@ def seed_all(db: Session) -> None:
                 set_config(db, key, default)
 
     refresh_demo_covers(db)
+
+
+def enforce_production_secrets(db: Session) -> None:
+    """配了微信密钥即视为正式环境：拒绝默认 JWT / 后台口令，并把已有管理员密码同步成环境变量。"""
+    if not wx_configured():
+        return
+    settings = get_settings()
+    if (settings.jwt_secret or "") == DEFAULT_JWT_SECRET:
+        raise RuntimeError("正式环境必须设置 JWT_SECRET，不能使用开发默认值")
+    password = settings.admin_password or ""
+    if not password or password == DEFAULT_ADMIN_PASSWORD:
+        raise RuntimeError("正式环境必须设置 ADMIN_PASSWORD，不能使用 admin123")
+    user = db.query(AdminUser).filter(AdminUser.username == settings.admin_username).first()
+    if user and not verify_password(password, user.password_hash):
+        user.password_hash = hash_password(password)
+        db.commit()

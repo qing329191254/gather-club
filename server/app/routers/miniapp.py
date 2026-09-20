@@ -87,18 +87,20 @@ def _client_openid(
     x_wx_openid: str = "",
     openid: str = "",
 ) -> str:
-    """Prefer WeChat Cloud trusted X-WX-OPENID; never trust query openid when WX configured."""
+    """正式环境只认云托管注入的 X-WX-OPENID，忽略客户端自带的 X-Openid / query。"""
     trusted = (x_wx_openid or "").strip()
+    if wx_configured():
+        if trusted and trusted != "anonymous":
+            return trusted
+        return ""
     if trusted and trusted != "anonymous":
         return trusted
     header = (x_openid or "").strip()
     if header and header != "anonymous":
         return header
-    # 本地未配微信密钥时，才允许 query openid（方便调试）
-    if not wx_configured():
-        q = (openid or "").strip()
-        if q and q != "anonymous":
-            return q
+    q = (openid or "").strip()
+    if q and q != "anonymous":
+        return q
     return ""
 
 
@@ -452,10 +454,11 @@ async def wx_login(payload: WxLoginIn, db: Session = Depends(get_db)):
 async def bind_phone(
     payload: WxPhoneIn,
     x_openid: str = Header(default="", alias="X-Openid"),
+    x_wx_openid: str = Header(default="", alias="X-WX-OPENID"),
     openid: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
-    oid = x_openid or openid
+    oid = _client_openid(x_openid, x_wx_openid, openid)
     if payload.loginCode:
         if wx_configured():
             session = await code2session(payload.loginCode)
@@ -1303,10 +1306,11 @@ def update_address(
     address_id: int,
     payload: dict = Body(default={}),
     x_openid: str = Header(default="", alias="X-Openid"),
+    x_wx_openid: str = Header(default="", alias="X-WX-OPENID"),
     openid: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
-    user = _ensure_user(db, _require_openid(x_openid, "", openid))
+    user = _ensure_user(db, _require_openid(x_openid, x_wx_openid, openid))
     row = db.query(Address).filter(Address.id == address_id, Address.user_id == user.id).first()
     if not row:
         raise HTTPException(status_code=404, detail="地址不存在")
@@ -1330,10 +1334,11 @@ def update_address(
 def delete_address(
     address_id: int,
     x_openid: str = Header(default="", alias="X-Openid"),
+    x_wx_openid: str = Header(default="", alias="X-WX-OPENID"),
     openid: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
-    user = _ensure_user(db, _require_openid(x_openid, "", openid))
+    user = _ensure_user(db, _require_openid(x_openid, x_wx_openid, openid))
     row = db.query(Address).filter(Address.id == address_id, Address.user_id == user.id).first()
     if row:
         db.delete(row)
@@ -1345,10 +1350,11 @@ def delete_address(
 def set_default_address(
     address_id: int,
     x_openid: str = Header(default="", alias="X-Openid"),
+    x_wx_openid: str = Header(default="", alias="X-WX-OPENID"),
     openid: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
-    user = _ensure_user(db, _require_openid(x_openid, "", openid))
+    user = _ensure_user(db, _require_openid(x_openid, x_wx_openid, openid))
     row = db.query(Address).filter(Address.id == address_id, Address.user_id == user.id).first()
     if not row:
         raise HTTPException(status_code=404, detail="地址不存在")
@@ -1415,13 +1421,14 @@ def claim_coupon(
 @router.get("/mall/records")
 def mall_records(
     x_openid: str = Header(default="", alias="X-Openid"),
+    x_wx_openid: str = Header(default="", alias="X-WX-OPENID"),
     openid: str = Query(default=""),
     page: int = Query(1),
     page_size: int = Query(20),
     db: Session = Depends(get_db),
 ):
     page, page_size, offset = normalize_page(page, page_size)
-    user = _ensure_user(db, _require_openid(x_openid, "", openid))
+    user = _ensure_user(db, _require_openid(x_openid, x_wx_openid, openid))
     q = (
         db.query(Order)
         .filter(Order.user_id == user.id, Order.type == "mall")
@@ -1471,13 +1478,14 @@ def order_detail(
 @router.get("/user/points")
 def user_points(
     x_openid: str = Header(default="", alias="X-Openid"),
+    x_wx_openid: str = Header(default="", alias="X-WX-OPENID"),
     openid: str = Query(default=""),
     page: int = Query(1),
     page_size: int = Query(20),
     db: Session = Depends(get_db),
 ):
     page, page_size, offset = normalize_page(page, page_size)
-    oid = _require_openid(x_openid, "", openid)
+    oid = _require_openid(x_openid, x_wx_openid, openid)
     user = _ensure_user(db, oid)
     q = (
         db.query(PointLedger)
@@ -1507,10 +1515,11 @@ def user_points(
 @router.get("/user/coupons")
 def user_coupons(
     x_openid: str = Header(default="", alias="X-Openid"),
+    x_wx_openid: str = Header(default="", alias="X-WX-OPENID"),
     openid: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
-    oid = _require_openid(x_openid, "", openid)
+    oid = _require_openid(x_openid, x_wx_openid, openid)
     user = _ensure_user(db, oid)
     rows = db.query(UserCoupon).filter(UserCoupon.user_id == user.id).order_by(UserCoupon.id.desc()).all()
     dirty = False
@@ -1706,6 +1715,7 @@ def _live_out(row: VideoLive, reserved: bool = False) -> dict:
 @router.get("/video")
 def video_home(
     x_openid: str = Header(default="", alias="X-Openid"),
+    x_wx_openid: str = Header(default="", alias="X-WX-OPENID"),
     openid: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
@@ -1718,7 +1728,7 @@ def video_home(
     )
     reserved_ids = set()
     followed = False
-    oid = x_openid or openid
+    oid = _client_openid(x_openid, x_wx_openid, openid)
     if oid:
         user = _user_by_openid(db, oid)
         if user:
@@ -1741,10 +1751,11 @@ def video_home(
 @router.post("/video/follow")
 def video_follow(
     x_openid: str = Header(default="", alias="X-Openid"),
+    x_wx_openid: str = Header(default="", alias="X-WX-OPENID"),
     openid: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
-    user = _ensure_user(db, _require_openid(x_openid, "", openid))
+    user = _ensure_user(db, _require_openid(x_openid, x_wx_openid, openid))
     exists = db.query(VideoFollow).filter(VideoFollow.user_id == user.id).first()
     if not exists:
         db.add(VideoFollow(user_id=user.id))
@@ -1762,10 +1773,11 @@ def video_follow(
 def video_reserve(
     payload: dict = Body(default={}),
     x_openid: str = Header(default="", alias="X-Openid"),
+    x_wx_openid: str = Header(default="", alias="X-WX-OPENID"),
     openid: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
-    user = _ensure_user(db, _require_openid(x_openid, "", openid))
+    user = _ensure_user(db, _require_openid(x_openid, x_wx_openid, openid))
     live_id = int(payload.get("liveId") or payload.get("live_id") or 0)
     live = db.query(VideoLive).filter(VideoLive.id == live_id, VideoLive.enabled.is_(True)).first()
     if not live:

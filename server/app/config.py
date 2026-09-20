@@ -4,15 +4,19 @@ from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+DEFAULT_JWT_SECRET = "gather-club-dev-secret-change-me"
+DEFAULT_ADMIN_PASSWORD = "admin123"
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     app_name: str = "Gather Club API"
     database_url: str = "sqlite:///./gather.db"
-    jwt_secret: str = "gather-club-dev-secret-change-me"
+    jwt_secret: str = DEFAULT_JWT_SECRET
     jwt_expire_hours: int = 72
     admin_username: str = "admin"
-    admin_password: str = "admin123"
+    admin_password: str = DEFAULT_ADMIN_PASSWORD
     wx_appid: str = ""
     wx_secret: str = ""
     wx_mch_id: str = ""
