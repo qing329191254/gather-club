@@ -90,10 +90,13 @@ const linkOptions = computed(() => {
         value: `/pages/nye/nye?tag=${encodeURIComponent(tag)}`
       }
     })
-  // 兼容旧「宴会专题」链接，编辑时仍能显示名称
-  const legacy = [{ label: '活动专题（默认年夜饭）', value: '/pages/nye/nye' }]
-  return [...baseLinkOptions.slice(0, 1), ...actLinks, ...legacy, ...baseLinkOptions.slice(1)]
+  return [...baseLinkOptions.slice(0, 1), ...actLinks, ...baseLinkOptions.slice(1)]
 })
+
+function defaultActivityLink() {
+  const nye = linkOptions.value.find((item) => item.label === '活动：年夜饭')
+  return (nye || linkOptions.value.find((item) => String(item.value).startsWith('/pages/nye/nye?')))?.value || ''
+}
 
 const list = ref([])
 const visible = ref(false)
@@ -108,7 +111,7 @@ function linkLabel(link) {
       const q = String(link).split('?')[1] || ''
       const tag = new URLSearchParams(q).get('tag')
       if (tag) return `活动：${decodeURIComponent(tag)}`
-      return '活动专题'
+      return '活动：年夜饭'
     }
   } catch (_) {
     /* ignore */
@@ -124,9 +127,8 @@ async function load() {
 
 function openEdit(row) {
   Object.assign(form, { id: null, image: '', link: '', sort: 0, enabled: true }, row || {})
-  // 旧「宴会专题」统一显示为默认活动页
   if (form.link === '/pages/nye/nye') {
-    /* keep */
+    form.link = defaultActivityLink()
   }
   visible.value = true
 }

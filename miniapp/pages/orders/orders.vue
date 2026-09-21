@@ -67,7 +67,7 @@
 			:expire="verifyExpire"
 			place-label="适用门店："
 			:places="verifyPlaces"
-			@close="verifyVisible = false"
+			@close="closeVerify"
 		/>
 	</view>
 </template>
@@ -97,11 +97,20 @@
 				verifyVisible: false,
 				verifyCode: '',
 				verifyExpire: '',
-				verifyPlaces: []
+				verifyPlaces: [],
+				verifyOrderId: '',
+				verifyTimer: null
 			}
 		},
 		onShow() {
 			this.reloadOrders()
+			if (this.verifyVisible && this.verifyOrderId) this.startVerifyPoll()
+		},
+		onHide() {
+			this.stopVerifyPoll()
+		},
+		onUnload() {
+			this.stopVerifyPoll()
 		},
 		onReachBottom() {
 			this.loadMoreOrders()
@@ -195,12 +204,56 @@
 			onShowCode(order) {
 				if (!order.verifyCode) return
 				const slot = this.slotName(order.roomSlot)
+				this.verifyOrderId = order.id
 				this.verifyCode = order.verifyCode
 				this.verifyExpire = order.roomDate ? `用餐时间：${order.roomDate}${slot ? ' ' + slot : ''}` : ''
 				this.verifyPlaces = order.storeName
 					? [{ id: order.storeId || order.storeName, name: order.storeName }]
 					: []
 				this.verifyVisible = true
+				this.startVerifyPoll()
+			},
+			closeVerify() {
+				this.verifyVisible = false
+				this.verifyOrderId = ''
+				this.stopVerifyPoll()
+			},
+			startVerifyPoll() {
+				this.stopVerifyPoll()
+				this.pollVerifyOrder()
+				this.verifyTimer = setInterval(() => {
+					this.pollVerifyOrder()
+				}, 2000)
+			},
+			stopVerifyPoll() {
+				if (this.verifyTimer) {
+					clearInterval(this.verifyTimer)
+					this.verifyTimer = null
+				}
+			},
+			async pollVerifyOrder() {
+				const id = this.verifyOrderId
+				if (!this.verifyVisible || !id) return
+				try {
+					const detail = await api.orderDetail(id)
+					if (!this.verifyVisible || this.verifyOrderId !== id) return
+					if (detail && detail.status && detail.status !== 'paid') {
+						this.applyVerifiedOrder(detail)
+					}
+				} catch (e) {
+					/* 网络抖动时继续下一轮 */
+				}
+			},
+			applyVerifiedOrder(detail) {
+				const mapped = this.mapOrder(detail)
+				this.closeVerify()
+				if (this.currentTab && this.currentTab !== mapped.status) {
+					this.orders = this.orders.filter((item) => item.id !== mapped.id)
+				} else {
+					const idx = this.orders.findIndex((item) => item.id === mapped.id)
+					if (idx >= 0) this.orders.splice(idx, 1, mapped)
+				}
+				uni.showToast({ title: mapped.statusText || '已核销', icon: 'none' })
 			},
 			onCancel(order) {
 				const key = 'cancel-' + order.id
