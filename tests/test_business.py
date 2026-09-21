@@ -39,6 +39,7 @@ from app.models import AppUser, Order, UserCoupon  # noqa: E402
 from app.utils import get_config, set_config, today_cn  # noqa: E402
 
 FUTURE = "2030-06-01"
+NYE_OPEN_DAY = "2027-02-08"
 
 
 def headers(openid: str) -> dict:
@@ -356,7 +357,7 @@ class BusinessTests(unittest.TestCase):
         saved = self.client.post(
             "/api/admin/rooms",
             headers={"Authorization": f"Bearer {token}"},
-            json={"store_id": "shibo", "date": "2030-07-01", "slot": "dinner", "capacity": 1, "booked": 1},
+            json={"store_id": "shibo", "date": NYE_OPEN_DAY, "slot": "dinner", "capacity": 1, "booked": 1},
         )
         self.assertEqual(saved.status_code, 200, saved.text)
         res = self.client.post(
@@ -366,7 +367,7 @@ class BusinessTests(unittest.TestCase):
                 "type": "nye",
                 "store_id": "shibo",
                 "package_id": "1",
-                "room_date": "2030-07-01",
+                "room_date": NYE_OPEN_DAY,
                 "room_slot": "dinner",
             },
         )
@@ -666,6 +667,36 @@ class BusinessTests(unittest.TestCase):
         self.assertEqual((page.json().get("activity") or {}).get("tag"), "测试宴")
         deleted = self.client.delete("/api/admin/activities/act_test_x", headers=auth)
         self.assertEqual(deleted.status_code, 200, deleted.text)
+
+    def test_pay_notify_cancelled_goes_refund_pending(self):
+        from unittest.mock import patch
+
+        hotel = self.hotel
+        created = self.client.post(
+            "/api/v1/orders",
+            headers=headers("openid-notify-cancel"),
+            json={"type": "recommend", "store_id": str(hotel["id"])},
+        )
+        self.assertEqual(created.status_code, 200, created.text)
+        order_id = created.json()["id"]
+        amount = float(created.json()["amount"])
+        cancelled = self.client.post(f"/api/v1/orders/{order_id}/cancel", headers=headers("openid-notify-cancel"))
+        self.assertEqual(cancelled.status_code, 200, cancelled.text)
+        self.assertEqual(cancelled.json()["status"], "cancelled")
+
+        notify = {
+            "return_code": "SUCCESS",
+            "result_code": "SUCCESS",
+            "out_trade_no": order_id,
+            "total_fee": str(int(round(amount * 100))),
+            "transaction_id": "tx-notify-cancel",
+        }
+        with patch("app.routers.miniapp.parse_notify", return_value=notify):
+            res = self.client.post("/api/v1/pay/notify", content="<xml/>")
+        self.assertEqual(res.status_code, 200, res.text)
+        detail = self.client.get(f"/api/v1/orders/{order_id}", headers=headers("openid-notify-cancel"))
+        self.assertEqual(detail.status_code, 200, detail.text)
+        self.assertEqual(detail.json()["status"], "refund_pending")
 
     def test_product_order_by_gather_id(self):
         res = self.client.post(

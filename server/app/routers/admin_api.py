@@ -1468,17 +1468,28 @@ def update_activity(
     item = _normalize_activity(data, require_id=True)
     if any(i != idx and str(r.get("tag")) == item["tag"] for i, r in enumerate(rows)):
         raise HTTPException(400, "筛选标识已被其他活动使用")
+    old_tag = str(rows[idx].get("tag") or "").strip()
+    new_tag = str(item.get("tag") or "").strip()
     rows[idx] = item
     set_config(db, "activities", rows)
+    # 筛选标识改了时，同步去哪聚商品上的所属活动，避免活动页空列表
+    if old_tag and new_tag and old_tag != new_tag:
+        for p in db.query(GatherProduct).filter(GatherProduct.tag == old_tag).all():
+            p.tag = new_tag
+        db.commit()
     return item
 
 
 @router.delete("/activities/{activity_id}")
 def delete_activity(activity_id: str, db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
     rows = _activities_all(db)
-    next_rows = [r for r in rows if str(r.get("id")) != activity_id]
-    if len(next_rows) == len(rows):
+    target = next((r for r in rows if str(r.get("id")) == activity_id), None)
+    if not target:
         raise HTTPException(404, "活动不存在")
+    tag = str(target.get("tag") or "").strip()
+    if tag and db.query(GatherProduct).filter(GatherProduct.tag == tag).count():
+        raise HTTPException(400, "仍有商品绑定该活动，请先改商品「所属活动」再删除")
+    next_rows = [r for r in rows if str(r.get("id")) != activity_id]
     set_config(db, "activities", next_rows)
     return OkResponse()
 

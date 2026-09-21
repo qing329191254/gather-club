@@ -326,8 +326,17 @@ def ensure_default_activities(db: Session) -> None:
 
 
 def sync_gather_demo_catalog(db: Session) -> None:
-    """把去哪聚演示目录刷成聚会业务数据（一次性 v2）。"""
+    """把去哪聚演示目录刷成聚会业务数据（一次性 v2）。
+
+    正式环境（已配微信密钥）不跑，避免覆盖运营已改的商品。
+    """
     if get_config(db, "gather_demo_catalog_v2"):
+        return
+    if wx_configured():
+        # 正式库只打标记，不改目录
+        set_config(db, "gather_demo_catalog_v2", "1")
+        set_config(db, "gather_demo_variety_v1", "1")
+        db.commit()
         return
 
     existing_tabs = {t.key: t for t in db.query(GatherTab).all()}
@@ -341,16 +350,17 @@ def sync_gather_demo_catalog(db: Session) -> None:
         else:
             db.add(GatherTab(**item, enabled=True))
 
-    # 删除旧「招牌菜 / 精品套餐」分类及其商品
+    # 旧「招牌菜 / 精品套餐」只下架，不硬删（避免误伤关联订单引用）
     for key in ("dish", "set"):
         row = existing_tabs.get(key)
         if row:
-            db.delete(row)
-    db.query(GatherProduct).filter(GatherProduct.tab.in_(("dish", "set"))).delete(synchronize_session=False)
+            row.enabled = False
+    for row in db.query(GatherProduct).filter(GatherProduct.tab.in_(("dish", "set"))).all():
+        row.enabled = False
 
     demo_ids = {item["id"] for item in GATHER_PRODUCTS}
     store_ids = {item["id"] for item in STORES}
-    # 下架门店编号遗留卡、以及不在本批演示清单里的旧测试商品
+    # 下架门店编号遗留卡、以及 0.01 占位价测试商品
     for row in db.query(GatherProduct).all():
         if row.id in demo_ids:
             continue
@@ -373,10 +383,14 @@ def sync_gather_demo_catalog(db: Session) -> None:
                 fields["lng"] = float(home.lng or 0)
         row = db.query(GatherProduct).filter(GatherProduct.id == fields["id"]).first()
         if row:
+            # 已有演示卡只补空字段 / 套餐，不覆盖运营已改标题封面
             for key, value in fields.items():
                 if key == "id":
                     continue
-                setattr(row, key, value)
+                cur = getattr(row, key, None)
+                empty = cur is None or cur == "" or cur == "[]" or cur == "{}" or cur == 0
+                if empty or (key == "packages" and not loads(getattr(row, "packages", None) or "[]", [])):
+                    setattr(row, key, value)
             row.enabled = True
         else:
             db.add(GatherProduct(**fields))
@@ -548,7 +562,26 @@ def _needs_demo_cover(url: str) -> bool:
 
 
 def refresh_demo_covers(db: Session) -> None:
-    """把仍指向失效 /static 的业务图刷成占位图（不影响已上传的 COS 地址）。"""
+    """把仍指向失效 /static 的业务图刷成占位图（不影响已上传的 COS 地址）。
+
+    正式环境跳过，避免启动时把运营素材误刷成 picsum。
+    """
+    if wx_configured():
+        return
+
+    def _patch_list(items: list, factory) -> list:
+        if not items:
+            return factory()
+        changed = False
+        out = []
+        for i, x in enumerate(items):
+            if _needs_demo_cover(x):
+                out.append(factory()[min(i, 2)])
+                changed = True
+            else:
+                out.append(x)
+        return out if changed else items
+
     for row in db.query(Store).all():
         if _needs_demo_cover(row.cover):
             row.cover = demo_img(f"store-{row.id}")
@@ -559,20 +592,36 @@ def refresh_demo_covers(db: Session) -> None:
         if _needs_demo_cover(row.cover):
             row.cover = demo_img(f"gather-{row.id}")
         banners = loads(row.banners, [])
-        if any(_needs_demo_cover(x) for x in banners) or not banners:
-            row.banners = dumps([demo_img(f"gather-{row.id}-b{i}") for i in range(1, 4)])
+        patched = _patch_list(
+            banners if isinstance(banners, list) else [],
+            lambda: [demo_img(f"gather-{row.id}-b{i}") for i in range(1, 4)],
+        )
+        if patched is not banners:
+            row.banners = dumps(patched)
         details = loads(row.detail_images, [])
-        if any(_needs_demo_cover(x) for x in details) or not details:
-            row.detail_images = dumps([demo_img(f"gather-{row.id}-d{i}", 900, 1200) for i in range(1, 3)])
+        patched_d = _patch_list(
+            details if isinstance(details, list) else [],
+            lambda: [demo_img(f"gather-{row.id}-d{i}", 900, 1200) for i in range(1, 3)],
+        )
+        if patched_d is not details:
+            row.detail_images = dumps(patched_d)
     for row in db.query(NyeStore).all():
         if _needs_demo_cover(row.cover):
             row.cover = demo_img(f"nye-{row.id}")
         banners = loads(row.banners, [])
-        if any(_needs_demo_cover(x) for x in banners) or not banners:
-            row.banners = dumps([demo_img(f"nye-{row.id}-b{i}") for i in range(1, 4)])
+        patched = _patch_list(
+            banners if isinstance(banners, list) else [],
+            lambda: [demo_img(f"nye-{row.id}-b{i}") for i in range(1, 4)],
+        )
+        if patched is not banners:
+            row.banners = dumps(patched)
         details = loads(row.detail_images, [])
-        if any(_needs_demo_cover(x) for x in details) or not details:
-            row.detail_images = dumps([demo_img(f"nye-{row.id}-d{i}", 900, 1200) for i in range(1, 3)])
+        patched_d = _patch_list(
+            details if isinstance(details, list) else [],
+            lambda: [demo_img(f"nye-{row.id}-d{i}", 900, 1200) for i in range(1, 3)],
+        )
+        if patched_d is not details:
+            row.detail_images = dumps(patched_d)
     for row in db.query(RecommendItem).all():
         if _needs_demo_cover(row.cover):
             row.cover = demo_img(f"rec-{row.id}")
@@ -581,8 +630,16 @@ def refresh_demo_covers(db: Session) -> None:
             row.cover = demo_img(f"mall-{row.id}", 600, 600)
     rec = dict(get_config(db, "recommend") or {})
     banners = rec.get("banners") or []
-    if not banners or any(_needs_demo_cover(x) for x in banners):
+    if not banners:
         set_config(db, "recommend", {"banners": RECOMMEND_BANNERS})
+    elif any(_needs_demo_cover(x) for x in banners):
+        patched = []
+        for i, x in enumerate(banners):
+            if _needs_demo_cover(x):
+                patched.append(RECOMMEND_BANNERS[min(i, len(RECOMMEND_BANNERS) - 1)])
+            else:
+                patched.append(x)
+        set_config(db, "recommend", {"banners": patched})
     db.commit()
 
 

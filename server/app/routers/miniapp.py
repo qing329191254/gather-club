@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Optional
 import calendar
+import uuid
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request
 from fastapi.responses import Response
@@ -931,7 +932,7 @@ def create_order(
 ):
     openid = _require_openid(x_openid, x_wx_openid, payload.openid)
     user = _ensure_user(db, openid)
-    order_id = f"o{int(datetime.utcnow().timestamp() * 1000)}"
+    order_id = f"o{int(datetime.utcnow().timestamp() * 1000)}{uuid.uuid4().hex[:6]}"
     qty = max(1, int(payload.quantity or 1))
     if (payload.type or "").strip() == "room":
         qty = 1
@@ -951,6 +952,12 @@ def create_order(
     if (payload.type or "") == "nye":
         product = find_gather_product(db, payload.store_id or "", enabled_only=True)
         if product:
+            open_start = (getattr(product, "open_start", None) or "").strip()
+            open_end = (getattr(product, "open_end", None) or "").strip()
+            if room_date and open_start and room_date < open_start:
+                raise HTTPException(status_code=400, detail=f"该活动开放日期为 {open_start} 起")
+            if room_date and open_end and room_date > open_end:
+                raise HTTPException(status_code=400, detail=f"该活动开放日期至 {open_end} 止")
             order_store_id = product.id
             linked = (getattr(product, "detail_id", None) or "").strip() or product.id
             if payload.room_date and payload.room_slot:
@@ -958,6 +965,12 @@ def create_order(
         else:
             nye = find_nye_store(db, payload.store_id or "", enabled_only=True)
             if nye:
+                open_start = (getattr(nye, "open_start", None) or "").strip()
+                open_end = (getattr(nye, "open_end", None) or "").strip()
+                if room_date and open_start and room_date < open_start:
+                    raise HTTPException(status_code=400, detail=f"该活动开放日期为 {open_start} 起")
+                if room_date and open_end and room_date > open_end:
+                    raise HTTPException(status_code=400, detail=f"该活动开放日期至 {open_end} 止")
                 order_store_id = nye.id
                 linked = (getattr(nye, "store_id", None) or "").strip() or nye.id
                 if payload.room_date and payload.room_slot:
@@ -1081,7 +1094,15 @@ async def pay_notify(request: Request, db: Session = Depends(get_db)):
         return Response(content=notify_ok_xml(), media_type="application/xml")
     _release_stale_room_holds(db)
     db.refresh(order)
-    if order.status not in ("pending", "cancelled"):
+    # 超时/过期会把 pending 改成 cancelled：此时钱已扣，走待退款，绝不能再标已支付
+    if order.status == "cancelled":
+        patch = {
+            "transaction_id": data.get("transaction_id") or "",
+            "prepay_id": loads(order.extra or "{}", {}).get("prepay_id"),
+        }
+        mark_refund_pending(db, order, "支付到达时订单已关闭", patch)
+        return Response(content=notify_ok_xml(), media_type="application/xml")
+    if order.status != "pending":
         return Response(content=notify_ok_xml(), media_type="application/xml")
     expected = int(round(float(order.amount or order.price or 0) * 100))
     try:
