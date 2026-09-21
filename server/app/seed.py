@@ -102,6 +102,8 @@ STORES = [
 GATHER_TABS = [
     {"key": "day", "name": "聚一天", "show_sold": True, "sort": 1},
     {"key": "meal", "name": "聚个餐", "show_sold": True, "sort": 2},
+    {"key": "room", "name": "包房局", "show_sold": True, "sort": 3},
+    {"key": "biz", "name": "商务宴", "show_sold": False, "sort": 4},
 ]
 
 GATHER_REGIONS = [
@@ -111,21 +113,236 @@ GATHER_REGIONS = [
     {"id": "ningbo", "name": "宁波市", "sort": 3},
 ]
 
-# 去哪聚总库：每张卡独立商品（封面/套餐/销量）；detail_id 绑首页门店做包房
+# 去哪聚总库：每张卡独立商品（封面/标题/套餐/销量）；detail_id 绑首页门店做包房
 GATHER_PRODUCTS = [
-    {"id": "d1", "tab": "day", "region": "shanghai", "detail_id": "xinzhuang", "tag": "年夜饭", "sort": 1},
-    {"id": "d3", "tab": "day", "region": "shanghai", "detail_id": "yaxin", "tag": "年夜饭", "sort": 2},
-    {"id": "d5", "tab": "day", "region": "shanghai", "detail_id": "gongkang", "tag": "年夜饭", "sort": 3},
-    {"id": "d8", "tab": "day", "region": "shanghai", "detail_id": "shibo", "tag": "年夜饭", "sort": 4},
-    {"id": "m1", "tab": "meal", "region": "shanghai", "detail_id": "xinzhuang", "tag": "家宴", "tags": ["近地铁", "包厢"], "sort": 1, "price": 799},
-    {"id": "m2", "tab": "meal", "region": "shanghai", "detail_id": "yaxin", "tag": "家宴", "tags": ["地铁直", "沉浸体验"], "sort": 2, "price": 799},
-    {"id": "m3", "tab": "meal", "region": "shanghai", "detail_id": "gongkang", "tag": "本帮菜", "tags": ["直营", "怀旧风"], "sort": 3, "price": 699},
-    {"id": "m4", "tab": "meal", "region": "shanghai", "detail_id": "shibo", "tag": "套餐", "tags": ["午市", "商务"], "sort": 4, "price": 899},
+    # 聚一天
+    {
+        "id": "d1",
+        "tab": "day",
+        "region": "shanghai",
+        "detail_id": "xinzhuang",
+        "title": "莘庄店·2027年夜饭专场",
+        "tag": "年夜饭",
+        "tags": ["可预订", "大厅+包厢"],
+        "cover": demo_img("gather-d1-nye"),
+        "price": 2688,
+        "origin_price": 3688,
+        "sort": 1,
+    },
+    {
+        "id": "d3",
+        "tab": "day",
+        "region": "shanghai",
+        "detail_id": "yaxin",
+        "title": "亚新店·跨年包场一日",
+        "tag": "包场",
+        "tags": ["全天", "可过夜"],
+        "cover": demo_img("gather-d3-baochang"),
+        "price": 1988,
+        "origin_price": 2588,
+        "sort": 2,
+    },
+    {
+        "id": "d5",
+        "tab": "day",
+        "region": "shanghai",
+        "detail_id": "gongkang",
+        "title": "共康店·同学聚会全天",
+        "tag": "聚会",
+        "tags": ["棋牌", "投影"],
+        "cover": demo_img("gather-d5-party"),
+        "price": 1288,
+        "origin_price": 1688,
+        "sort": 3,
+    },
+    {
+        "id": "d8",
+        "tab": "day",
+        "region": "shanghai",
+        "detail_id": "shibo",
+        "title": "世博店·亲子欢乐日",
+        "tag": "亲子",
+        "tags": ["儿童餐", "活动区"],
+        "cover": demo_img("gather-d8-kids"),
+        "price": 988,
+        "origin_price": 1288,
+        "sort": 4,
+    },
+    # 聚个餐
+    {
+        "id": "m1",
+        "tab": "meal",
+        "region": "shanghai",
+        "detail_id": "xinzhuang",
+        "title": "莘庄店·团圆家宴",
+        "tag": "家宴",
+        "tags": ["近地铁", "包厢"],
+        "cover": demo_img("gather-m1-family"),
+        "price": 799,
+        "origin_price": 999,
+        "sort": 1,
+    },
+    {
+        "id": "m2",
+        "tab": "meal",
+        "region": "shanghai",
+        "detail_id": "yaxin",
+        "title": "亚新店·海鲜龙虾宴",
+        "tag": "海鲜",
+        "tags": ["地铁直", "沉浸体验"],
+        "cover": demo_img("gather-m2-seafood"),
+        "price": 1288,
+        "origin_price": 1588,
+        "sort": 2,
+    },
+    {
+        "id": "m3",
+        "tab": "meal",
+        "region": "shanghai",
+        "detail_id": "gongkang",
+        "title": "共康店·本帮经典宴",
+        "tag": "本帮菜",
+        "tags": ["直营", "怀旧风"],
+        "cover": demo_img("gather-m3-local"),
+        "price": 699,
+        "origin_price": 899,
+        "sort": 3,
+    },
+    {
+        "id": "m4",
+        "tab": "meal",
+        "region": "shanghai",
+        "detail_id": "shibo",
+        "title": "世博店·午市商务套餐",
+        "tag": "套餐",
+        "tags": ["午市", "可开发票"],
+        "cover": demo_img("gather-m4-lunch"),
+        "price": 899,
+        "origin_price": 1099,
+        "sort": 4,
+    },
+    # 包房局
+    {
+        "id": "r1",
+        "tab": "room",
+        "region": "shanghai",
+        "detail_id": "xinzhuang",
+        "title": "莘庄店·六人棋牌包房",
+        "tag": "包房",
+        "tags": ["麻将", "可延长"],
+        "cover": demo_img("gather-r1-mahjong"),
+        "price": 399,
+        "origin_price": 499,
+        "sort": 1,
+    },
+    {
+        "id": "r2",
+        "tab": "room",
+        "region": "shanghai",
+        "detail_id": "yaxin",
+        "title": "亚新店·双桌豪华包厢",
+        "tag": "包房",
+        "tags": ["独立卫浴", "沙发区"],
+        "cover": demo_img("gather-r2-vip"),
+        "price": 1299,
+        "origin_price": 1599,
+        "sort": 2,
+    },
+    {
+        "id": "r3",
+        "tab": "room",
+        "region": "shanghai",
+        "detail_id": "gongkang",
+        "title": "共康店·通宵娱乐包场",
+        "tag": "通宵",
+        "tags": ["00:00-08:00", "含早餐"],
+        "cover": demo_img("gather-r3-night"),
+        "price": 1599,
+        "origin_price": 1999,
+        "sort": 3,
+    },
+    # 商务宴
+    {
+        "id": "b1",
+        "tab": "biz",
+        "region": "shanghai",
+        "detail_id": "shibo",
+        "title": "世博店·商务宴请套餐",
+        "tag": "商务",
+        "tags": ["含茶歇", "可开发票"],
+        "cover": demo_img("gather-b1-biz"),
+        "price": 1588,
+        "origin_price": 1988,
+        "sort": 1,
+    },
+    {
+        "id": "b2",
+        "tab": "biz",
+        "region": "ningbo",
+        "detail_id": "ningbo",
+        "title": "宁波天一店·客户接待宴",
+        "tag": "接待",
+        "tags": ["地铁直达", "静音包厢"],
+        "cover": demo_img("gather-b2-ningbo"),
+        "price": 1188,
+        "origin_price": 1488,
+        "sort": 2,
+    },
 ]
 
 
-def _nye_catalog_by_store() -> dict:
-    return {item["id"]: item for item in NYE_STORES}
+def sync_gather_demo_catalog(db: Session) -> None:
+    """补齐分类，并把演示商品刷成互不重复的标题/封面/价格（一次性）。"""
+    if get_config(db, "gather_demo_variety_v1"):
+        return
+
+    existing_tabs = {t.key: t for t in db.query(GatherTab).all()}
+    for item in GATHER_TABS:
+        row = existing_tabs.get(item["key"])
+        if row:
+            row.name = item["name"]
+            row.show_sold = item["show_sold"]
+            row.sort = item["sort"]
+            row.enabled = True
+        else:
+            db.add(GatherTab(**item, enabled=True))
+    # 旧单点分类继续隐藏
+    for key in ("dish", "set"):
+        row = existing_tabs.get(key)
+        if row:
+            row.enabled = False
+
+    catalog = _nye_catalog_by_store()
+    # 补宁波门店基础信息，便于 b2 取地址
+    home_stores = {s.id: s for s in db.query(Store).all()}
+    for item in GATHER_PRODUCTS:
+        fields = _build_gather_product_fields(item, catalog)
+        home = home_stores.get(fields.get("detail_id") or "")
+        if home:
+            if not fields.get("address"):
+                fields["address"] = home.address or ""
+            if not fields.get("route"):
+                fields["route"] = home.route or ""
+            if not fields.get("lat"):
+                fields["lat"] = float(home.lat or 0)
+            if not fields.get("lng"):
+                fields["lng"] = float(home.lng or 0)
+        row = db.query(GatherProduct).filter(GatherProduct.id == fields["id"]).first()
+        if row:
+            for key, value in fields.items():
+                if key == "id":
+                    continue
+                setattr(row, key, value)
+            row.enabled = True
+        else:
+            db.add(GatherProduct(**fields))
+
+    # 活动页仍保留年夜饭/家宴
+    if not get_config(db, "activities"):
+        set_config(db, "activities", DEFAULT_ACTIVITIES)
+
+    set_config(db, "gather_demo_variety_v1", "1")
+    db.commit()
 
 
 def _build_gather_product_fields(item: dict, catalog: dict) -> dict:
@@ -144,12 +361,23 @@ def _build_gather_product_fields(item: dict, catalog: dict) -> dict:
         pkgs = default_nye_packages(price, cover)
         open_start = src.get("open_start") or "2027-02-05"
         open_end = src.get("open_end") or "2027-02-12"
+        banners = payload.get("banners") or src.get("banners") or ([cover] if cover else [])
+        detail_images = payload.get("detail_images") or src.get("detail_images") or []
     else:
         store_label = (src.get("name") or detail_id or "").split("-")[0] or detail_id
         title = payload.get("title") or f"{store_label}-{tag}"
         pkgs = default_theme_packages(price, cover)
         open_start = ""
         open_end = ""
+        banners = payload.get("banners") or (
+            [cover, demo_img(f"gather-{payload.get('id')}-b2"), demo_img(f"gather-{payload.get('id')}-b3")]
+            if cover
+            else []
+        )
+        detail_images = payload.get("detail_images") or [
+            demo_img(f"gather-{payload.get('id')}-d1", 900, 1200),
+            demo_img(f"gather-{payload.get('id')}-d2", 900, 1200),
+        ]
     return {
         **payload,
         "title": title,
@@ -160,8 +388,8 @@ def _build_gather_product_fields(item: dict, catalog: dict) -> dict:
         "route": payload.get("route") or src.get("route") or "",
         "lat": float(payload.get("lat") or src.get("lat") or 0),
         "lng": float(payload.get("lng") or src.get("lng") or 0),
-        "banners": dumps(payload.get("banners") or src.get("banners") or ([cover] if cover else [])),
-        "detail_images": dumps(payload.get("detail_images") or src.get("detail_images") or []),
+        "banners": dumps(banners),
+        "detail_images": dumps(detail_images),
         "recent_buy": dumps(payload.get("recent_buy") or {}),
         "packages": dumps(pkgs),
         "open_start": payload.get("open_start") or open_start,
@@ -234,6 +462,11 @@ NYE_STORES = [
         "sort": 4,
     },
 ]
+
+
+def _nye_catalog_by_store() -> dict:
+    return {item["id"]: item for item in NYE_STORES}
+
 
 MALL_USAGE = "适用于天天俱乐部上海共康店、亚新生活广场、上海莘庄店、上钢新邻里3楼，凭兑换码到店使用。"
 MALL_VALID = "领取后立即生效，有效期30天。"
@@ -409,6 +642,8 @@ def seed_all(db: Session) -> None:
                 if empty or key in ("packages",):
                     setattr(row, key, filled[key])
         db.commit()
+
+    sync_gather_demo_catalog(db)
 
     if not get_config(db, "activities"):
         set_config(db, "activities", DEFAULT_ACTIVITIES)
