@@ -106,13 +106,143 @@
 						this.profile = Object.assign({}, this.profile, res.profile)
 					}
 					this.followed = !!(res && res.followed)
-					this.living = (res && res.living) || null
-					this.lives = (res && res.lives) || []
+					this.living = null
+					this.lives = []
+					const fromProfile = Number(res && res.profile && res.profile.defaultReservePoints)
+					const defaultPoints =
+						Number.isFinite(fromProfile) && fromProfile >= 0 ? fromProfile : 10
+					const finder = (this.profile && this.profile.finderUserName) || ''
+					if (!finder) {
+						return
+					}
+					try {
+						await this.syncFromChannels(
+							finder,
+							defaultPoints,
+							(res && res.reservedNoticeIds) || []
+						)
+					} catch (e) {
+						this.living = null
+						this.lives = []
+					}
 				} catch (e) {
 					this.living = null
 					this.lives = []
 					uni.showToast({ title: '直播列表加载失败', icon: 'none' })
 				}
+			},
+			wxCall(name, opts) {
+				return new Promise((resolve, reject) => {
+					const fn = typeof wx !== 'undefined' && wx[name]
+					if (typeof fn !== 'function') {
+						reject(new Error('unsupported'))
+						return
+					}
+					fn(
+						Object.assign({}, opts || {}, {
+							success(res) {
+								resolve(res || {})
+							},
+							fail(err) {
+								reject(err || new Error('fail'))
+							}
+						})
+					)
+				})
+			},
+			splitLiveTitle(raw) {
+				const text = String(raw || '').trim()
+				if (!text) {
+					return { line1: '视频号直播', line2: '' }
+				}
+				const parts = text.split(/\s*[+＋／/|\n]\s*/).filter(Boolean)
+				if (parts.length >= 2) {
+					return { line1: parts[0], line2: parts.slice(1).join('+') }
+				}
+				return { line1: text, line2: '' }
+			},
+			formatLiveTime(raw) {
+				if (raw === null || raw === undefined || raw === '') return ''
+				const n = Number(raw)
+				let d
+				if (Number.isFinite(n) && n > 0) {
+					d = new Date(n > 1e12 ? n : n * 1000)
+				} else {
+					d = new Date(raw)
+				}
+				if (isNaN(d.getTime())) return String(raw)
+				const m = d.getMonth() + 1
+				const day = d.getDate()
+				const hh = String(d.getHours()).padStart(2, '0')
+				const mm = String(d.getMinutes()).padStart(2, '0')
+				return m + '月' + day + ' ' + hh + ':' + mm
+			},
+			async syncFromChannels(finder, defaultPoints, reservedNoticeIds) {
+				const reservedNotice = {}
+				;(reservedNoticeIds || []).forEach((id) => {
+					if (id) reservedNotice[String(id)] = true
+				})
+
+				let liveInfo = null
+				let noticeInfo = null
+				try {
+					liveInfo = await this.wxCall('getChannelsLiveInfo', { finderUserName: finder })
+				} catch (e) {}
+				try {
+					noticeInfo = await this.wxCall('getChannelsLiveNoticeInfo', {
+						finderUserName: finder
+					})
+				} catch (e) {}
+
+				if (!liveInfo && !noticeInfo) {
+					throw new Error('channels unavailable')
+				}
+
+				if (liveInfo && Number(liveInfo.status) === 2) {
+					const titles = this.splitLiveTitle(
+						liveInfo.description || liveInfo.nickname || this.profile.name || ''
+					)
+					this.living = {
+						id: 'living',
+						line1: titles.line1,
+						line2: titles.line2,
+						avatar: liveInfo.headUrl || this.profile.avatar || '',
+						feedId: liveInfo.feedId || '',
+						nonceId: liveInfo.nonceId || ''
+					}
+				} else {
+					this.living = null
+				}
+
+				const notices = []
+				if (noticeInfo && noticeInfo.noticeId) {
+					notices.push(noticeInfo)
+				}
+				const others = (noticeInfo && noticeInfo.otherInfos) || []
+				if (Array.isArray(others)) {
+					others.forEach((row) => {
+						if (row && row.noticeId) notices.push(row)
+					})
+				}
+
+				const n = Number(defaultPoints)
+				const points = Number.isFinite(n) && n >= 0 ? n : 10
+				this.lives = notices.map((row) => {
+					const nid = String(row.noticeId)
+					const titles = this.splitLiveTitle(
+						row.description || row.nickname || this.profile.name || '视频号直播'
+					)
+					return {
+						id: nid,
+						noticeId: nid,
+						time: this.formatLiveTime(row.startTime),
+						line1: titles.line1,
+						line2: titles.line2,
+						points,
+						avatar: row.headUrl || this.profile.avatar || '',
+						reserved: !!reservedNotice[nid]
+					}
+				})
 			},
 			async onFollow() {
 				return this.tapGuard('follow', async () => {
@@ -136,39 +266,83 @@
 				return this.tapGuard(key, async () => {
 				try {
 					const res = await api.videoWatch(item && item.id)
-					const finder = (res && res.finderUserName) || ''
+					const finder = (res && res.finderUserName) || this.profile.finderUserName || ''
 					this.profile.finderUserName = finder
 					if (!finder) {
 						uni.showToast({ title: '视频号审核中，直播稍后开放', icon: 'none' })
 						return
 					}
-					this.openChannel('openChannelsLive')
+					const extra = {}
+					if (item && item.feedId) extra.feedId = item.feedId
+					if (item && item.nonceId) extra.nonceId = item.nonceId
+					this.openChannel('openChannelsLive', extra)
 				} catch (e) {
 					uni.showToast({ title: (e && e.message) || '打开失败', icon: 'none' })
 				}
 				})
 			},
 			async onReserve(item) {
-				if (!item || !item.id) return
-				return this.tapGuard('reserve-' + item.id, async () => {
+				if (!item || !item.noticeId) return
+				return this.tapGuard('reserve-' + item.noticeId, async () => {
 				try {
-					const res = await api.videoReserve(item.id)
+					const finder = this.profile.finderUserName || ''
+					const noticeId = item.noticeId
+					if (finder) {
+						try {
+							await this.openChannelPromise('reserveChannelsLive', { noticeId })
+						} catch (e) {
+							uni.showToast({
+								title: (e && e.message) || '打开预约失败',
+								icon: 'none'
+							})
+							return
+						}
+					}
+					const res = await api.videoReserve({
+						noticeId,
+						time: item.time || '',
+						line1: item.line1 || '',
+						line2: item.line2 || '',
+						points: item.points || 10,
+						avatar: item.avatar || ''
+					})
 					const data = (res && res.data) || {}
 					item.reserved = true
 					const gained = data.points || 0
-					const finder = data.finderUserName || this.profile.finderUserName || ''
-					this.profile.finderUserName = finder
+					const nextFinder = data.finderUserName || finder || ''
+					this.profile.finderUserName = nextFinder
 					if (gained) {
 						uni.showToast({ title: '预约成功 +' + gained + '积分', icon: 'none' })
-					} else if (!finder) {
-						uni.showToast({ title: '已预约，视频号审核中', icon: 'none' })
-					}
-					if (finder && data.noticeId) {
-						this.openChannel('reserveChannelsLive', { noticeId: data.noticeId })
+					} else {
+						uni.showToast({ title: '已预约', icon: 'none' })
 					}
 				} catch (e) {
 					uni.showToast({ title: (e && e.message) || '预约失败', icon: 'none' })
 				}
+				})
+			},
+			openChannelPromise(name, extra) {
+				return new Promise((resolve, reject) => {
+					const finder = this.profile.finderUserName || ''
+					if (!finder) {
+						reject(new Error('视频号未配置'))
+						return
+					}
+					const fn = (typeof wx !== 'undefined' && wx[name]) || uni[name]
+					if (typeof fn !== 'function') {
+						reject(new Error('请在微信中打开'))
+						return
+					}
+					fn(
+						Object.assign({ finderUserName: finder }, extra || {}, {
+							success(res) {
+								resolve(res || {})
+							},
+							fail(err) {
+								reject(new Error((err && err.errMsg) || '打开视频号失败'))
+							}
+						})
+					)
 				})
 			},
 			openChannel(name, extra) {

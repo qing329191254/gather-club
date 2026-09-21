@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
@@ -44,7 +44,7 @@ from ..models import (
     RoomSlot,
     Store,
     UserCoupon,
-    VideoLive,
+    VerifyLog,
 )
 from ..schemas import (
     BannerIn,
@@ -73,8 +73,10 @@ from ..utils import (
     loads,
     mark_coupon_expired,
     normalize_page,
+    now_cn,
     page_payload,
     set_config,
+    today_cn,
 )
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -780,6 +782,51 @@ def _verify_coupon_item(db: Session, row: UserCoupon) -> dict:
     }
 
 
+def _verify_log_out(row: VerifyLog) -> dict:
+    return {
+        "id": row.id,
+        "kind": row.kind,
+        "target_id": row.target_id,
+        "verify_code": row.verify_code,
+        "title": row.title,
+        "store_name": row.store_name,
+        "contact_name": row.contact_name,
+        "contact_phone": row.contact_phone,
+        "amount": row.amount,
+        "admin_name": row.admin_name,
+        "created_at": row.created_at.strftime("%Y-%m-%d %H:%M:%S") if row.created_at else "",
+    }
+
+
+def _add_verify_log(
+    db: Session,
+    *,
+    kind: str,
+    target_id: str,
+    verify_code: str,
+    title: str,
+    store_name: str,
+    contact_name: str,
+    contact_phone: str,
+    amount: float,
+    admin: AdminUser,
+) -> VerifyLog:
+    row = VerifyLog(
+        kind=kind,
+        target_id=str(target_id or ""),
+        verify_code=verify_code or "",
+        title=title or "",
+        store_name=store_name or "",
+        contact_name=contact_name or "",
+        contact_phone=contact_phone or "",
+        amount=float(amount or 0),
+        admin_name=(admin.username if admin else "") or "",
+        created_at=now_cn().replace(tzinfo=None),
+    )
+    db.add(row)
+    return row
+
+
 @router.get("/verify")
 def search_verify(
     q: str = Query(""),
@@ -816,6 +863,41 @@ def search_verify(
     return {"list": payload}
 
 
+@router.get("/verify/logs")
+def list_verify_logs(
+    date: str = Query(""),
+    kind: str = Query(""),
+    keyword: str = Query(""),
+    page: int = Query(1),
+    page_size: int = Query(20),
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    page, page_size, offset = normalize_page(page, page_size)
+    day = (date or "").strip() or today_cn()
+    try:
+        start = datetime.strptime(day, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(400, "日期格式无效")
+    end = start + timedelta(days=1)
+    q = db.query(VerifyLog).filter(VerifyLog.created_at >= start, VerifyLog.created_at < end)
+    if kind in ("order", "coupon"):
+        q = q.filter(VerifyLog.kind == kind)
+    kw = (keyword or "").strip()
+    if kw:
+        like = f"%{kw}%"
+        q = q.filter(
+            (VerifyLog.verify_code.like(like))
+            | (VerifyLog.contact_phone.like(like))
+            | (VerifyLog.title.like(like))
+            | (VerifyLog.contact_name.like(like))
+        )
+    q = q.order_by(VerifyLog.id.desc())
+    total = q.count()
+    rows = q.offset(offset).limit(page_size).all()
+    return page_payload([_verify_log_out(r) for r in rows], total, page, page_size)
+
+
 @router.post("/verify")
 def confirm_verify(
     payload: dict,
@@ -839,6 +921,18 @@ def confirm_verify(
         user = db.query(AppUser).filter(AppUser.id == row.user_id).first() if row.user_id else None
         if user:
             sync_user_vip(db, user)
+        _add_verify_log(
+            db,
+            kind="order",
+            target_id=str(row.id),
+            verify_code=row.verify_code or "",
+            title=row.title or "",
+            store_name=row.store_name or "",
+            contact_name=row.contact_name or "",
+            contact_phone=row.contact_phone or "",
+            amount=float(row.amount or 0),
+            admin=admin,
+        )
         db.commit()
         return {"ok": True, "message": "订单已核销", "item": _verify_order_item(db, row)}
     if kind == "coupon":
@@ -857,6 +951,19 @@ def confirm_verify(
         if row.status != "unused":
             raise HTTPException(400, "该优惠券不可核销")
         row.status = "used"
+        user = db.query(AppUser).filter(AppUser.id == row.user_id).first() if row.user_id else None
+        _add_verify_log(
+            db,
+            kind="coupon",
+            target_id=str(row.id),
+            verify_code=row.verify_code or "",
+            title=row.name or "到店券",
+            store_name="",
+            contact_name=(user.nickname if user else "") or "",
+            contact_phone=(user.phone if user else "") or "",
+            amount=float(row.amount or 0),
+            admin=admin,
+        )
         db.commit()
         return {"ok": True, "message": "优惠券已核销", "item": _verify_coupon_item(db, row)}
     raise HTTPException(400, "核销类型无效")
@@ -1293,71 +1400,3 @@ def restore_site_config(key: str, db: Session = Depends(get_db), _: AdminUser = 
         raise HTTPException(400, "该配置不支持从模板恢复")
     set_config(db, key, default)
     return {"key": key, "value": default}
-
-
-def _live_admin(row: VideoLive) -> dict:
-    return {
-        "id": row.id,
-        "status": row.status,
-        "time_text": row.time_text,
-        "line1": row.line1,
-        "line2": row.line2,
-        "points": row.points,
-        "avatar": row.avatar,
-        "notice_id": row.notice_id,
-        "sort": row.sort,
-        "enabled": row.enabled,
-    }
-
-
-@router.get("/video/lives")
-def list_video_lives(db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
-    rows = db.query(VideoLive).order_by(VideoLive.sort.asc(), VideoLive.id.asc()).all()
-    return [_live_admin(r) for r in rows]
-
-
-@router.post("/video/lives")
-def create_video_live(payload: dict, db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
-    row = VideoLive(
-        status=payload.get("status") or "scheduled",
-        time_text=payload.get("time_text") or "",
-        line1=payload.get("line1") or "",
-        line2=payload.get("line2") or "",
-        points=int(payload.get("points") or 0),
-        avatar=payload.get("avatar") or "",
-        notice_id=payload.get("notice_id") or "",
-        sort=int(payload.get("sort") or 0),
-        enabled=bool(payload.get("enabled", True)),
-    )
-    db.add(row)
-    db.commit()
-    db.refresh(row)
-    return _live_admin(row)
-
-
-@router.put("/video/lives/{live_id}")
-def update_video_live(live_id: int, payload: dict, db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
-    row = db.query(VideoLive).filter(VideoLive.id == live_id).first()
-    if not row:
-        raise HTTPException(404, "不存在")
-    row.status = payload.get("status") or row.status
-    row.time_text = payload.get("time_text", row.time_text) or ""
-    row.line1 = payload.get("line1", row.line1) or ""
-    row.line2 = payload.get("line2", row.line2) or ""
-    row.points = int(payload.get("points", row.points) or 0)
-    row.avatar = payload.get("avatar", row.avatar) or ""
-    row.notice_id = payload.get("notice_id", row.notice_id) or ""
-    row.sort = int(payload.get("sort", row.sort) or 0)
-    row.enabled = bool(payload.get("enabled", row.enabled))
-    db.commit()
-    db.refresh(row)
-    return _live_admin(row)
-
-
-@router.delete("/video/lives/{live_id}")
-def delete_video_live(live_id: int, db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
-    row = db.query(VideoLive).filter(VideoLive.id == live_id).first()
-    if row:
-        db.delete(row)
-        db.commit()
-    return OkResponse()

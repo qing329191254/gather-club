@@ -1,5 +1,5 @@
 <template>
-  <el-card>
+  <el-card class="page-fill">
     <div class="toolbar">
       <el-select v-model="status" clearable placeholder="状态" style="width: 140px" @change="onSearch">
         <el-option label="待支付" value="pending" />
@@ -12,39 +12,43 @@
       <el-input v-model="keyword" placeholder="订单号/手机号/门店" style="width: 240px" clearable @keyup.enter="onSearch" />
       <el-button type="primary" @click="onSearch">查询</el-button>
     </div>
-    <el-table :data="list" stripe>
-      <el-table-column prop="id" label="订单号" width="160" />
-      <el-table-column label="类型" width="100">
-        <template #default="{ row }">{{ typeLabel(row.type) }}</template>
-      </el-table-column>
-      <el-table-column prop="store_name" label="门店" min-width="140" />
-      <el-table-column prop="title" label="标题" min-width="180" show-overflow-tooltip />
-      <el-table-column prop="amount" label="金额" width="90" />
-      <el-table-column prop="contact_phone" label="手机" width="120" />
-      <el-table-column prop="room_date" label="用餐日" width="110" />
-      <el-table-column label="时段" width="90">
-        <template #default="{ row }">{{ slotLabel(row.room_slot) }}</template>
-      </el-table-column>
-      <el-table-column prop="status_text" label="状态" width="90" />
-      <el-table-column label="操作" width="200" fixed="right">
-        <template #default="{ row }">
-          <el-button link type="primary" @click="showDetail(row)">详情</el-button>
-          <el-dropdown @command="(cmd) => setStatus(row, cmd)">
-            <el-button link type="primary" :loading="busy('status-' + row.id)">改状态</el-button>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item command="pending">待支付</el-dropdown-item>
-                <el-dropdown-item command="paid">待核销</el-dropdown-item>
-                <el-dropdown-item command="completed">已完成</el-dropdown-item>
-                <el-dropdown-item command="cancelled">已取消</el-dropdown-item>
-                <el-dropdown-item command="refund_pending">待退款</el-dropdown-item>
-                <el-dropdown-item command="refunded">已退款</el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
-        </template>
-      </el-table-column>
-    </el-table>
+    <div class="table-wrap">
+      <el-table :data="list" stripe height="100%">
+        <el-table-column prop="id" label="订单号" width="160" />
+        <el-table-column label="类型" width="100">
+          <template #default="{ row }">{{ typeLabel(row.type) }}</template>
+        </el-table-column>
+        <el-table-column prop="store_name" label="门店" min-width="140" />
+        <el-table-column prop="title" label="标题" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="amount" label="金额" width="90" />
+        <el-table-column prop="contact_phone" label="手机" width="120" />
+        <el-table-column prop="room_date" label="用餐日" width="110" />
+        <el-table-column label="时段" width="90">
+          <template #default="{ row }">{{ slotLabel(row.room_slot) }}</template>
+        </el-table-column>
+        <el-table-column prop="status_text" label="状态" width="90" />
+        <el-table-column label="操作" width="200" fixed="right">
+          <template #default="{ row }">
+            <div class="row-ops">
+              <el-button link type="primary" @click="showDetail(row)">详情</el-button>
+              <el-dropdown @command="(cmd) => setStatus(row, cmd)">
+                <el-button link type="primary" :loading="busy('status-' + row.id)">改状态</el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="pending">待支付</el-dropdown-item>
+                    <el-dropdown-item command="paid">待核销</el-dropdown-item>
+                    <el-dropdown-item command="completed">已完成</el-dropdown-item>
+                    <el-dropdown-item command="cancelled">已取消</el-dropdown-item>
+                    <el-dropdown-item command="refund_pending">待退款</el-dropdown-item>
+                    <el-dropdown-item command="refunded">已退款</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </div>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
     <div class="pager">
       <el-pagination
         v-model:current-page="page"
@@ -156,17 +160,3 @@ onMounted(() => {
   load()
 })
 </script>
-
-<style scoped>
-.toolbar {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-.pager {
-  margin-top: 16px;
-  display: flex;
-  justify-content: flex-end;
-}
-</style>

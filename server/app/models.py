@@ -319,3 +319,19 @@ class VideoReserve(Base):
     live_id: Mapped[int] = mapped_column(Integer, index=True)
     points: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now)
+
+
+class VerifyLog(Base):
+    __tablename__ = "verify_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    kind: Mapped[str] = mapped_column(String(16), index=True)  # order | coupon
+    target_id: Mapped[str] = mapped_column(String(64), default="", index=True)
+    verify_code: Mapped[str] = mapped_column(String(16), default="", index=True)
+    title: Mapped[str] = mapped_column(String(255), default="")
+    store_name: Mapped[str] = mapped_column(String(128), default="")
+    contact_name: Mapped[str] = mapped_column(String(64), default="")
+    contact_phone: Mapped[str] = mapped_column(String(32), default="", index=True)
+    amount: Mapped[float] = mapped_column(Float, default=0)
+    admin_name: Mapped[str] = mapped_column(String(64), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=now, index=True)

@@ -120,11 +120,19 @@ export const api = {
 	videoFollow() {
 		return request('/api/v1/video/follow', { method: 'POST' })
 	},
-	videoReserve(liveId) {
-		return request('/api/v1/video/reserve', { method: 'POST', data: { liveId } })
+	videoReserve(payload) {
+		const data =
+			payload && typeof payload === 'object'
+				? payload
+				: { liveId: payload }
+		return request('/api/v1/video/reserve', { method: 'POST', data })
 	},
 	videoWatch(liveId) {
-		return request('/api/v1/video/watch', { method: 'POST', data: { liveId: liveId || 0 } })
+		const id = Number(liveId)
+		return request('/api/v1/video/watch', {
+			method: 'POST',
+			data: { liveId: Number.isFinite(id) && id > 0 ? id : 0 }
+		})
 	},
 	recommend() {
 		return request('/api/v1/recommend')

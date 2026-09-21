@@ -1,23 +1,27 @@
 <template>
-  <el-card>
+  <el-card class="page-fill">
     <div class="toolbar">
       <el-input v-model="keyword" placeholder="昵称或手机号" style="width: 240px" clearable @keyup.enter="onSearch" />
       <el-button type="primary" @click="onSearch">查询</el-button>
     </div>
-    <el-table :data="list" stripe>
-      <el-table-column prop="nickname" label="昵称" width="120" />
-      <el-table-column prop="phone" label="手机" width="120" />
-      <el-table-column prop="points" label="积分" width="90" />
-      <el-table-column prop="table_count" label="近1年桌数" width="110" />
-      <el-table-column prop="vip_level" label="会员" width="90" />
-      <el-table-column label="操作" width="260" fixed="right">
-        <template #default="{ row }">
-          <el-button link type="primary" @click="openDetail(row)">详情</el-button>
-          <el-button link type="primary" :loading="busy('adjust-list-' + row.id)" @click="adjust(row, 'adjust-list-' + row.id)">调积分</el-button>
-          <el-button link type="warning" :loading="busy('vip-list-' + row.id)" @click="setVip(row, 'vip-list-' + row.id)">改等级</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <div class="table-wrap">
+      <el-table :data="list" stripe height="100%">
+        <el-table-column prop="nickname" label="昵称" width="120" />
+        <el-table-column prop="phone" label="手机" width="120" />
+        <el-table-column prop="points" label="积分" width="90" />
+        <el-table-column prop="table_count" label="近1年桌数" width="110" />
+        <el-table-column prop="vip_level" label="会员" width="90" />
+        <el-table-column label="操作" width="260" fixed="right">
+          <template #default="{ row }">
+            <div class="row-ops">
+              <el-button link type="primary" @click="openDetail(row)">详情</el-button>
+              <el-button link type="primary" :loading="busy('adjust-list-' + row.id)" @click="adjust(row, 'adjust-list-' + row.id)">调积分</el-button>
+              <el-button link type="warning" :loading="busy('vip-list-' + row.id)" @click="setVip(row, 'vip-list-' + row.id)">改等级</el-button>
+            </div>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
     <div class="pager">
       <el-pagination
         v-model:current-page="page"
@@ -328,13 +332,7 @@ onMounted(load)
 </script>
 
 <style scoped>
-.toolbar { margin-bottom: 12px; display: flex; gap: 8px; }
-.pager {
-  margin-top: 16px;
-  display: flex;
-  justify-content: flex-end;
-}
-.pager.compact { margin-top: 12px; }
+.pager.compact { margin-top: 12px; display: flex; justify-content: flex-end; }
 .detail { min-height: 240px; }
 .detail-actions { margin-top: 16px; display: flex; gap: 8px; }
 .subbar {

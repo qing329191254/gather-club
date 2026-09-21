@@ -15,7 +15,7 @@
         </el-menu-item>
       </el-menu>
     </el-aside>
-    <el-container>
+    <el-container class="body">
       <el-header class="header">
         <div class="title">{{ route.meta.title || '后台' }}</div>
         <div class="right">
@@ -71,10 +71,16 @@ function logout() {
 <style scoped>
 .layout {
   height: 100vh;
+  overflow: hidden;
+}
+.body {
+  min-height: 0;
+  overflow: hidden;
 }
 .aside {
   background: #111827;
   color: #fff;
+  overflow: auto;
 }
 .brand {
   min-height: 72px;
@@ -127,6 +133,10 @@ function logout() {
 }
 .main {
   padding: 16px;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
 }
 .el-menu {
   border-right: none;

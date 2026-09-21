@@ -4,6 +4,62 @@ textarea,
   resize: none !important;
 }
 
+/* 列表页：铺满主区域高度 */
+.page-fill.el-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.page-fill > .el-card__header {
+  flex-shrink: 0;
+}
+.page-fill > .el-card__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.page-fill .toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+.page-fill .toolbar .el-button {
+  height: 32px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.page-fill .table-wrap {
+  flex: 1;
+  min-height: 200px;
+  overflow: hidden;
+}
+.page-fill .pager {
+  flex-shrink: 0;
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+.row-ops {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+.row-ops .el-dropdown {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  line-height: 1;
+}
+
 /* 细滚动条（Chrome / Edge / Safari） */
 *::-webkit-scrollbar {
   width: 6px;
