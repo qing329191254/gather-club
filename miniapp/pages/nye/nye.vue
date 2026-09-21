@@ -30,7 +30,10 @@
 			</swiper>
 		</view>
 
-		<view class="sheet" :style="{ marginTop: sheetTop + 'px' }">
+		<view
+			class="sheet"
+			:style="{ marginTop: sheetTop + 'px', minHeight: 'calc(100vh - ' + sheetTop + 'px)' }"
+		>
 			<view
 				v-for="item in list"
 				:key="item.id"
@@ -131,9 +134,7 @@
 
 <style>
 	.page {
-		min-height: 100vh;
 		background: #f5f5f5;
-		padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
 	}
 
 	.navbar {
@@ -220,10 +221,9 @@
 	.sheet {
 		position: relative;
 		z-index: 2;
-		min-height: calc(100vh - 200rpx);
 		background: #f5f5f5;
 		border-radius: 28rpx 28rpx 0 0;
-		padding: 24rpx 20rpx 8rpx;
+		padding: 24rpx 20rpx calc(24rpx + env(safe-area-inset-bottom));
 		box-sizing: border-box;
 	}
 

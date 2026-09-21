@@ -82,11 +82,17 @@
         </el-form-item>
 
         <el-divider />
-        <el-form-item label="开放起">
-          <el-input v-model="form.open_start" placeholder="YYYY-MM-DD" />
-        </el-form-item>
-        <el-form-item label="开放止">
-          <el-input v-model="form.open_end" placeholder="YYYY-MM-DD" />
+        <el-form-item label="开放日期">
+          <el-date-picker
+            v-model="openRange"
+            type="daterange"
+            value-format="YYYY-MM-DD"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            clearable
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="排序">
           <el-input-number v-model="form.sort" :min="0" controls-position="right" class="num" />
@@ -182,7 +188,7 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
 import { useLock } from '../composables/useLock'
@@ -229,6 +235,24 @@ const empty = () => ({
   enabled: true
 })
 const form = reactive(empty())
+
+const openRange = computed({
+  get() {
+    const a = form.open_start || ''
+    const b = form.open_end || ''
+    if (!a && !b) return null
+    return [a || b, b || a]
+  },
+  set(v) {
+    if (Array.isArray(v) && v.length >= 2) {
+      form.open_start = v[0] || ''
+      form.open_end = v[1] || ''
+    } else {
+      form.open_start = ''
+      form.open_end = ''
+    }
+  }
+})
 
 function genId() {
   return `nye${Date.now().toString(36)}`

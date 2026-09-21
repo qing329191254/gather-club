@@ -225,11 +225,17 @@
         <el-form-item label="已购文案">
           <el-input v-model="productForm.sold_text" placeholder="留空则按真实销量「N人已购」" />
         </el-form-item>
-        <el-form-item label="开放起">
-          <el-input v-model="productForm.open_start" placeholder="YYYY-MM-DD，可选" />
-        </el-form-item>
-        <el-form-item label="开放止">
-          <el-input v-model="productForm.open_end" placeholder="YYYY-MM-DD，可选" />
+        <el-form-item label="开放日期">
+          <el-date-picker
+            v-model="productOpenRange"
+            type="daterange"
+            value-format="YYYY-MM-DD"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            clearable
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="排序">
           <el-input-number v-model="productForm.sort" :min="0" />
@@ -362,6 +368,24 @@ const productForm = reactive({
   open_end: '',
   sort: 0,
   enabled: true
+})
+
+const productOpenRange = computed({
+  get() {
+    const a = productForm.open_start || ''
+    const b = productForm.open_end || ''
+    if (!a && !b) return null
+    return [a || b, b || a]
+  },
+  set(v) {
+    if (Array.isArray(v) && v.length >= 2) {
+      productForm.open_start = v[0] || ''
+      productForm.open_end = v[1] || ''
+    } else {
+      productForm.open_start = ''
+      productForm.open_end = ''
+    }
+  }
 })
 
 const pkgVisible = ref(false)
