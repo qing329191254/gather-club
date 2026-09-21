@@ -99,11 +99,12 @@ STORES = [
     },
 ]
 
+# 去哪聚顶部 Tab：按「怎么聚」分类（不是单点菜/精品套餐）
 GATHER_TABS = [
     {"key": "day", "name": "聚一天", "show_sold": True, "sort": 1},
     {"key": "meal", "name": "聚个餐", "show_sold": True, "sort": 2},
     {"key": "room", "name": "包房局", "show_sold": True, "sort": 3},
-    {"key": "biz", "name": "商务宴", "show_sold": False, "sort": 4},
+    {"key": "biz", "name": "商务宴", "show_sold": True, "sort": 4},
 ]
 
 GATHER_REGIONS = [
@@ -113,7 +114,7 @@ GATHER_REGIONS = [
     {"id": "ningbo", "name": "宁波市", "sort": 3},
 ]
 
-# 去哪聚总库：每张卡独立商品（封面/标题/套餐/销量）；detail_id 绑首页门店做包房
+# 去哪聚总库：每张卡独立商品；tag=所属活动（年夜饭/家宴/宴席）；tags=卖点
 GATHER_PRODUCTS = [
     # 聚一天
     {
@@ -123,32 +124,32 @@ GATHER_PRODUCTS = [
         "detail_id": "xinzhuang",
         "title": "莘庄店·2027年夜饭专场",
         "tag": "年夜饭",
-        "tags": ["可预订", "大厅+包厢"],
+        "tags": ["大厅+包厢", "可预订"],
         "cover": demo_img("gather-d1-nye"),
         "price": 2688,
         "origin_price": 3688,
         "sort": 1,
     },
     {
-        "id": "d3",
+        "id": "d2",
         "tab": "day",
         "region": "shanghai",
-        "detail_id": "yaxin",
-        "title": "亚新店·跨年包场一日",
-        "tag": "包场",
-        "tags": ["全天", "可过夜"],
-        "cover": demo_img("gather-d3-baochang"),
-        "price": 1988,
-        "origin_price": 2588,
+        "detail_id": "gongkang",
+        "title": "共康店·年夜饭家庭日",
+        "tag": "年夜饭",
+        "tags": ["近地铁", "亲子友好"],
+        "cover": demo_img("gather-d2-nye"),
+        "price": 2388,
+        "origin_price": 2988,
         "sort": 2,
     },
     {
         "id": "d5",
         "tab": "day",
         "region": "shanghai",
-        "detail_id": "gongkang",
-        "title": "共康店·同学聚会全天",
-        "tag": "聚会",
+        "detail_id": "yaxin",
+        "title": "亚新店·同学聚会一整天",
+        "tag": "家宴",
         "tags": ["棋牌", "投影"],
         "cover": demo_img("gather-d5-party"),
         "price": 1288,
@@ -161,7 +162,7 @@ GATHER_PRODUCTS = [
         "region": "shanghai",
         "detail_id": "shibo",
         "title": "世博店·亲子欢乐日",
-        "tag": "亲子",
+        "tag": "家宴",
         "tags": ["儿童餐", "活动区"],
         "cover": demo_img("gather-d8-kids"),
         "price": 988,
@@ -174,7 +175,7 @@ GATHER_PRODUCTS = [
         "tab": "meal",
         "region": "shanghai",
         "detail_id": "xinzhuang",
-        "title": "莘庄店·团圆家宴",
+        "title": "莘庄店·团圆家宴（10人）",
         "tag": "家宴",
         "tags": ["近地铁", "包厢"],
         "cover": demo_img("gather-m1-family"),
@@ -187,12 +188,12 @@ GATHER_PRODUCTS = [
         "tab": "meal",
         "region": "shanghai",
         "detail_id": "yaxin",
-        "title": "亚新店·海鲜龙虾宴",
-        "tag": "海鲜",
-        "tags": ["地铁直", "沉浸体验"],
+        "title": "亚新店·帝王蟹海鲜宴（10人）",
+        "tag": "宴席",
+        "tags": ["海鲜", "沉浸式"],
         "cover": demo_img("gather-m2-seafood"),
-        "price": 1288,
-        "origin_price": 1588,
+        "price": 1888,
+        "origin_price": 2288,
         "sort": 2,
     },
     {
@@ -200,12 +201,12 @@ GATHER_PRODUCTS = [
         "tab": "meal",
         "region": "shanghai",
         "detail_id": "gongkang",
-        "title": "共康店·本帮经典宴",
-        "tag": "本帮菜",
-        "tags": ["直营", "怀旧风"],
-        "cover": demo_img("gather-m3-local"),
-        "price": 699,
-        "origin_price": 899,
+        "title": "共康店·喜气羊羊宴（10-12人）",
+        "tag": "宴席",
+        "tags": ["生日宴", "可定制"],
+        "cover": demo_img("gather-m3-sheep"),
+        "price": 1288,
+        "origin_price": 1588,
         "sort": 3,
     },
     {
@@ -213,12 +214,12 @@ GATHER_PRODUCTS = [
         "tab": "meal",
         "region": "shanghai",
         "detail_id": "shibo",
-        "title": "世博店·午市商务套餐",
-        "tag": "套餐",
-        "tags": ["午市", "可开发票"],
-        "cover": demo_img("gather-m4-lunch"),
-        "price": 899,
-        "origin_price": 1099,
+        "title": "世博店·本帮家常宴",
+        "tag": "家宴",
+        "tags": ["本帮菜", "直营"],
+        "cover": demo_img("gather-m4-local"),
+        "price": 699,
+        "origin_price": 899,
         "sort": 4,
     },
     # 包房局
@@ -228,7 +229,7 @@ GATHER_PRODUCTS = [
         "region": "shanghai",
         "detail_id": "xinzhuang",
         "title": "莘庄店·六人棋牌包房",
-        "tag": "包房",
+        "tag": "家宴",
         "tags": ["麻将", "可延长"],
         "cover": demo_img("gather-r1-mahjong"),
         "price": 399,
@@ -241,7 +242,7 @@ GATHER_PRODUCTS = [
         "region": "shanghai",
         "detail_id": "yaxin",
         "title": "亚新店·双桌豪华包厢",
-        "tag": "包房",
+        "tag": "宴席",
         "tags": ["独立卫浴", "沙发区"],
         "cover": demo_img("gather-r2-vip"),
         "price": 1299,
@@ -254,8 +255,8 @@ GATHER_PRODUCTS = [
         "region": "shanghai",
         "detail_id": "gongkang",
         "title": "共康店·通宵娱乐包场",
-        "tag": "通宵",
-        "tags": ["00:00-08:00", "含早餐"],
+        "tag": "家宴",
+        "tags": ["通宵", "含早餐"],
         "cover": demo_img("gather-r3-night"),
         "price": 1599,
         "origin_price": 1999,
@@ -268,7 +269,7 @@ GATHER_PRODUCTS = [
         "region": "shanghai",
         "detail_id": "shibo",
         "title": "世博店·商务宴请套餐",
-        "tag": "商务",
+        "tag": "宴席",
         "tags": ["含茶歇", "可开发票"],
         "cover": demo_img("gather-b1-biz"),
         "price": 1588,
@@ -281,7 +282,7 @@ GATHER_PRODUCTS = [
         "region": "ningbo",
         "detail_id": "ningbo",
         "title": "宁波天一店·客户接待宴",
-        "tag": "接待",
+        "tag": "宴席",
         "tags": ["地铁直达", "静音包厢"],
         "cover": demo_img("gather-b2-ningbo"),
         "price": 1188,
@@ -325,8 +326,8 @@ def ensure_default_activities(db: Session) -> None:
 
 
 def sync_gather_demo_catalog(db: Session) -> None:
-    """补齐分类，并把演示商品刷成互不重复的标题/封面/价格（一次性）。"""
-    if get_config(db, "gather_demo_variety_v1"):
+    """把去哪聚演示目录刷成聚会业务数据（一次性 v2）。"""
+    if get_config(db, "gather_demo_catalog_v2"):
         return
 
     existing_tabs = {t.key: t for t in db.query(GatherTab).all()}
@@ -339,14 +340,24 @@ def sync_gather_demo_catalog(db: Session) -> None:
             row.enabled = True
         else:
             db.add(GatherTab(**item, enabled=True))
-    # 旧单点分类继续隐藏
+
+    # 删除旧「招牌菜 / 精品套餐」分类及其商品
     for key in ("dish", "set"):
         row = existing_tabs.get(key)
         if row:
+            db.delete(row)
+    db.query(GatherProduct).filter(GatherProduct.tab.in_(("dish", "set"))).delete(synchronize_session=False)
+
+    demo_ids = {item["id"] for item in GATHER_PRODUCTS}
+    store_ids = {item["id"] for item in STORES}
+    # 下架门店编号遗留卡、以及不在本批演示清单里的旧测试商品
+    for row in db.query(GatherProduct).all():
+        if row.id in demo_ids:
+            continue
+        if row.id in store_ids or float(row.price or 0) <= 0.01:
             row.enabled = False
 
     catalog = _nye_catalog_by_store()
-    # 补宁波门店基础信息，便于 b2 取地址
     home_stores = {s.id: s for s in db.query(Store).all()}
     for item in GATHER_PRODUCTS:
         fields = _build_gather_product_fields(item, catalog)
@@ -370,9 +381,9 @@ def sync_gather_demo_catalog(db: Session) -> None:
         else:
             db.add(GatherProduct(**fields))
 
-    # 活动页仍保留年夜饭/家宴
     ensure_default_activities(db)
 
+    set_config(db, "gather_demo_catalog_v2", "1")
     set_config(db, "gather_demo_variety_v1", "1")
     db.commit()
 
