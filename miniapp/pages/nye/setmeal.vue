@@ -148,8 +148,7 @@
 </template>
 
 <script>
-	import { api } from '../../common/api.js'
-	import { settlePay } from '../../common/pay.js'
+	import { api, settlePay } from '../../common/api.js'
 	import { isLoggedIn, silentLogin, getUser } from '../../common/auth.js'
 
 	export default {

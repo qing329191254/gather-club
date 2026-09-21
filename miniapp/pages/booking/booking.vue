@@ -129,9 +129,8 @@
 		SLOTS,
 		formatDate
 	} from './room-inventory.js'
-	import { api } from '../../common/api.js'
+	import { api, settlePay } from '../../common/api.js'
 	import { isLoggedIn, silentLogin } from '../../common/auth.js'
-	import { settlePay } from '../../common/pay.js'
 
 	export default {
 		data() {
