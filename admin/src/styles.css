@@ -4,12 +4,17 @@ textarea,
   resize: none !important;
 }
 
-/* 列表页：铺满主区域高度 */
+/* 列表页：铺满主区域宽高 */
 .page-fill.el-card {
   flex: 1;
+  width: 100%;
+  max-width: 100%;
   min-height: 0;
+  min-width: 0;
+  align-self: stretch;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
 }
 .page-fill > .el-card__header {
   flex-shrink: 0;
@@ -17,6 +22,8 @@ textarea,
 .page-fill > .el-card__body {
   flex: 1;
   min-height: 0;
+  min-width: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -29,6 +36,7 @@ textarea,
   gap: 10px;
   margin-bottom: 12px;
   flex-shrink: 0;
+  width: 100%;
 }
 .page-fill .toolbar .el-button {
   height: 32px;
@@ -38,13 +46,19 @@ textarea,
 .page-fill .table-wrap {
   flex: 1;
   min-height: 200px;
+  min-width: 0;
+  width: 100%;
   overflow: hidden;
+}
+.page-fill .table-wrap .el-table {
+  width: 100% !important;
 }
 .page-fill .pager {
   flex-shrink: 0;
   margin-top: 12px;
   display: flex;
   justify-content: flex-end;
+  width: 100%;
 }
 .row-ops {
   display: inline-flex;

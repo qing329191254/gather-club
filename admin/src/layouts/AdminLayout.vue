@@ -138,6 +138,13 @@ function logout() {
   display: flex;
   flex-direction: column;
 }
+.main :deep(> *) {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  align-self: stretch;
+}
 .el-menu {
   border-right: none;
   padding: 8px 0;

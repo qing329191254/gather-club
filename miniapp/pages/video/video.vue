@@ -98,6 +98,44 @@
 			this.loadList()
 		},
 		methods: {
+			channelsErrorText(err, fallback) {
+				const fb = fallback || '视频号操作失败'
+				if (!err) return fb
+				const code = Number(
+					(err && (err.errCode != null ? err.errCode : err.errno != null ? err.errno : err.err_code)) ||
+						0
+				)
+				const byCode = {
+					100008: '视频号需认证或与小程序主体不一致',
+					40097: '视频号参数异常',
+					1416100: '视频号 ID 无效',
+					1416104: '暂无直播或预告'
+				}
+				if (byCode[code]) return byCode[code]
+
+				const raw = String((err && (err.errMsg || err.message)) || '').trim()
+				if (!raw) return fb
+				const lower = raw.toLowerCase()
+				if (lower.indexOf('unsupported') >= 0) return '请在微信真机中打开'
+				if (lower.indexOf('not same contractor') >= 0 || lower.indexOf('100008') >= 0) {
+					return '视频号需认证或与小程序主体不一致'
+				}
+				if (lower.indexOf('cancel') >= 0) return '已取消'
+				if (lower.indexOf('auth deny') >= 0 || lower.indexOf('authorize') >= 0) {
+					return '未获得视频号授权'
+				}
+				if (lower.indexOf('invalid') >= 0 && lower.indexOf('finder') >= 0) {
+					return '视频号 ID 无效'
+				}
+				if (lower.indexOf('fail') >= 0 && /[a-z]/i.test(raw) && !/[\u4e00-\u9fff]/.test(raw)) {
+					return fb
+				}
+				// 已是中文或简短可读文案时直接展示
+				if (/[\u4e00-\u9fff]/.test(raw)) {
+					return raw.replace(/^[^:]+:\s*/i, '').slice(0, 40) || fb
+				}
+				return fb
+			},
 			async loadList() {
 				try {
 					const res = await api.videoHome()
@@ -122,16 +160,13 @@
 					} catch (e) {
 						this.living = null
 						this.lives = []
-						const msg =
-							(e && (e.errMsg || e.message)) ||
-							'视频号直播同步失败'
+						const msg = this.channelsErrorText(e, '视频号直播同步失败')
 						console.warn('[video] channels sync failed', finder, e)
-						// 开发者工具不支持该能力；真机失败时提示具体原因（如视频号 id 错误）
-						if (String(msg).indexOf('unsupported') >= 0) {
+						if (String((e && (e.errMsg || e.message)) || '').indexOf('unsupported') >= 0) {
 							console.warn('[video] getChannelsLive* 仅真机可用')
 						} else {
 							uni.showToast({
-								title: String(msg).slice(0, 40),
+								title: msg,
 								icon: 'none',
 								duration: 3000
 							})
@@ -283,7 +318,10 @@
 					}
 					this.openChannel('openChannelsUserProfile')
 				} catch (e) {
-					uni.showToast({ title: (e && e.message) || '打开失败', icon: 'none' })
+					uni.showToast({
+						title: this.channelsErrorText(e, '打开失败'),
+						icon: 'none'
+					})
 				}
 				})
 			},
@@ -303,7 +341,10 @@
 					if (item && item.nonceId) extra.nonceId = item.nonceId
 					this.openChannel('openChannelsLive', extra)
 				} catch (e) {
-					uni.showToast({ title: (e && e.message) || '打开失败', icon: 'none' })
+					uni.showToast({
+						title: this.channelsErrorText(e, '打开失败'),
+						icon: 'none'
+					})
 				}
 				})
 			},
@@ -318,7 +359,7 @@
 							await this.openChannelPromise('reserveChannelsLive', { noticeId })
 						} catch (e) {
 							uni.showToast({
-								title: (e && e.message) || '打开预约失败',
+								title: this.channelsErrorText(e, '打开预约失败'),
 								icon: 'none'
 							})
 							return
@@ -343,7 +384,10 @@
 						uni.showToast({ title: '已预约', icon: 'none' })
 					}
 				} catch (e) {
-					uni.showToast({ title: (e && e.message) || '预约失败', icon: 'none' })
+					uni.showToast({
+						title: this.channelsErrorText(e, '预约失败'),
+						icon: 'none'
+					})
 				}
 				})
 			},
@@ -359,13 +403,19 @@
 						reject(new Error('请在微信中打开'))
 						return
 					}
+					const self = this
 					fn(
 						Object.assign({ finderUserName: finder }, extra || {}, {
 							success(res) {
 								resolve(res || {})
 							},
 							fail(err) {
-								reject(new Error((err && err.errMsg) || '打开视频号失败'))
+								const e = err || {}
+								reject({
+									errMsg: e.errMsg || '',
+									errCode: e.errCode != null ? e.errCode : e.errno != null ? e.errno : e.err_code,
+									message: self.channelsErrorText(e, '打开视频号失败')
+								})
 							}
 						})
 					)
@@ -379,9 +429,13 @@
 					uni.showToast({ title: '请在微信中打开', icon: 'none' })
 					return
 				}
+				const self = this
 				fn(Object.assign({ finderUserName: finder }, extra || {}, {
 					fail(err) {
-						uni.showToast({ title: (err && err.errMsg) || '打开视频号失败', icon: 'none' })
+						uni.showToast({
+							title: self.channelsErrorText(err, '打开视频号失败'),
+							icon: 'none'
+						})
 					}
 				}))
 			}

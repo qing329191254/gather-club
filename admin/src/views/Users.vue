@@ -5,12 +5,12 @@
       <el-button type="primary" @click="onSearch">查询</el-button>
     </div>
     <div class="table-wrap">
-      <el-table :data="list" stripe height="100%">
-        <el-table-column prop="nickname" label="昵称" width="120" />
-        <el-table-column prop="phone" label="手机" width="120" />
-        <el-table-column prop="points" label="积分" width="90" />
-        <el-table-column prop="table_count" label="近1年桌数" width="110" />
-        <el-table-column prop="vip_level" label="会员" width="90" />
+      <el-table :data="list" stripe height="100%" style="width: 100%">
+        <el-table-column prop="nickname" label="昵称" min-width="160" show-overflow-tooltip />
+        <el-table-column prop="phone" label="手机" min-width="140" />
+        <el-table-column prop="points" label="积分" width="100" />
+        <el-table-column prop="table_count" label="近1年桌数" width="120" />
+        <el-table-column prop="vip_level" label="会员" width="100" />
         <el-table-column label="操作" width="260" fixed="right">
           <template #default="{ row }">
             <div class="row-ops">
