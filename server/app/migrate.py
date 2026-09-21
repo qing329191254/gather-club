@@ -43,10 +43,40 @@ def ensure_schema() -> None:
                 )
         if "gather_products" in tables:
             cols = {c["name"] for c in inspector.get_columns("gather_products")}
-            if "sold_count" not in cols:
-                conn.execute(text("ALTER TABLE gather_products ADD COLUMN sold_count INTEGER DEFAULT 0"))
-            if "region" not in cols:
-                conn.execute(text("ALTER TABLE gather_products ADD COLUMN region VARCHAR(32) DEFAULT ''"))
+            gather_patches = {
+                "sold_count": "ALTER TABLE gather_products ADD COLUMN sold_count INTEGER DEFAULT 0",
+                "region": "ALTER TABLE gather_products ADD COLUMN region VARCHAR(32) DEFAULT ''",
+                "address": "ALTER TABLE gather_products ADD COLUMN address VARCHAR(255) DEFAULT ''",
+                "route": "ALTER TABLE gather_products ADD COLUMN route TEXT NULL",
+                "lat": "ALTER TABLE gather_products ADD COLUMN lat FLOAT DEFAULT 0",
+                "lng": "ALTER TABLE gather_products ADD COLUMN lng FLOAT DEFAULT 0",
+                "banners": "ALTER TABLE gather_products ADD COLUMN banners TEXT NULL",
+                "detail_images": "ALTER TABLE gather_products ADD COLUMN detail_images TEXT NULL",
+                "recent_buy": "ALTER TABLE gather_products ADD COLUMN recent_buy TEXT NULL",
+                "packages": "ALTER TABLE gather_products ADD COLUMN packages TEXT NULL",
+                "open_start": "ALTER TABLE gather_products ADD COLUMN open_start VARCHAR(16) DEFAULT ''",
+                "open_end": "ALTER TABLE gather_products ADD COLUMN open_end VARCHAR(16) DEFAULT ''",
+            }
+            added_region = "region" not in cols
+            for name, sql in gather_patches.items():
+                if name not in cols:
+                    conn.execute(text(sql))
+            # TEXT 列补空 JSON，避免旧库 NULL
+            for text_col, empty in (
+                ("banners", "[]"),
+                ("detail_images", "[]"),
+                ("recent_buy", "{}"),
+                ("packages", "[]"),
+                ("route", ""),
+            ):
+                conn.execute(
+                    text(
+                        f"UPDATE gather_products SET {text_col} = :empty "
+                        f"WHERE {text_col} IS NULL"
+                    ),
+                    {"empty": empty},
+                )
+            if added_region:
                 # 按门店/标题粗略回填，便于老数据立刻可筛
                 conn.execute(
                     text(
@@ -88,6 +118,113 @@ def ensure_schema() -> None:
                         ),
                         {"updated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")},
                     )
+            # 去哪聚总库：从宴会专题拷贝封面/套餐等到商品（仅空字段，一次性）
+            if "site_configs" in tables and "nye_stores" in tables:
+                marker = conn.execute(
+                    text("SELECT id FROM site_configs WHERE `key` = 'gather_catalog_v1' LIMIT 1")
+                ).fetchone()
+                if not marker:
+                    nye_rows = conn.execute(
+                        text(
+                            "SELECT id, store_id, name, cover, price, origin_price, address, route, "
+                            "lat, lng, banners, detail_images, packages, open_start, open_end, sold_count "
+                            "FROM nye_stores"
+                        )
+                    ).mappings().all()
+                    nye_by_key: dict = {}
+                    for n in nye_rows:
+                        nye_by_key[n["id"]] = n
+                        sid = (n.get("store_id") or "").strip()
+                        if sid:
+                            nye_by_key[sid] = n
+                    products = conn.execute(
+                        text(
+                            "SELECT id, detail_id, tag, cover, title, price, origin_price, address, route, "
+                            "lat, lng, banners, detail_images, packages, open_start, open_end, sold_count "
+                            "FROM gather_products"
+                        )
+                    ).mappings().all()
+
+                    def _empty(val, empty_json=None):
+                        if val is None:
+                            return True
+                        s = str(val).strip()
+                        if not s:
+                            return True
+                        if empty_json is not None and s == empty_json:
+                            return True
+                        return False
+
+                    for g in products:
+                        detail_id = (g.get("detail_id") or "").strip()
+                        if not detail_id:
+                            continue
+                        n = nye_by_key.get(detail_id)
+                        if not n:
+                            continue
+                        is_nye_theme = (g.get("tag") or "").strip() == "年夜饭"
+                        # 非年夜饭主题不拷贝年夜饭套餐，留给默认家宴套餐
+                        packages_val = g["packages"]
+                        if _empty(g.get("packages"), "[]"):
+                            packages_val = (n.get("packages") or "[]") if is_nye_theme else "[]"
+                        conn.execute(
+                            text(
+                                """
+                                UPDATE gather_products SET
+                                  cover = :cover,
+                                  title = :title,
+                                  price = :price,
+                                  origin_price = :origin_price,
+                                  address = :address,
+                                  route = :route,
+                                  lat = :lat,
+                                  lng = :lng,
+                                  banners = :banners,
+                                  detail_images = :detail_images,
+                                  packages = :packages,
+                                  open_start = :open_start,
+                                  open_end = :open_end,
+                                  sold_count = :sold_count
+                                WHERE id = :id
+                                """
+                            ),
+                            {
+                                "id": g["id"],
+                                "cover": g["cover"] if not _empty(g.get("cover")) else (n.get("cover") or ""),
+                                "title": g["title"] if not _empty(g.get("title")) else (n.get("name") or ""),
+                                "price": float(g.get("price") or 0) or float(n.get("price") or 0),
+                                "origin_price": float(g.get("origin_price") or 0)
+                                or float(n.get("origin_price") or 0),
+                                "address": g["address"]
+                                if not _empty(g.get("address"))
+                                else (n.get("address") or ""),
+                                "route": g["route"] if not _empty(g.get("route")) else (n.get("route") or ""),
+                                "lat": float(g.get("lat") or 0) or float(n.get("lat") or 0),
+                                "lng": float(g.get("lng") or 0) or float(n.get("lng") or 0),
+                                "banners": g["banners"]
+                                if not _empty(g.get("banners"), "[]")
+                                else (n.get("banners") or "[]"),
+                                "detail_images": g["detail_images"]
+                                if not _empty(g.get("detail_images"), "[]")
+                                else (n.get("detail_images") or "[]"),
+                                "packages": packages_val,
+                                "open_start": g["open_start"]
+                                if not _empty(g.get("open_start"))
+                                else ((n.get("open_start") or "") if is_nye_theme else ""),
+                                "open_end": g["open_end"]
+                                if not _empty(g.get("open_end"))
+                                else ((n.get("open_end") or "") if is_nye_theme else ""),
+                                "sold_count": int(g.get("sold_count") or 0)
+                                or int(n.get("sold_count") or 0),
+                            },
+                        )
+                    conn.execute(
+                        text(
+                            "INSERT INTO site_configs (`key`, value, updated_at) "
+                            "VALUES ('gather_catalog_v1', '1', :updated_at)"
+                        ),
+                        {"updated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")},
+                    )
         if "orders" in tables:
             cols = {c["name"] for c in inspector.get_columns("orders")}
             if "extra" not in cols:
@@ -102,8 +239,8 @@ def ensure_schema() -> None:
                         SET sold_count = COALESCE((
                             SELECT SUM(COALESCE(orders.quantity, 1))
                             FROM orders
-                            WHERE orders.type = 'gather'
-                              AND orders.store_id = gather_products.id
+                            WHERE orders.store_id = gather_products.id
+                              AND orders.type IN ('nye', 'gather')
                               AND orders.status IN ('paid', 'completed')
                         ), 0)
                         WHERE COALESCE(sold_count, 0) = 0

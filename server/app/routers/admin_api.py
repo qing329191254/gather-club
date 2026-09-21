@@ -22,6 +22,7 @@ from ..commerce import (
     find_nye_store,
     hold_room_slot,
     nye_starting_price,
+    product_starting_price,
     release_room_if_needed,
     release_stale_room_holds,
     reverse_order_points,
@@ -333,34 +334,30 @@ def list_gather_products(
     rows = q.offset(offset).limit(page_size).all()
     items = []
     for r in rows:
-        detail_id = (r.detail_id or "").strip()
-        cover = r.cover or ""
-        title = r.title or ""
-        price = float(r.price or 0)
-        origin_price = float(r.origin_price or 0)
-        sold_count = int(getattr(r, "sold_count", 0) or 0)
-        if detail_id:
-            store = find_nye_store(db, detail_id)
-            if store:
-                cover = store.cover or cover
-                title = store.name or title
-                price = nye_starting_price(store)
-                origin_price = float(store.origin_price or 0) or origin_price
-                sold_count = int(getattr(store, "sold_count", 0) or 0)
         items.append(
             {
                 "id": r.id,
                 "tab": r.tab,
                 "region": getattr(r, "region", "") or "",
-                "detail_id": detail_id,
-                "cover": cover,
-                "title": title,
-                "tag": r.tag,
+                "detail_id": (r.detail_id or "").strip(),
+                "cover": r.cover or "",
+                "title": r.title or "",
+                "tag": r.tag or "",
                 "tags": loads(r.tags, []),
-                "sold_text": r.sold_text,
-                "sold_count": sold_count,
-                "price": price,
-                "origin_price": origin_price,
+                "sold_text": r.sold_text or "",
+                "sold_count": int(getattr(r, "sold_count", 0) or 0),
+                "price": product_starting_price(r),
+                "origin_price": float(r.origin_price or 0),
+                "address": r.address or "",
+                "route": r.route or "",
+                "lat": float(r.lat or 0),
+                "lng": float(r.lng or 0),
+                "banners": loads(r.banners, []),
+                "detail_images": loads(r.detail_images, []),
+                "recent_buy": loads(r.recent_buy, {}),
+                "packages": loads(getattr(r, "packages", None) or "[]", []),
+                "open_start": r.open_start or "",
+                "open_end": r.open_end or "",
                 "sort": r.sort,
                 "enabled": r.enabled,
             }
@@ -368,34 +365,60 @@ def list_gather_products(
     return page_payload(items, total, page, page_size)
 
 
-def _hydrate_gather_product_from_nye(db: Session, data: dict) -> dict:
-    """封面/店名/起价跟宴会专题走；去哪聚只保留入口元数据。"""
+def _normalize_gather_product(db: Session, data: dict) -> dict:
+    """去哪聚商品自持封面/套餐；detail_id 只绑首页门店做包房库存。"""
     detail_id = (data.get("detail_id") or "").strip()
     if not detail_id:
-        raise HTTPException(400, "请选择关联门店（封面、店名、套餐价在宴会专题配置）")
-    store = find_nye_store(db, detail_id)
-    if not store:
-        raise HTTPException(400, "关联门店没有宴会专题，请先在「宴会专题」配置")
+        raise HTTPException(400, "请选择关联首页门店")
+    if not db.query(Store).filter(Store.id == detail_id).first():
+        raise HTTPException(400, "首页门店不存在")
+    title = (data.get("title") or "").strip()
+    if not title:
+        raise HTTPException(400, "请填写商品名称")
     data["detail_id"] = detail_id
-    data["title"] = store.name or data.get("title") or detail_id
-    data["cover"] = store.cover or data.get("cover") or ""
-    data["price"] = nye_starting_price(store)
-    data["origin_price"] = float(store.origin_price or 0)
-    if not (data.get("tag") or "").strip():
-        data["tag"] = store.tag or ""
+    data["title"] = title
+    data["tags"] = data.get("tags") or []
+    data["banners"] = data.get("banners") or []
+    data["detail_images"] = data.get("detail_images") or []
+    data["recent_buy"] = data.get("recent_buy") or {}
+    data["packages"] = data.get("packages") or []
     return data
+
+
+def _gather_product_row_dict(data: dict):
+    tags = data.pop("tags", [])
+    banners = data.pop("banners", [])
+    detail_images = data.pop("detail_images", [])
+    recent_buy = data.pop("recent_buy", {})
+    packages = data.pop("packages", [])
+    row_data = {
+        **data,
+        "tags": dumps(tags),
+        "banners": dumps(banners),
+        "detail_images": dumps(detail_images),
+        "recent_buy": dumps(recent_buy),
+        "packages": dumps(packages),
+    }
+    return row_data, tags, banners, detail_images, recent_buy, packages
 
 
 @router.post("/gather/products")
 def create_gather_product(payload: GatherProductIn, db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
     if db.query(GatherProduct).filter(GatherProduct.id == payload.id).first():
         raise HTTPException(400, "商品 ID 已存在")
-    data = _hydrate_gather_product_from_nye(db, payload.model_dump())
-    tags = data.pop("tags", [])
-    row = GatherProduct(**data, tags=dumps(tags))
-    db.add(row)
+    data = _normalize_gather_product(db, payload.model_dump())
+    row_data, tags, banners, detail_images, recent_buy, packages = _gather_product_row_dict(data)
+    db.add(GatherProduct(**row_data))
     db.commit()
-    return {**data, "tags": tags}
+    out = {k: v for k, v in row_data.items() if k not in ("tags", "banners", "detail_images", "recent_buy", "packages")}
+    return {
+        **out,
+        "tags": tags,
+        "banners": banners,
+        "detail_images": detail_images,
+        "recent_buy": recent_buy,
+        "packages": packages,
+    }
 
 
 @router.put("/gather/products/{product_id}")
@@ -403,14 +426,22 @@ def update_gather_product(product_id: str, payload: GatherProductIn, db: Session
     row = db.query(GatherProduct).filter(GatherProduct.id == product_id).first()
     if not row:
         raise HTTPException(404, "不存在")
-    data = _hydrate_gather_product_from_nye(db, payload.model_dump())
-    tags = data.pop("tags", [])
-    data.pop("id", None)
-    for k, v in data.items():
+    data = _normalize_gather_product(db, payload.model_dump())
+    row_data, tags, banners, detail_images, recent_buy, packages = _gather_product_row_dict(data)
+    row_data.pop("id", None)
+    for k, v in row_data.items():
         setattr(row, k, v)
-    row.tags = dumps(tags)
     db.commit()
-    return {**data, "id": product_id, "tags": tags}
+    out = {k: v for k, v in row_data.items() if k not in ("tags", "banners", "detail_images", "recent_buy", "packages")}
+    return {
+        **out,
+        "id": product_id,
+        "tags": tags,
+        "banners": banners,
+        "detail_images": detail_images,
+        "recent_buy": recent_buy,
+        "packages": packages,
+    }
 
 
 @router.delete("/gather/products/{product_id}")
@@ -422,7 +453,7 @@ def delete_gather_product(product_id: str, db: Session = Depends(get_db), _: Adm
     return OkResponse()
 
 
-# ---- nye ----
+# ---- nye（遗留兼容；新品请用 /gather/products）----
 @router.get("/nye")
 def list_nye(db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
     rows = db.query(NyeStore).order_by(NyeStore.sort.asc(), NyeStore.id.asc()).all()

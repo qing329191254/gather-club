@@ -398,14 +398,15 @@
 			async continuePay() {
 				if (this.isTapBusy('pay')) return
 				return this.tapGuard('pay', async () => {
-				const storeId = (this.detail && (this.detail.storeId || this.detail.id)) || ''
+				const productId = (this.detail && this.detail.id) || ''
+				const roomStoreId = (this.detail && (this.detail.storeId || this.detail.id)) || ''
 				const storeName = (this.detail && this.detail.name) || '天天俱乐部'
 				const cur = this.current
-				if (!cur) return
+				if (!cur || !productId) return
 
 				if (this.date) {
 					try {
-						const avail = await api.roomAvailability(storeId, this.date, this.roomSlot)
+						const avail = await api.roomAvailability(roomStoreId, this.date, this.roomSlot)
 						if (avail && avail.full) {
 							uni.showToast({ title: '该日期包房已满，请换一天', icon: 'none' })
 							return
@@ -428,9 +429,9 @@
 					if (!isLoggedIn()) await silentLogin()
 					const created = await api.createOrder({
 						type: 'nye',
-						store_id: storeId,
+						store_id: productId,
 						store_name: storeName,
-						title: storeName + '-年夜饭',
+						title: storeName,
 						spec: cur.name + (this.date ? ' · ' + this.date : ''),
 						cover: cur.cover || (this.detail && this.detail.cover) || '',
 						quantity: this.quantity,

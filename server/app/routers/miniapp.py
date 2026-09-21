@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from ..cms_data import (
     AGREEMENTS,
+    DEFAULT_ACTIVITIES,
     HOBBY_OPTIONS,
     MEMBER_CONFIG,
     PRIVACY_COLLECT,
@@ -20,14 +21,18 @@ from ..commerce import (
     award_order_points,
     bump_sold_on_paid,
     display_sold_text,
+    find_gather_product,
     find_nye_store,
     get_checkin_config,
     get_loyalty_config,
     hold_room_slot,
-    mark_refund_pending,
     nye_packages_for,
     nye_recent_buy,
     nye_starting_price,
+    product_packages_for,
+    product_recent_buy,
+    product_starting_price,
+    mark_refund_pending,
     order_earn_points,
     release_room_if_needed,
     release_stale_room_holds,
@@ -178,42 +183,67 @@ def _user_out(user: AppUser, db: Optional[Session] = None) -> dict:
 
 
 def _product_out(row: GatherProduct, db: Optional[Session] = None) -> dict:
-    """关联年夜饭门店时，封面/店名/起价/销量与专题门店共享；仅套餐价在门店内各不相同。"""
-    cover = row.cover or ""
-    title = row.title or ""
-    tag = row.tag or ""
-    price = float(row.price or 0)
-    origin_price = float(row.origin_price or 0)
+    """去哪聚列表：每张卡是独立商品（封面/标题/起价/销量各自独立）。"""
     sold_count = int(getattr(row, "sold_count", 0) or 0)
-    detail_id = (getattr(row, "detail_id", None) or "").strip()
-    if db is not None and detail_id:
-        store = find_nye_store(db, detail_id, enabled_only=True)
-        if store:
-            cover = store.cover or cover
-            title = store.name or title
-            price = nye_starting_price(store)
-            origin_price = float(store.origin_price or 0) or origin_price
-            sold_count = int(getattr(store, "sold_count", 0) or 0)
-            if not tag.strip():
-                tag = store.tag or ""
+    price = product_starting_price(row)
     return {
         "id": row.id,
         "tab": row.tab,
         "region": getattr(row, "region", "") or "",
-        "detailId": row.detail_id,
-        "cover": cover,
-        "title": title,
-        "tag": tag,
+        "detailId": row.id,
+        "storeId": (getattr(row, "detail_id", None) or "").strip(),
+        "cover": row.cover or "",
+        "title": row.title or "",
+        "tag": row.tag or "",
         "tags": loads(row.tags, []),
         "soldText": display_sold_text(sold_count, row.sold_text),
         "soldCount": sold_count,
         "price": price,
-        "originPrice": origin_price,
+        "originPrice": float(row.origin_price or 0),
     }
 
 
 def _nye_packages_for(row: NyeStore) -> list:
     return nye_packages_for(row)
+
+
+def _product_detail_out(row: GatherProduct, db: Optional[Session] = None) -> dict:
+    """详情页结构与原年夜饭详情一致，便于小程序 UI 复用。"""
+    recent = product_recent_buy(db, row) if db is not None else (loads(row.recent_buy, {}) or {})
+    store_id = (getattr(row, "detail_id", None) or "").strip() or row.id
+    address = row.address or ""
+    route = row.route or ""
+    lat = float(row.lat or 0)
+    lng = float(row.lng or 0)
+    if store_id:
+        home = db.query(Store).filter(Store.id == store_id).first() if db is not None else None
+        if home:
+            address = address or home.address or ""
+            route = route or home.route or ""
+            lat = lat or float(home.lat or 0)
+            lng = lng or float(home.lng or 0)
+    banners = loads(row.banners, [])
+    if not banners and row.cover:
+        banners = [row.cover]
+    return {
+        "id": row.id,
+        "storeId": store_id,
+        "name": row.title,
+        "cover": row.cover,
+        "price": product_starting_price(row),
+        "originPrice": row.origin_price,
+        "tag": row.tag,
+        "address": address,
+        "route": route,
+        "lat": lat,
+        "lng": lng,
+        "banners": banners,
+        "detailImages": loads(row.detail_images, []),
+        "recentBuy": recent,
+        "soldCount": int(getattr(row, "sold_count", 0) or 0),
+        "openStart": row.open_start or "",
+        "openEnd": row.open_end or "",
+    }
 
 
 def _nye_out(row: NyeStore, db: Optional[Session] = None) -> dict:
@@ -238,6 +268,39 @@ def _nye_out(row: NyeStore, db: Optional[Session] = None) -> dict:
         "openStart": row.open_start,
         "openEnd": row.open_end,
     }
+
+
+def _activity_pages(db: Session) -> list:
+    raw = get_config(db, "activities") or {}
+    items = raw.get("list") if isinstance(raw, dict) else raw
+    if not isinstance(items, list) or not items:
+        return list(DEFAULT_ACTIVITIES)
+    return items
+
+
+def _pick_package(packages: list, payload) -> dict:
+    pkg = None
+    pid = str(payload.package_id or "").strip()
+    if pid:
+        for p in packages:
+            if str(p.get("id")) == pid and not p.get("disabled"):
+                pkg = p
+                break
+        if not pkg:
+            raise HTTPException(status_code=400, detail="套餐不存在或已下架")
+    elif payload.spec:
+        for p in packages:
+            name = str(p.get("name") or "")
+            if name and str(payload.spec).startswith(name) and not p.get("disabled"):
+                pkg = p
+                break
+    if not pkg:
+        enabled = [p for p in packages if not p.get("disabled")]
+        pkg = enabled[0] if enabled else None
+    if not pkg:
+        raise HTTPException(status_code=400, detail="暂无可用套餐")
+    return pkg
+
 
 
 def _order_out(row: Order) -> dict:
@@ -367,30 +430,24 @@ def _resolve_order_price(db: Session, payload: OrderCreateIn) -> tuple[float, fl
         return unit, round(unit * qty, 2), row.name, row.cover or "", payload.spec or "订酒店"
 
     if otype == "nye":
+        product = find_gather_product(db, payload.store_id or "", enabled_only=True)
+        if product:
+            packages = product_packages_for(product)
+            pkg = _pick_package(packages, payload)
+            unit = float(pkg.get("price") or 0)
+            if unit <= 0:
+                raise HTTPException(status_code=400, detail="套餐价格异常")
+            title = product.title or "去哪聚"
+            cover = pkg.get("cover") or product.cover or ""
+            spec = str(pkg.get("name") or "")
+            if (payload.room_date or "").strip():
+                spec = f"{spec} · {payload.room_date.strip()}" if spec else payload.room_date.strip()
+            return unit, round(unit * qty, 2), title, cover, spec
         store = find_nye_store(db, payload.store_id or "", enabled_only=True)
         if not store:
-            raise HTTPException(status_code=404, detail="门店不存在或已下架")
+            raise HTTPException(status_code=404, detail="商品不存在或已下架")
         packages = _nye_packages_for(store)
-        pkg = None
-        pid = str(payload.package_id or "").strip()
-        if pid:
-            for p in packages:
-                if str(p.get("id")) == pid and not p.get("disabled"):
-                    pkg = p
-                    break
-            if not pkg:
-                raise HTTPException(status_code=400, detail="套餐不存在或已下架")
-        elif payload.spec:
-            for p in packages:
-                name = str(p.get("name") or "")
-                if name and str(payload.spec).startswith(name) and not p.get("disabled"):
-                    pkg = p
-                    break
-        if not pkg:
-            enabled = [p for p in packages if not p.get("disabled")]
-            pkg = enabled[0] if enabled else None
-        if not pkg:
-            raise HTTPException(status_code=400, detail="暂无可用套餐")
+        pkg = _pick_package(packages, payload)
         unit = float(pkg.get("price") or 0)
         if unit <= 0:
             raise HTTPException(status_code=400, detail="套餐价格异常")
@@ -588,29 +645,54 @@ def gather(db: Session = Depends(get_db)):
 
 
 @router.get("/nye")
-def nye_list(db: Session = Depends(get_db)):
+def nye_list(db: Session = Depends(get_db), tag: str = Query("")):
+    """活动集合页：默认筛「年夜饭」标签的去哪聚商品。"""
+    activities = _activity_pages(db)
+    activity = None
+    want = (tag or "").strip()
+    if want:
+        activity = next((a for a in activities if (a.get("tag") or a.get("id")) == want), None)
+    if activity is None:
+        activity = next((a for a in activities if (a.get("tag") or "") == "年夜饭"), None) or (
+            activities[0] if activities else {"tag": "年夜饭", "banners": []}
+        )
+    filter_tag = (activity.get("tag") or "年夜饭").strip()
     rows = (
-        db.query(NyeStore)
-        .filter(NyeStore.enabled.is_(True))
-        .order_by(NyeStore.sort.asc(), NyeStore.id.asc())
+        db.query(GatherProduct)
+        .filter(GatherProduct.enabled.is_(True), GatherProduct.tag == filter_tag)
+        .order_by(GatherProduct.sort.asc(), GatherProduct.id.asc())
         .all()
     )
+    banners = activity.get("banners") or []
+    if not banners:
+        banners = [r.cover for r in rows[:3] if r.cover]
     return {
         "list": [
             {
                 "id": r.id,
-                "name": r.name,
+                "name": r.title,
                 "cover": r.cover,
-                "price": nye_starting_price(r),
+                "price": product_starting_price(r),
                 "originPrice": r.origin_price,
             }
             for r in rows
-        ]
+        ],
+        "banners": banners,
+        "activity": {
+            "id": activity.get("id") or filter_tag,
+            "name": activity.get("name") or filter_tag,
+            "tag": filter_tag,
+        },
     }
 
 
 @router.get("/nye/{nye_id}")
 def nye_detail(nye_id: str, db: Session = Depends(get_db)):
+    product = find_gather_product(db, nye_id, enabled_only=True)
+    if product:
+        detail = _product_detail_out(product, db)
+        detail["packages"] = product_packages_for(product)
+        return detail
     row = find_nye_store(db, nye_id, enabled_only=True)
     if not row:
         raise HTTPException(status_code=404, detail="该门店暂未开放预约")
@@ -859,12 +941,19 @@ def create_order(
     extra = {}
     order_store_id = payload.store_id
     if (payload.type or "") == "nye":
-        nye = find_nye_store(db, payload.store_id or "", enabled_only=True)
-        if nye:
-            order_store_id = nye.id
-            linked = (getattr(nye, "store_id", None) or "").strip() or nye.id
+        product = find_gather_product(db, payload.store_id or "", enabled_only=True)
+        if product:
+            order_store_id = product.id
+            linked = (getattr(product, "detail_id", None) or "").strip() or product.id
             if payload.room_date and payload.room_slot:
                 extra["roomStoreId"] = linked
+        else:
+            nye = find_nye_store(db, payload.store_id or "", enabled_only=True)
+            if nye:
+                order_store_id = nye.id
+                linked = (getattr(nye, "store_id", None) or "").strip() or nye.id
+                if payload.room_date and payload.room_slot:
+                    extra["roomStoreId"] = linked
     slot_key = extra.get("roomStoreId") or order_store_id
     if payload.room_date and payload.room_slot and slot_key:
         _release_stale_room_holds(db)

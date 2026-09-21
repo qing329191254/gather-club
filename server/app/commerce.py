@@ -187,7 +187,7 @@ def reverse_order_points(db: Session, order: Order, user: Optional[AppUser]) -> 
 
 
 def find_nye_store(db: Session, key: str, enabled_only: bool = False) -> Optional[NyeStore]:
-    """专题详情可以用自己的编号，也可以用绑定的首页门店编号打开。"""
+    """兼容旧专题编号；新链路以 GatherProduct 为准。"""
     key = (key or "").strip()
     if not key:
         return None
@@ -203,20 +203,42 @@ def find_nye_store(db: Session, key: str, enabled_only: bool = False) -> Optiona
     return q.order_by(NyeStore.sort.asc(), NyeStore.id.asc()).first()
 
 
-def nye_packages_for(store: NyeStore) -> list:
-    """门店套餐列表；未配置时按门店起价生成默认规格。"""
-    from .cms_data import default_nye_packages
+def find_gather_product(db: Session, key: str, enabled_only: bool = False) -> Optional[GatherProduct]:
+    """去哪聚商品详情；key 为商品 id。"""
+    key = (key or "").strip()
+    if not key:
+        return None
+    q = db.query(GatherProduct).filter(GatherProduct.id == key)
+    if enabled_only:
+        q = q.filter(GatherProduct.enabled.is_(True))
+    return q.first()
 
-    stored = loads(getattr(store, "packages", None) or "[]", [])
+
+def _package_list_from_row(row, *, nye_style: bool) -> list:
+    from .cms_data import default_nye_packages, default_theme_packages
+
+    stored = loads(getattr(row, "packages", None) or "[]", [])
     if stored:
         return stored
-    return default_nye_packages(store.price or 2388, store.cover or "")
+    price = float(getattr(row, "price", 0) or 0)
+    cover = getattr(row, "cover", "") or ""
+    tag = (getattr(row, "tag", None) or "").strip()
+    if nye_style or tag == "年夜饭":
+        return default_nye_packages(price or 2388, cover)
+    return default_theme_packages(price or 799, cover)
 
 
-def nye_starting_price(store: NyeStore) -> float:
-    """对外展示的「起」价：可用套餐最低价，否则退回门店价。"""
+def nye_packages_for(store: NyeStore) -> list:
+    return _package_list_from_row(store, nye_style=True)
+
+
+def product_packages_for(product: GatherProduct) -> list:
+    return _package_list_from_row(product, nye_style=False)
+
+
+def _starting_price_from_packages(packages: list, fallback: float) -> float:
     prices: list[float] = []
-    for pkg in nye_packages_for(store):
+    for pkg in packages:
         if pkg.get("disabled"):
             continue
         try:
@@ -228,9 +250,17 @@ def nye_starting_price(store: NyeStore) -> float:
     if prices:
         return min(prices)
     try:
-        return float(store.price or 0)
+        return float(fallback or 0)
     except (TypeError, ValueError):
         return 0.0
+
+
+def nye_starting_price(store: NyeStore) -> float:
+    return _starting_price_from_packages(nye_packages_for(store), float(store.price or 0))
+
+
+def product_starting_price(product: GatherProduct) -> float:
+    return _starting_price_from_packages(product_packages_for(product), float(product.price or 0))
 
 
 def room_inventory_id(order: Order) -> str:
@@ -245,14 +275,14 @@ def reverse_sold_on_refund(db: Session, order: Order) -> None:
     if extra.get("soldReversed") or not extra.get("soldBumped"):
         return
     qty = max(1, int(order.quantity or 1))
-    if order.type == "gather" and order.store_id:
-        product = db.query(GatherProduct).filter(GatherProduct.id == order.store_id).first()
+    if order.type in ("gather", "nye") and order.store_id:
+        product = find_gather_product(db, order.store_id)
         if product:
             product.sold_count = max(0, int(getattr(product, "sold_count", 0) or 0) - qty)
-    elif order.type == "nye" and order.store_id:
-        store = find_nye_store(db, order.store_id)
-        if store:
-            store.sold_count = max(0, int(getattr(store, "sold_count", 0) or 0) - qty)
+        elif order.type == "nye":
+            store = find_nye_store(db, order.store_id)
+            if store:
+                store.sold_count = max(0, int(getattr(store, "sold_count", 0) or 0) - qty)
     extra["soldReversed"] = True
     order.extra = dumps(extra)
 
@@ -469,40 +499,90 @@ def _relative_buy_text(created_at: Optional[datetime], qty: int) -> str:
 
 
 def nye_recent_buy(db: Session, store: NyeStore) -> dict:
+    """旧专题销量展示；新商品请用 product_recent_buy。"""
     since = datetime.utcnow() - timedelta(days=7)
-    ids = [store.id]
-    linked = (getattr(store, "store_id", None) or "").strip()
-    if linked and linked not in ids:
-        ids.append(linked)
     q = (
         db.query(Order)
         .filter(
             Order.type == "nye",
-            Order.store_id.in_(ids),
+            Order.store_id == store.id,
             Order.status.in_(TABLE_COUNTED_STATUSES),
             Order.created_at >= since,
         )
         .order_by(Order.created_at.desc())
     )
+    return _recent_buy_from_query(db, q, loads(getattr(store, "recent_buy", None) or "{}", {}) or {})
+
+
+def product_recent_buy(db: Session, product: GatherProduct) -> dict:
+    """按商品维度统计近一周购买（同店不同主题互不影响）。"""
+    since = datetime.utcnow() - timedelta(days=7)
+    q = (
+        db.query(Order)
+        .filter(
+            Order.type.in_(("nye", "gather")),
+            Order.store_id == product.id,
+            Order.status.in_(TABLE_COUNTED_STATUSES),
+            Order.created_at >= since,
+        )
+        .order_by(Order.created_at.desc())
+    )
+    return _recent_buy_from_query(db, q, loads(getattr(product, "recent_buy", None) or "{}", {}) or {})
+
+
+def _recent_buy_from_query(db: Session, q, fallback: dict) -> dict:
     week_n = q.count()
-    last = q.first()
-    fallback = loads(getattr(store, "recent_buy", None) or "{}", {}) or {}
-    if not last:
-        if fallback:
-            return fallback
-        return {
-            "countText": "近一周0人买过",
-            "avatar": "/static/icons/avatar-default.png",
-            "name": "微信用户",
-            "timeText": "",
-        }
-    user = db.query(AppUser).filter(AppUser.id == last.user_id).first()
-    avatar = (user.avatar if user and user.avatar else "") or "/static/icons/avatar-default.png"
+    rows = q.limit(12).all()
+    items: list[dict] = []
+    for order in rows:
+        user = db.query(AppUser).filter(AppUser.id == order.user_id).first()
+        avatar = (user.avatar if user and user.avatar else "") or "/static/icons/avatar-default.png"
+        items.append(
+            {
+                "avatar": avatar,
+                "name": mask_nickname(user.nickname if user else ""),
+                "timeText": _relative_buy_text(order.created_at, order.quantity),
+            }
+        )
+    if not items:
+        fb = fallback or {}
+        fb_list = fb.get("list") if isinstance(fb.get("list"), list) else None
+        if fb_list:
+            items = [
+                {
+                    "avatar": (x.get("avatar") or "/static/icons/avatar-default.png"),
+                    "name": x.get("name") or "微信用户",
+                    "timeText": x.get("timeText") or "",
+                }
+                for x in fb_list
+                if isinstance(x, dict)
+            ]
+            week_n = int(fb.get("weekCount") or len(items) or 0)
+        elif fb.get("name") or fb.get("timeText") or fb.get("avatar"):
+            items = [
+                {
+                    "avatar": fb.get("avatar") or "/static/icons/avatar-default.png",
+                    "name": fb.get("name") or "微信用户",
+                    "timeText": fb.get("timeText") or "",
+                }
+            ]
+            week_n = int(fb.get("weekCount") or 1)
+        else:
+            return {
+                "countText": "近一周0人买过",
+                "list": [],
+                "avatar": "/static/icons/avatar-default.png",
+                "name": "微信用户",
+                "timeText": "",
+            }
+    first = items[0]
     return {
         "countText": f"近一周{week_n}人买过",
-        "avatar": avatar,
-        "name": mask_nickname(user.nickname if user else ""),
-        "timeText": _relative_buy_text(last.created_at, last.quantity),
+        "list": items,
+        # 兼容旧字段（单条展示）
+        "avatar": first["avatar"],
+        "name": first["name"],
+        "timeText": first["timeText"],
     }
 
 
@@ -513,15 +593,16 @@ def bump_sold_on_paid(db: Session, order: Order, user: Optional[AppUser] = None)
             sync_user_vip(db, user)
         return
     qty = max(1, int(order.quantity or 1))
-    if order.type == "gather" and order.store_id:
-        product = db.query(GatherProduct).filter(GatherProduct.id == order.store_id).first()
+    if order.type in ("gather", "nye") and order.store_id:
+        product = find_gather_product(db, order.store_id)
         if product:
             product.sold_count = int(getattr(product, "sold_count", 0) or 0) + qty
-    elif order.type == "nye" and order.store_id:
-        store = find_nye_store(db, order.store_id)
-        if store:
-            store.sold_count = int(getattr(store, "sold_count", 0) or 0) + qty
-            store.recent_buy = dumps(nye_recent_buy(db, store))
+            product.recent_buy = dumps(product_recent_buy(db, product))
+        elif order.type == "nye":
+            store = find_nye_store(db, order.store_id)
+            if store:
+                store.sold_count = int(getattr(store, "sold_count", 0) or 0) + qty
+                store.recent_buy = dumps(nye_recent_buy(db, store))
     extra["soldBumped"] = True
     order.extra = dumps(extra)
     uid = order.user_id or (user.id if user else 0)

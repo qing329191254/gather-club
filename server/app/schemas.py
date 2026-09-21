@@ -81,7 +81,7 @@ class GatherProductIn(BaseModel):
     id: str
     tab: str
     region: str = ""
-    detail_id: str = ""
+    detail_id: str = ""  # 首页门店 Store.id（包房库存）
     cover: str = ""
     title: str = ""
     tag: str = ""
@@ -89,12 +89,22 @@ class GatherProductIn(BaseModel):
     sold_text: str = ""
     price: float = 0
     origin_price: float = 0
+    address: str = ""
+    route: str = ""
+    lat: float = 0
+    lng: float = 0
+    banners: list[str] = Field(default_factory=list)
+    detail_images: list[str] = Field(default_factory=list)
+    recent_buy: dict[str, Any] = Field(default_factory=dict)
+    packages: list[Any] = Field(default_factory=list)
+    open_start: str = ""
+    open_end: str = ""
     sort: int = 0
     enabled: bool = True
 
 
 class GatherProductOut(GatherProductIn, ORMModel):
-    pass
+    sold_count: int = 0
 
 
 class NyeStoreIn(BaseModel):

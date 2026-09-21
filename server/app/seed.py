@@ -7,12 +7,14 @@ from sqlalchemy.orm import Session
 from .cms_data import (
     AGREEMENTS,
     CHECKIN_CONFIG,
+    DEFAULT_ACTIVITIES,
     HOBBY_OPTIONS,
     LOYALTY_CONFIG,
     MEMBER_CONFIG,
     PRIVACY_COLLECT,
     PRIVACY_SHARE,
     default_nye_packages,
+    default_theme_packages,
 )
 from .config import DEFAULT_ADMIN_PASSWORD, DEFAULT_JWT_SECRET, get_settings
 from .deps import hash_password, verify_password
@@ -109,17 +111,64 @@ GATHER_REGIONS = [
     {"id": "ningbo", "name": "宁波市", "sort": 3},
 ]
 
-# 去哪聚入口只挂专题门店；封面/店名/套餐价在宴会专题配置
+# 去哪聚总库：每张卡独立商品（封面/套餐/销量）；detail_id 绑首页门店做包房
 GATHER_PRODUCTS = [
     {"id": "d1", "tab": "day", "region": "shanghai", "detail_id": "xinzhuang", "tag": "年夜饭", "sort": 1},
     {"id": "d3", "tab": "day", "region": "shanghai", "detail_id": "yaxin", "tag": "年夜饭", "sort": 2},
     {"id": "d5", "tab": "day", "region": "shanghai", "detail_id": "gongkang", "tag": "年夜饭", "sort": 3},
     {"id": "d8", "tab": "day", "region": "shanghai", "detail_id": "shibo", "tag": "年夜饭", "sort": 4},
-    {"id": "m1", "tab": "meal", "region": "shanghai", "detail_id": "xinzhuang", "tag": "家宴", "tags": ["近地铁", "包厢"], "sort": 1},
-    {"id": "m2", "tab": "meal", "region": "shanghai", "detail_id": "yaxin", "tag": "家宴", "tags": ["地铁直", "沉浸体验"], "sort": 2},
-    {"id": "m3", "tab": "meal", "region": "shanghai", "detail_id": "gongkang", "tag": "本帮菜", "tags": ["直营", "怀旧风"], "sort": 3},
-    {"id": "m4", "tab": "meal", "region": "shanghai", "detail_id": "shibo", "tag": "套餐", "tags": ["午市", "商务"], "sort": 4},
+    {"id": "m1", "tab": "meal", "region": "shanghai", "detail_id": "xinzhuang", "tag": "家宴", "tags": ["近地铁", "包厢"], "sort": 1, "price": 799},
+    {"id": "m2", "tab": "meal", "region": "shanghai", "detail_id": "yaxin", "tag": "家宴", "tags": ["地铁直", "沉浸体验"], "sort": 2, "price": 799},
+    {"id": "m3", "tab": "meal", "region": "shanghai", "detail_id": "gongkang", "tag": "本帮菜", "tags": ["直营", "怀旧风"], "sort": 3, "price": 699},
+    {"id": "m4", "tab": "meal", "region": "shanghai", "detail_id": "shibo", "tag": "套餐", "tags": ["午市", "商务"], "sort": 4, "price": 899},
 ]
+
+
+def _nye_catalog_by_store() -> dict:
+    return {item["id"]: item for item in NYE_STORES}
+
+
+def _build_gather_product_fields(item: dict, catalog: dict) -> dict:
+    """从门店目录拼出完整商品字段；非年夜饭主题用独立标题/套餐。"""
+    payload = dict(item)
+    tags = payload.pop("tags", [])
+    detail_id = (payload.get("detail_id") or "").strip()
+    tag = (payload.get("tag") or "").strip()
+    src = catalog.get(detail_id) or {}
+    is_nye = tag == "年夜饭"
+    cover = payload.get("cover") or src.get("cover") or demo_img(f"gather-{payload.get('id')}")
+    price = float(payload.get("price") or src.get("price") or (2388 if is_nye else 799))
+    origin_price = float(payload.get("origin_price") or src.get("origin_price") or 0)
+    if is_nye:
+        title = payload.get("title") or src.get("name") or detail_id
+        pkgs = default_nye_packages(price, cover)
+        open_start = src.get("open_start") or "2027-02-05"
+        open_end = src.get("open_end") or "2027-02-12"
+    else:
+        store_label = (src.get("name") or detail_id or "").split("-")[0] or detail_id
+        title = payload.get("title") or f"{store_label}-{tag}"
+        pkgs = default_theme_packages(price, cover)
+        open_start = ""
+        open_end = ""
+    return {
+        **payload,
+        "title": title,
+        "cover": cover,
+        "price": price,
+        "origin_price": origin_price,
+        "address": payload.get("address") or src.get("address") or "",
+        "route": payload.get("route") or src.get("route") or "",
+        "lat": float(payload.get("lat") or src.get("lat") or 0),
+        "lng": float(payload.get("lng") or src.get("lng") or 0),
+        "banners": dumps(payload.get("banners") or src.get("banners") or ([cover] if cover else [])),
+        "detail_images": dumps(payload.get("detail_images") or src.get("detail_images") or []),
+        "recent_buy": dumps(payload.get("recent_buy") or {}),
+        "packages": dumps(pkgs),
+        "open_start": payload.get("open_start") or open_start,
+        "open_end": payload.get("open_end") or open_end,
+        "tags": dumps(tags),
+        "enabled": True,
+    }
 
 NYE_STORES = [
     {
@@ -233,6 +282,12 @@ def refresh_demo_covers(db: Session) -> None:
     for row in db.query(GatherProduct).all():
         if _needs_demo_cover(row.cover):
             row.cover = demo_img(f"gather-{row.id}")
+        banners = loads(row.banners, [])
+        if any(_needs_demo_cover(x) for x in banners) or not banners:
+            row.banners = dumps([demo_img(f"gather-{row.id}-b{i}") for i in range(1, 4)])
+        details = loads(row.detail_images, [])
+        if any(_needs_demo_cover(x) for x in details) or not details:
+            row.detail_images = dumps([demo_img(f"gather-{row.id}-d{i}", 900, 1200) for i in range(1, 3)])
     for row in db.query(NyeStore).all():
         if _needs_demo_cover(row.cover):
             row.cover = demo_img(f"nye-{row.id}")
@@ -311,32 +366,52 @@ def seed_all(db: Session) -> None:
         db.commit()
 
     if db.query(GatherProduct).count() == 0:
+        catalog = _nye_catalog_by_store()
         for item in GATHER_PRODUCTS:
-            payload = dict(item)
-            tags = payload.pop("tags", [])
-            detail_id = (payload.get("detail_id") or "").strip()
-            store = None
-            if detail_id:
-                store = db.query(NyeStore).filter(NyeStore.id == detail_id).first()
-                if not store:
-                    store = db.query(NyeStore).filter(NyeStore.store_id == detail_id).first()
-            title = (store.name if store else "") or detail_id or payload.get("id") or "去哪聚"
-            cover = (store.cover if store else "") or ""
-            price = float(store.price if store else 0) or 0
-            origin_price = float(store.origin_price if store else 0) or 0
-            db.add(
-                GatherProduct(
-                    **payload,
-                    title=title,
-                    cover=cover,
-                    price=price,
-                    origin_price=origin_price,
-                    tags=dumps(tags),
-                    enabled=True,
-                )
-            )
+            db.add(GatherProduct(**_build_gather_product_fields(item, catalog)))
+        db.commit()
+    else:
+        catalog = _nye_catalog_by_store()
+        for row in db.query(GatherProduct).all():
+            pkgs = loads(getattr(row, "packages", None) or "[]", [])
+            if pkgs:
+                continue
+            item = {
+                "id": row.id,
+                "tab": row.tab,
+                "region": getattr(row, "region", "") or "",
+                "detail_id": row.detail_id or "",
+                "tag": row.tag or "",
+                "title": row.title or "",
+                "cover": row.cover or "",
+                "price": row.price or 0,
+                "origin_price": row.origin_price or 0,
+                "sort": row.sort or 0,
+            }
+            filled = _build_gather_product_fields(item, catalog)
+            for key in (
+                "title",
+                "cover",
+                "price",
+                "origin_price",
+                "address",
+                "route",
+                "lat",
+                "lng",
+                "banners",
+                "detail_images",
+                "packages",
+                "open_start",
+                "open_end",
+            ):
+                cur = getattr(row, key, None)
+                empty = cur is None or cur == "" or cur == "[]" or cur == 0
+                if empty or key in ("packages",):
+                    setattr(row, key, filled[key])
         db.commit()
 
+    if not get_config(db, "activities"):
+        set_config(db, "activities", DEFAULT_ACTIVITIES)
     if db.query(RecommendItem).count() == 0:
         for item in RECOMMEND_ITEMS:
             db.add(RecommendItem(**item, enabled=True))

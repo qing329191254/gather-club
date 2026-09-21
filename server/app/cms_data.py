@@ -636,3 +636,40 @@ def default_nye_packages(price: float, cover: str) -> list[dict]:
         {"id": 7, "name": "名羊四海宴 (16人) 晚市大厅", "meal": "名羊四海宴", "time": "17:00-21:00", "price": p + 2100, "people": 16, "cover": c, "disabled": True},
         {"id": 8, "name": "名羊四海宴 (16人) 晚市包厢", "meal": "名羊四海宴", "time": "17:00-21:00", "price": p + 2100, "people": 16, "cover": c, "disabled": True},
     ]
+
+
+def default_theme_packages(price: float, cover: str) -> list[dict]:
+    """非年夜饭主题（包房聚会等）默认规格。"""
+    p = price or 799
+    c = cover or ""
+    return [
+        {"id": 1, "name": "【大厅】6人（标准菜单）", "meal": "标准菜单", "time": "10:00-21:00", "price": p, "people": 6, "cover": c, "disabled": False},
+        {"id": 2, "name": "【包房】6人（标准菜单）", "meal": "标准菜单", "time": "10:00-21:00", "price": p + 100, "people": 6, "cover": c, "disabled": False},
+        {"id": 3, "name": "6人包房-海鲜聚宝盆", "meal": "海鲜聚宝盆", "time": "10:00-21:00", "price": p + 200, "people": 6, "cover": c, "disabled": False},
+        {"id": 4, "name": "【大厅】12人（标准菜单）", "meal": "标准菜单", "time": "10:00-21:00", "price": p + 589, "people": 12, "cover": c, "disabled": False},
+        {"id": 5, "name": "【包房】12人套餐（大厅棋牌）（标准菜单）", "meal": "标准菜单", "time": "10:00-21:00", "price": p + 789, "people": 12, "cover": c, "disabled": False},
+        {"id": 6, "name": "【包房】12人套餐（包房内棋牌）（标准菜单）", "meal": "标准菜单", "time": "10:00-21:00", "price": p + 889, "people": 12, "cover": c, "disabled": False},
+        {"id": 7, "name": "【包房】12人套餐（大厅棋牌）（尊享菜单）", "meal": "尊享菜单", "time": "10:00-21:00", "price": p + 1317, "people": 12, "cover": c, "disabled": False},
+        {"id": 8, "name": "【双桌包房】20-22人套餐（包房内棋牌）（标准菜单）", "meal": "标准菜单", "time": "10:00-21:00", "price": p + 2377, "people": 22, "cover": c, "disabled": False},
+        {"id": 9, "name": "【豪华包房】18-20人套餐（标准菜单）", "meal": "标准菜单", "time": "10:00-21:00", "price": p + 2589, "people": 20, "cover": c, "disabled": False},
+    ]
+
+
+DEFAULT_ACTIVITIES = [
+    {
+        "id": "nye",
+        "name": "年夜饭",
+        "tag": "年夜饭",
+        "banners": [],
+        "enabled": True,
+        "sort": 1,
+    },
+    {
+        "id": "family",
+        "name": "家宴",
+        "tag": "家宴",
+        "banners": [],
+        "enabled": True,
+        "sort": 2,
+    },
+]

@@ -55,10 +55,38 @@
 
 		<view class="block buy-block">
 			<text class="buy-count">{{ detail.recentBuy.countText }}</text>
-			<view class="buyer-row">
-				<image class="avatar" :src="detail.recentBuy.avatar" mode="aspectFill" />
-				<text class="buyer-name">{{ detail.recentBuy.name }}</text>
-				<text class="buyer-time">{{ detail.recentBuy.timeText }}</text>
+			<swiper
+				v-if="buyerScroll"
+				class="buyer-swiper"
+				vertical
+				circular
+				autoplay
+				:interval="2800"
+				:duration="500"
+				:display-multiple-items="2"
+				:style="{ height: buyerSwiperHeight }"
+			>
+				<swiper-item v-for="(item, idx) in recentBuyers" :key="'b' + idx">
+					<view class="buyer-row">
+						<image class="avatar" :src="item.avatar" mode="aspectFill" />
+						<text class="buyer-name">{{ item.name }}</text>
+						<text class="buyer-time">{{ item.timeText }}</text>
+						<view class="order-btn" @tap="onBook">去下单</view>
+					</view>
+				</swiper-item>
+			</swiper>
+			<view v-else-if="recentBuyers.length" class="buyer-static">
+				<view v-for="(item, idx) in recentBuyers" :key="'s' + idx" class="buyer-row">
+					<image class="avatar" :src="item.avatar" mode="aspectFill" />
+					<text class="buyer-name">{{ item.name }}</text>
+					<text class="buyer-time">{{ item.timeText }}</text>
+					<view class="order-btn" @tap="onBook">去下单</view>
+				</view>
+			</view>
+			<view v-else class="buyer-row">
+				<image class="avatar" :src="detail.recentBuy.avatar || '/static/icons/avatar-default.png'" mode="aspectFill" />
+				<text class="buyer-name">{{ detail.recentBuy.name || '微信用户' }}</text>
+				<text class="buyer-time">{{ detail.recentBuy.timeText || '' }}</text>
 				<view class="order-btn" @tap="onBook">去下单</view>
 			</view>
 		</view>
@@ -113,6 +141,34 @@
 			}
 		},
 		computed: {
+			recentBuyers() {
+				const rb = (this.detail && this.detail.recentBuy) || {}
+				const list = rb.list
+				if (Array.isArray(list) && list.length) {
+					return list.map((x) => ({
+						avatar: (x && x.avatar) || '/static/icons/avatar-default.png',
+						name: (x && x.name) || '微信用户',
+						timeText: (x && x.timeText) || ''
+					}))
+				}
+				if (rb.name || rb.timeText || rb.avatar) {
+					return [
+						{
+							avatar: rb.avatar || '/static/icons/avatar-default.png',
+							name: rb.name || '微信用户',
+							timeText: rb.timeText || ''
+						}
+					]
+				}
+				return []
+			},
+			buyerScroll() {
+				// 超过可视两行才轮播；1～2 条静态展示
+				return this.recentBuyers.length > 2
+			},
+			buyerSwiperHeight() {
+				return '176rpx'
+			},
 			thumbStyle() {
 				const count = (this.detail && this.detail.banners && this.detail.banners.length) || 1
 				const track = 112
@@ -401,6 +457,19 @@
 		font-size: 28rpx;
 		color: #999;
 		margin-bottom: 24rpx;
+	}
+
+	.buyer-swiper {
+		width: 100%;
+	}
+
+	.buyer-swiper .buyer-row {
+		height: 88rpx;
+		box-sizing: border-box;
+	}
+
+	.buyer-static .buyer-row + .buyer-row {
+		margin-top: 16rpx;
 	}
 
 	.buyer-row {

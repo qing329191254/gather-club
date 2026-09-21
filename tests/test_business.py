@@ -608,13 +608,13 @@ class BusinessTests(unittest.TestCase):
         res = self.client.get("/api/v1/nye/not-a-store")
         self.assertEqual(res.status_code, 404)
 
-    def test_gather_card_shares_nye_store_fields(self):
+    def test_gather_card_owns_catalog_fields(self):
         gather = self.client.get("/api/v1/gather")
         self.assertEqual(gather.status_code, 200, gather.text)
         products = gather.json().get("products") or []
         card = next((p for p in products if p.get("id") == "d1"), None)
         self.assertIsNotNone(card)
-        detail = self.client.get("/api/v1/nye/xinzhuang")
+        detail = self.client.get("/api/v1/nye/d1")
         self.assertEqual(detail.status_code, 200, detail.text)
         store = detail.json()
         self.assertEqual(card["title"], store["name"])
@@ -624,6 +624,128 @@ class BusinessTests(unittest.TestCase):
         enabled = [float(p["price"]) for p in packages if not p.get("disabled") and float(p.get("price") or 0) > 0]
         self.assertTrue(enabled)
         self.assertEqual(store["price"], min(enabled))
+
+    def test_nye_list_filters_by_tag(self):
+        res = self.client.get("/api/v1/nye", params={"tag": "年夜饭"})
+        self.assertEqual(res.status_code, 200, res.text)
+        body = res.json()
+        self.assertEqual((body.get("activity") or {}).get("tag"), "年夜饭")
+        for row in body.get("list") or []:
+            detail = self.client.get(f"/api/v1/nye/{row['id']}")
+            self.assertEqual(detail.status_code, 200, detail.text)
+            self.assertEqual(detail.json().get("tag"), "年夜饭")
+
+    def test_product_order_by_gather_id(self):
+        res = self.client.post(
+            "/api/v1/orders",
+            headers=headers("openid-gather-product"),
+            json={
+                "type": "nye",
+                "store_id": "d5",
+                "package_id": "1",
+                "quantity": 1,
+                "price": 1,
+                "amount": 1,
+            },
+        )
+        self.assertEqual(res.status_code, 200, res.text)
+        self.assertEqual(res.json()["storeId"], "d5")
+        self.assertGreater(res.json()["amount"], 1)
+
+    def test_recent_buy_returns_list(self):
+        openid = "openid-recent-buy-list"
+        created = self.client.post(
+            "/api/v1/orders",
+            headers=headers(openid),
+            json={
+                "type": "nye",
+                "store_id": "d1",
+                "package_id": "1",
+                "quantity": 1,
+            },
+        )
+        self.assertEqual(created.status_code, 200, created.text)
+        order_id = created.json()["id"]
+        db = SessionLocal()
+        try:
+            from app.commerce import bump_sold_on_paid
+
+            row = db.query(Order).filter(Order.id == order_id).one()
+            user = db.query(AppUser).filter(AppUser.openid == openid).one()
+            row.status = "paid"
+            row.status_text = "待核销"
+            bump_sold_on_paid(db, row, user)
+            db.commit()
+        finally:
+            db.close()
+
+        detail = self.client.get("/api/v1/nye/d1")
+        self.assertEqual(detail.status_code, 200, detail.text)
+        recent = detail.json().get("recentBuy") or {}
+        self.assertIn("近一周", recent.get("countText") or "")
+        buyers = recent.get("list") or []
+        self.assertGreaterEqual(len(buyers), 1)
+        self.assertIn("name", buyers[0])
+        self.assertIn("timeText", buyers[0])
+        self.assertIn("avatar", buyers[0])
+
+    def test_admin_gather_product_persists_packages(self):
+        login = self.client.post(
+            "/api/admin/login",
+            json={"username": "admin", "password": "admin123"},
+        )
+        self.assertEqual(login.status_code, 200, login.text)
+        token = login.json()["access_token"]
+        auth = {"Authorization": f"Bearer {token}"}
+        pid = "gtest_pkg_1"
+        payload = {
+            "id": pid,
+            "tab": "day",
+            "region": "shanghai",
+            "detail_id": "gongkang",
+            "title": "测试去哪聚商品",
+            "cover": "https://example.com/c.jpg",
+            "tag": "年夜饭",
+            "tags": ["测"],
+            "price": 1888,
+            "origin_price": 2888,
+            "address": "测试地址",
+            "packages": [
+                {
+                    "id": 1,
+                    "name": "测试套餐",
+                    "meal": "测试",
+                    "time": "10:00-14:00",
+                    "price": 1888,
+                    "people": 10,
+                    "cover": "",
+                    "disabled": False,
+                }
+            ],
+            "banners": ["https://example.com/b.jpg"],
+            "detail_images": [],
+            "sort": 99,
+            "enabled": True,
+        }
+        created = self.client.post("/api/admin/gather/products", headers=auth, json=payload)
+        self.assertEqual(created.status_code, 200, created.text)
+        listed = self.client.get("/api/admin/gather/products", headers=auth, params={"page_size": 50})
+        self.assertEqual(listed.status_code, 200, listed.text)
+        items = listed.json().get("list") or []
+        row = next((x for x in items if x.get("id") == pid), None)
+        self.assertIsNotNone(row, listed.text)
+        self.assertEqual(row["title"], "测试去哪聚商品")
+        self.assertEqual(len(row.get("packages") or []), 1)
+        self.assertEqual((row["packages"][0] or {}).get("price"), 1888)
+
+        detail = self.client.get(f"/api/v1/nye/{pid}")
+        self.assertEqual(detail.status_code, 200, detail.text)
+        self.assertEqual(detail.json()["name"], "测试去哪聚商品")
+        pkgs = detail.json().get("packages") or []
+        self.assertTrue(any(float(p.get("price") or 0) == 1888 for p in pkgs))
+
+        deleted = self.client.delete(f"/api/admin/gather/products/{pid}", headers=auth)
+        self.assertEqual(deleted.status_code, 200, deleted.text)
 
 
 if __name__ == "__main__":

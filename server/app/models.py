@@ -89,6 +89,7 @@ class GatherProduct(Base):
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     tab: Mapped[str] = mapped_column(String(32), index=True)
     region: Mapped[str] = mapped_column(String(32), default="", index=True)  # 空=全国，匹配 gather_regions.id
+    # 关联首页实体店 Store.id（地址/包房库存）；同一家店可有多张主题商品
     detail_id: Mapped[str] = mapped_column(String(64), default="")
     cover: Mapped[str] = mapped_column(String(512), default="")
     title: Mapped[str] = mapped_column(String(255))
@@ -98,6 +99,16 @@ class GatherProduct(Base):
     sold_count: Mapped[int] = mapped_column(Integer, default=0)
     price: Mapped[float] = mapped_column(Float, default=0)
     origin_price: Mapped[float] = mapped_column(Float, default=0)
+    address: Mapped[str] = mapped_column(String(255), default="")
+    route: Mapped[str] = mapped_column(Text, default="")
+    lat: Mapped[float] = mapped_column(Float, default=0)
+    lng: Mapped[float] = mapped_column(Float, default=0)
+    banners: Mapped[str] = mapped_column(Text, default="[]")
+    detail_images: Mapped[str] = mapped_column(Text, default="[]")
+    recent_buy: Mapped[str] = mapped_column(Text, default="{}")
+    packages: Mapped[str] = mapped_column(Text, default="[]")
+    open_start: Mapped[str] = mapped_column(String(16), default="")
+    open_end: Mapped[str] = mapped_column(String(16), default="")
     sort: Mapped[int] = mapped_column(Integer, default=0)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
