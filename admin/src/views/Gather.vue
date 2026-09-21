@@ -198,10 +198,10 @@
           />
         </el-form-item>
         <el-form-item label="现价">
-          <el-input-number v-model="productForm.price" :min="0" :precision="0" />
+          <el-input-number v-model="productForm.price" :min="0" :precision="2" :step="0.01" />
         </el-form-item>
         <el-form-item label="原价">
-          <el-input-number v-model="productForm.origin_price" :min="0" :precision="0" />
+          <el-input-number v-model="productForm.origin_price" :min="0" :precision="2" :step="0.01" />
         </el-form-item>
         <el-form-item label="排序">
           <el-input-number v-model="productForm.sort" :min="0" />

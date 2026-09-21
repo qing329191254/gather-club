@@ -55,10 +55,10 @@
           <ImageField v-model="form.cover" folder="nye" />
         </el-form-item>
         <el-form-item label="现价">
-          <el-input-number v-model="form.price" :min="0" :precision="0" controls-position="right" class="num" />
+          <el-input-number v-model="form.price" :min="0" :precision="2" :step="0.01" controls-position="right" class="num" />
         </el-form-item>
         <el-form-item label="原价">
-          <el-input-number v-model="form.origin_price" :min="0" :precision="0" controls-position="right" class="num" />
+          <el-input-number v-model="form.origin_price" :min="0" :precision="2" :step="0.01" controls-position="right" class="num" />
         </el-form-item>
         <el-form-item label="角标文案">
           <el-input v-model="form.tag" placeholder="角标文字" />
@@ -146,7 +146,8 @@
                 <el-input-number
                   v-model="pkg.price"
                   :min="0"
-                  :precision="0"
+                  :precision="2"
+                  :step="0.01"
                   controls-position="right"
                   class="pkg-num"
                 />

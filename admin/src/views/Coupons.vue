@@ -33,7 +33,7 @@
     <el-dialog v-model="visible" title="优惠券" width="520px">
       <el-form label-width="90px">
         <el-form-item label="名称"><el-input v-model="form.name" /></el-form-item>
-        <el-form-item label="面额"><el-input-number v-model="form.amount" :min="0" /></el-form-item>
+        <el-form-item label="面额"><el-input-number v-model="form.amount" :min="0" :precision="2" :step="0.01" /></el-form-item>
         <el-form-item label="条件"><el-input v-model="form.condition" /></el-form-item>
         <el-form-item label="有效期"><el-input v-model="form.expire" /></el-form-item>
         <el-form-item label="总量"><el-input-number v-model="form.total" :min="0" /></el-form-item>

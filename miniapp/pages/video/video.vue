@@ -17,7 +17,7 @@
 				<view class="channel-row">
 					<image v-if="profile.avatar" class="channel-avatar" :src="profile.avatar" mode="aspectFill" />
 					<text class="channel-name">{{ profile.name }}</text>
-					<view class="follow" :class="{ 'tap-busy': isTapBusy('follow') }" @tap.stop="onFollow">{{ followed ? '已关注' : '关注视频号' }}</view>
+					<view class="follow" :class="{ 'tap-busy': isTapBusy('follow') }" @tap.stop="onFollow">关注视频号</view>
 				</view>
 				<text class="intro">{{ profile.intro }}</text>
 			</view>
@@ -89,7 +89,6 @@
 					intro: '天天俱乐部！天天都有局！关注直播间，给您带来更多超高性价比的聚会餐，酒店直播！',
 					finderUserName: ''
 				},
-				followed: false,
 				living: null,
 				lives: []
 			}
@@ -105,7 +104,6 @@
 					if (res && res.profile) {
 						this.profile = Object.assign({}, this.profile, res.profile)
 					}
-					this.followed = !!(res && res.followed)
 					this.living = null
 					this.lives = []
 					const fromProfile = Number(res && res.profile && res.profile.defaultReservePoints)
@@ -124,6 +122,20 @@
 					} catch (e) {
 						this.living = null
 						this.lives = []
+						const msg =
+							(e && (e.errMsg || e.message)) ||
+							'视频号直播同步失败'
+						console.warn('[video] channels sync failed', finder, e)
+						// 开发者工具不支持该能力；真机失败时提示具体原因（如视频号 id 错误）
+						if (String(msg).indexOf('unsupported') >= 0) {
+							console.warn('[video] getChannelsLive* 仅真机可用')
+						} else {
+							uni.showToast({
+								title: String(msg).slice(0, 40),
+								icon: 'none',
+								duration: 3000
+							})
+						}
 					}
 				} catch (e) {
 					this.living = null
@@ -185,17 +197,32 @@
 
 				let liveInfo = null
 				let noticeInfo = null
+				let liveErr = null
+				let noticeErr = null
 				try {
 					liveInfo = await this.wxCall('getChannelsLiveInfo', { finderUserName: finder })
-				} catch (e) {}
+				} catch (e) {
+					liveErr = e
+				}
 				try {
 					noticeInfo = await this.wxCall('getChannelsLiveNoticeInfo', {
 						finderUserName: finder
 					})
-				} catch (e) {}
+				} catch (e) {
+					noticeErr = e
+				}
+
+				console.log('[video] channels result', {
+					finder,
+					liveInfo,
+					noticeInfo,
+					liveErr,
+					noticeErr
+				})
 
 				if (!liveInfo && !noticeInfo) {
-					throw new Error('channels unavailable')
+					const err = noticeErr || liveErr || new Error('channels unavailable')
+					throw err
 				}
 
 				if (liveInfo && Number(liveInfo.status) === 2) {
@@ -248,16 +275,15 @@
 				return this.tapGuard('follow', async () => {
 				try {
 					const res = await api.videoFollow()
-					this.followed = true
 					const finder = (res && res.finderUserName) || this.profile.finderUserName || ''
 					this.profile.finderUserName = finder
 					if (!finder) {
-						uni.showToast({ title: '已关注，视频号审核中', icon: 'none' })
+						uni.showToast({ title: '视频号审核中', icon: 'none' })
 						return
 					}
 					this.openChannel('openChannelsUserProfile')
 				} catch (e) {
-					uni.showToast({ title: (e && e.message) || '关注失败', icon: 'none' })
+					uni.showToast({ title: (e && e.message) || '打开失败', icon: 'none' })
 				}
 				})
 			},
@@ -364,8 +390,14 @@
 </script>
 
 <style>
+	page {
+		height: 100%;
+		background: #FDECEC;
+	}
+
 	.page {
-		min-height: 100vh;
+		box-sizing: border-box;
+		min-height: 100%;
 		background: #FDECEC;
 		padding-bottom: calc(168rpx + env(safe-area-inset-bottom));
 	}
@@ -738,11 +770,13 @@
 		align-items: center;
 		justify-content: center;
 		box-sizing: border-box;
+		overflow: visible;
 	}
 
 	.watch-heart text {
-		font-size: 14rpx;
+		font-size: 18rpx;
 		color: #fff;
 		line-height: 1;
+		transform: scaleX(1.22);
 	}
 </style>

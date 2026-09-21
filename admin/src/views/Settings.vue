@@ -48,7 +48,7 @@
         <el-input-number v-model="loyalty.vipTables.V3" :min="1" />
       </el-form-item>
       <el-form-item label="包房单价">
-        <el-input-number v-model="loyalty.roomPrice" :min="0" :precision="2" />
+        <el-input-number v-model="loyalty.roomPrice" :min="0" :precision="2" :step="0.01" />
         <span class="inline-tip">支付成功后才锁定包房，填 0 则不能预约</span>
       </el-form-item>
 

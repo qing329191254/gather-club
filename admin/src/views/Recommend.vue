@@ -38,7 +38,7 @@
           <ImageField v-model="form.cover" folder="recommend" />
         </el-form-item>
         <el-form-item label="参考价">
-          <el-input-number v-model="form.price" :min="0" :precision="0" />
+          <el-input-number v-model="form.price" :min="0" :precision="2" :step="0.01" />
         </el-form-item>
         <el-form-item label="排序">
           <el-input-number v-model="form.sort" :min="0" />
