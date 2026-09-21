@@ -203,6 +203,36 @@ def find_nye_store(db: Session, key: str, enabled_only: bool = False) -> Optiona
     return q.order_by(NyeStore.sort.asc(), NyeStore.id.asc()).first()
 
 
+def nye_packages_for(store: NyeStore) -> list:
+    """门店套餐列表；未配置时按门店起价生成默认规格。"""
+    from .cms_data import default_nye_packages
+
+    stored = loads(getattr(store, "packages", None) or "[]", [])
+    if stored:
+        return stored
+    return default_nye_packages(store.price or 2388, store.cover or "")
+
+
+def nye_starting_price(store: NyeStore) -> float:
+    """对外展示的「起」价：可用套餐最低价，否则退回门店价。"""
+    prices: list[float] = []
+    for pkg in nye_packages_for(store):
+        if pkg.get("disabled"):
+            continue
+        try:
+            value = float(pkg.get("price") or 0)
+        except (TypeError, ValueError):
+            continue
+        if value > 0:
+            prices.append(value)
+    if prices:
+        return min(prices)
+    try:
+        return float(store.price or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def room_inventory_id(order: Order) -> str:
     """包房库存按首页门店编号占用，和后台包房库存是同一行。"""
     extra = loads(order.extra or "{}", {}) or {}

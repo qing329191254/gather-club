@@ -100,8 +100,6 @@ STORES = [
 GATHER_TABS = [
     {"key": "day", "name": "聚一天", "show_sold": True, "sort": 1},
     {"key": "meal", "name": "聚个餐", "show_sold": True, "sort": 2},
-    {"key": "dish", "name": "招牌菜", "show_sold": False, "sort": 3},
-    {"key": "set", "name": "精品套餐", "show_sold": False, "sort": 4},
 ]
 
 GATHER_REGIONS = [
@@ -111,26 +109,16 @@ GATHER_REGIONS = [
     {"id": "ningbo", "name": "宁波市", "sort": 3},
 ]
 
+# 去哪聚入口只挂专题门店；封面/店名/套餐价在宴会专题配置
 GATHER_PRODUCTS = [
-    {"id": "d1", "tab": "day", "region": "shanghai", "detail_id": "xinzhuang", "cover": demo_img("g-d1"), "title": "上海莘庄店-天天俱乐部-2027年夜饭", "tag": "年夜饭", "price": 2688, "origin_price": 3688, "sort": 1},
-    {"id": "d2", "tab": "day", "region": "shanghai", "detail_id": "xinzhuang", "cover": demo_img("g-d2"), "title": "天天俱乐部-上海莘庄店（环球主题馆）", "price": 899, "origin_price": 1988, "sort": 2},
-    {"id": "d3", "tab": "day", "region": "shanghai", "detail_id": "yaxin", "cover": demo_img("g-d3"), "title": "上海亚新店-天天俱乐部-2027年夜饭", "tag": "年夜饭", "price": 2688, "origin_price": 3488, "sort": 3},
-    {"id": "d4", "tab": "day", "region": "shanghai", "detail_id": "yaxin", "cover": demo_img("g-d4"), "title": "天天俱乐部上海亚新店（时光主题馆）", "tags": ["地铁直", "沉浸体验", "全包房"], "price": 899, "origin_price": 1988, "sort": 4},
-    {"id": "d5", "tab": "day", "region": "shanghai", "detail_id": "gongkang", "cover": demo_img("g-d5"), "title": "上海共康店-天天俱乐部-2027年夜饭", "tag": "年夜饭", "price": 2388, "origin_price": 3488, "sort": 5},
-    {"id": "d6", "tab": "day", "region": "shanghai", "detail_id": "gongkang", "cover": demo_img("g-d6"), "title": "天天俱乐部上海共康店（老上海情怀型）", "tags": ["直营", "近地铁", "怀旧风"], "price": 799, "origin_price": 999, "sort": 6},
-    {"id": "d7", "tab": "day", "region": "ningbo", "detail_id": "ningbo", "cover": demo_img("g-d7"), "title": "宁波天天俱乐部（天一店）", "tags": ["核心商圈", "地铁直达"], "price": 828, "origin_price": 1688, "sort": 7},
-    {"id": "m1", "tab": "meal", "region": "shanghai", "detail_id": "xinzhuang", "cover": demo_img("g-m1"), "title": "莘庄店·帝王蟹海鲜盛宴（10人）", "tag": "海鲜", "price": 1888, "origin_price": 2588, "sort": 1},
-    {"id": "m2", "tab": "meal", "region": "shanghai", "detail_id": "yaxin", "cover": demo_img("g-m2"), "title": "亚新店·羊蝎子火锅双人餐", "tags": ["招牌", "双人餐"], "price": 198, "origin_price": 298, "sort": 2},
-    {"id": "m3", "tab": "meal", "region": "shanghai", "detail_id": "gongkang", "cover": demo_img("g-m3"), "title": "共康店·老上海本帮菜家宴", "tag": "本帮菜", "price": 688, "origin_price": 988, "sort": 3},
-    {"id": "m4", "tab": "meal", "region": "shanghai", "detail_id": "shibo", "cover": demo_img("g-m4"), "title": "世博店·午市自助畅吃", "tags": ["自助", "午市"], "price": 168, "origin_price": 228, "sort": 4},
-    {"id": "c1", "tab": "dish", "region": "shanghai", "detail_id": "xinzhuang", "cover": demo_img("g-c1", 600, 600), "title": "招牌手撕盐焗鸡（整只）", "tag": "招牌", "price": 128, "origin_price": 168, "sort": 1},
-    {"id": "c2", "tab": "dish", "region": "shanghai", "detail_id": "yaxin", "cover": demo_img("g-c2", 600, 600), "title": "黄油香煎小牛排", "tags": ["人气", "西式"], "price": 88, "origin_price": 118, "sort": 2},
-    {"id": "c3", "tab": "dish", "region": "shanghai", "detail_id": "gongkang", "cover": demo_img("g-c3", 600, 600), "title": "红烧肉配糯米饭", "tag": "本帮", "price": 68, "origin_price": 88, "sort": 3},
-    {"id": "c4", "tab": "dish", "region": "shanghai", "detail_id": "shibo", "cover": demo_img("g-c4", 600, 600), "title": "蒜蓉粉丝蒸扇贝（6只）", "tags": ["海鲜", "热销"], "price": 98, "origin_price": 128, "sort": 4},
-    {"id": "s1", "tab": "set", "region": "shanghai", "detail_id": "xinzhuang", "cover": demo_img("g-s1"), "title": "喜气羊羊宴（10-12人）", "tag": "套餐", "price": 2688, "origin_price": 3288, "sort": 1},
-    {"id": "s2", "tab": "set", "region": "shanghai", "detail_id": "yaxin", "cover": demo_img("g-s2"), "title": "团圆家宴（8-10人）", "tags": ["包厢", "晚市"], "price": 1988, "origin_price": 2588, "sort": 2},
-    {"id": "s3", "tab": "set", "region": "shanghai", "detail_id": "gongkang", "cover": demo_img("g-s3"), "title": "名羊四海宴（12-14人）", "tag": "套餐", "price": 3588, "origin_price": 4288, "sort": 3},
-    {"id": "s4", "tab": "set", "region": "shanghai", "detail_id": "shibo", "cover": demo_img("g-s4"), "title": "商务午宴精选套餐（6人）", "tags": ["午市", "商务"], "price": 1288, "origin_price": 1688, "sort": 4},
+    {"id": "d1", "tab": "day", "region": "shanghai", "detail_id": "xinzhuang", "tag": "年夜饭", "sort": 1},
+    {"id": "d3", "tab": "day", "region": "shanghai", "detail_id": "yaxin", "tag": "年夜饭", "sort": 2},
+    {"id": "d5", "tab": "day", "region": "shanghai", "detail_id": "gongkang", "tag": "年夜饭", "sort": 3},
+    {"id": "d8", "tab": "day", "region": "shanghai", "detail_id": "shibo", "tag": "年夜饭", "sort": 4},
+    {"id": "m1", "tab": "meal", "region": "shanghai", "detail_id": "xinzhuang", "tag": "家宴", "tags": ["近地铁", "包厢"], "sort": 1},
+    {"id": "m2", "tab": "meal", "region": "shanghai", "detail_id": "yaxin", "tag": "家宴", "tags": ["地铁直", "沉浸体验"], "sort": 2},
+    {"id": "m3", "tab": "meal", "region": "shanghai", "detail_id": "gongkang", "tag": "本帮菜", "tags": ["直营", "怀旧风"], "sort": 3},
+    {"id": "m4", "tab": "meal", "region": "shanghai", "detail_id": "shibo", "tag": "套餐", "tags": ["午市", "商务"], "sort": 4},
 ]
 
 NYE_STORES = [
@@ -297,13 +285,6 @@ def seed_all(db: Session) -> None:
             db.add(GatherRegion(**item, enabled=True))
         db.commit()
 
-    if db.query(GatherProduct).count() == 0:
-        for item in GATHER_PRODUCTS:
-            payload = dict(item)
-            tags = payload.pop("tags", [])
-            db.add(GatherProduct(**payload, tags=dumps(tags), enabled=True))
-        db.commit()
-
     if db.query(NyeStore).count() == 0:
         for item in NYE_STORES:
             payload = dict(item)
@@ -327,6 +308,33 @@ def seed_all(db: Session) -> None:
             existing = loads(getattr(row, "packages", None) or "[]", [])
             if not existing:
                 row.packages = dumps(default_nye_packages(row.price or 2388, row.cover or ""))
+        db.commit()
+
+    if db.query(GatherProduct).count() == 0:
+        for item in GATHER_PRODUCTS:
+            payload = dict(item)
+            tags = payload.pop("tags", [])
+            detail_id = (payload.get("detail_id") or "").strip()
+            store = None
+            if detail_id:
+                store = db.query(NyeStore).filter(NyeStore.id == detail_id).first()
+                if not store:
+                    store = db.query(NyeStore).filter(NyeStore.store_id == detail_id).first()
+            title = (store.name if store else "") or detail_id or payload.get("id") or "去哪聚"
+            cover = (store.cover if store else "") or ""
+            price = float(store.price if store else 0) or 0
+            origin_price = float(store.origin_price if store else 0) or 0
+            db.add(
+                GatherProduct(
+                    **payload,
+                    title=title,
+                    cover=cover,
+                    price=price,
+                    origin_price=origin_price,
+                    tags=dumps(tags),
+                    enabled=True,
+                )
+            )
         db.commit()
 
     if db.query(RecommendItem).count() == 0:

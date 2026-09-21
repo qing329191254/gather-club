@@ -118,14 +118,24 @@
 		},
 		onShow() {
 			uni.hideTabBar({ fail() {} })
-			const app = getApp()
-			const tab = app.globalData && app.globalData.gatherTab
-			if (tab && this.tabs.some((item) => item.key === tab)) {
-				this.currentTab = tab
-				app.globalData.gatherTab = ''
-			}
+			this.applyGatherTabIntent()
 		},
 		methods: {
+			applyGatherTabIntent() {
+				const app = getApp()
+				const gd = (app && app.globalData) || {}
+				const tab = gd.gatherTab
+				if (!tab || !this.tabs.length) return
+				if (tab === '__first__') {
+					this.currentTab = this.tabs[0].key
+					gd.gatherTab = ''
+					return
+				}
+				if (this.tabs.some((item) => item.key === tab)) {
+					this.currentTab = tab
+					gd.gatherTab = ''
+				}
+			},
 			loadGather() {
 				api
 					.gather()
@@ -154,6 +164,7 @@
 						if (Array.isArray(res.products)) {
 							this.products = res.products
 						}
+						this.applyGatherTabIntent()
 					})
 					.catch(() => {
 						uni.showToast({ title: '加载失败', icon: 'none' })

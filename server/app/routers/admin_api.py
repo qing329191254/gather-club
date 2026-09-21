@@ -19,7 +19,9 @@ from ..commerce import (
     table_count,
     add_points,
     award_order_points,
+    find_nye_store,
     hold_room_slot,
+    nye_starting_price,
     release_room_if_needed,
     release_stale_room_holds,
     reverse_order_points,
@@ -329,42 +331,71 @@ def list_gather_products(
         q = q.filter(GatherProduct.tab == tab)
     total = q.count()
     rows = q.offset(offset).limit(page_size).all()
-    return page_payload(
-        [
+    items = []
+    for r in rows:
+        detail_id = (r.detail_id or "").strip()
+        cover = r.cover or ""
+        title = r.title or ""
+        price = float(r.price or 0)
+        origin_price = float(r.origin_price or 0)
+        sold_count = int(getattr(r, "sold_count", 0) or 0)
+        if detail_id:
+            store = find_nye_store(db, detail_id)
+            if store:
+                cover = store.cover or cover
+                title = store.name or title
+                price = nye_starting_price(store)
+                origin_price = float(store.origin_price or 0) or origin_price
+                sold_count = int(getattr(store, "sold_count", 0) or 0)
+        items.append(
             {
                 "id": r.id,
                 "tab": r.tab,
                 "region": getattr(r, "region", "") or "",
-                "detail_id": r.detail_id,
-                "cover": r.cover,
-                "title": r.title,
+                "detail_id": detail_id,
+                "cover": cover,
+                "title": title,
                 "tag": r.tag,
                 "tags": loads(r.tags, []),
                 "sold_text": r.sold_text,
-                "sold_count": int(getattr(r, "sold_count", 0) or 0),
-                "price": r.price,
-                "origin_price": r.origin_price,
+                "sold_count": sold_count,
+                "price": price,
+                "origin_price": origin_price,
                 "sort": r.sort,
                 "enabled": r.enabled,
             }
-            for r in rows
-        ],
-        total,
-        page,
-        page_size,
-    )
+        )
+    return page_payload(items, total, page, page_size)
+
+
+def _hydrate_gather_product_from_nye(db: Session, data: dict) -> dict:
+    """封面/店名/起价跟宴会专题走；去哪聚只保留入口元数据。"""
+    detail_id = (data.get("detail_id") or "").strip()
+    if not detail_id:
+        raise HTTPException(400, "请选择关联门店（封面、店名、套餐价在宴会专题配置）")
+    store = find_nye_store(db, detail_id)
+    if not store:
+        raise HTTPException(400, "关联门店没有宴会专题，请先在「宴会专题」配置")
+    data["detail_id"] = detail_id
+    data["title"] = store.name or data.get("title") or detail_id
+    data["cover"] = store.cover or data.get("cover") or ""
+    data["price"] = nye_starting_price(store)
+    data["origin_price"] = float(store.origin_price or 0)
+    if not (data.get("tag") or "").strip():
+        data["tag"] = store.tag or ""
+    return data
 
 
 @router.post("/gather/products")
 def create_gather_product(payload: GatherProductIn, db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
     if db.query(GatherProduct).filter(GatherProduct.id == payload.id).first():
         raise HTTPException(400, "商品 ID 已存在")
-    data = payload.model_dump()
+    data = _hydrate_gather_product_from_nye(db, payload.model_dump())
     tags = data.pop("tags", [])
     row = GatherProduct(**data, tags=dumps(tags))
     db.add(row)
     db.commit()
-    return payload
+    return {**data, "tags": tags}
 
 
 @router.put("/gather/products/{product_id}")
@@ -372,14 +403,14 @@ def update_gather_product(product_id: str, payload: GatherProductIn, db: Session
     row = db.query(GatherProduct).filter(GatherProduct.id == product_id).first()
     if not row:
         raise HTTPException(404, "不存在")
-    data = payload.model_dump()
+    data = _hydrate_gather_product_from_nye(db, payload.model_dump())
     tags = data.pop("tags", [])
     data.pop("id", None)
     for k, v in data.items():
         setattr(row, k, v)
     row.tags = dumps(tags)
     db.commit()
-    return payload
+    return {**data, "id": product_id, "tags": tags}
 
 
 @router.delete("/gather/products/{product_id}")

@@ -131,7 +131,6 @@
 	import { api } from '../../common/api.js'
 	import { stewardPropsFromSite } from '../../common/site.js'
 	import { isProfileComplete } from '../../common/profile.js'
-	import { openGatherTarget } from '../../common/open-gather.js'
 	import ProfileRewardDialog from '../../components/profile-reward-dialog/profile-reward-dialog.vue'
 
 	export default {
@@ -353,10 +352,11 @@
 			closeSteward() {
 				this.stewardVisible = false
 			},
-			bookStore(store) {
-				const id = (store && store.id) || ''
-				if (!id) return
-				openGatherTarget({ detailId: id })
+			bookStore() {
+				const app = getApp()
+				app.globalData = app.globalData || {}
+				app.globalData.gatherTab = '__first__'
+				uni.switchTab({ url: '/pages/gather/gather' })
 			},
 			callStore(store) {
 				if (!store.phone) {

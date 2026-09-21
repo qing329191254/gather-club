@@ -13,7 +13,6 @@ from ..cms_data import (
     PRIVACY_COLLECT,
     PRIVACY_SHARE,
     RECOMMEND_BANNERS,
-    default_nye_packages,
 )
 from ..commerce import (
     add_points,
@@ -26,7 +25,9 @@ from ..commerce import (
     get_loyalty_config,
     hold_room_slot,
     mark_refund_pending,
+    nye_packages_for,
     nye_recent_buy,
+    nye_starting_price,
     order_earn_points,
     release_room_if_needed,
     release_stale_room_holds,
@@ -176,28 +177,43 @@ def _user_out(user: AppUser, db: Optional[Session] = None) -> dict:
     return out
 
 
-def _product_out(row: GatherProduct) -> dict:
+def _product_out(row: GatherProduct, db: Optional[Session] = None) -> dict:
+    """关联年夜饭门店时，封面/店名/起价/销量与专题门店共享；仅套餐价在门店内各不相同。"""
+    cover = row.cover or ""
+    title = row.title or ""
+    tag = row.tag or ""
+    price = float(row.price or 0)
+    origin_price = float(row.origin_price or 0)
+    sold_count = int(getattr(row, "sold_count", 0) or 0)
+    detail_id = (getattr(row, "detail_id", None) or "").strip()
+    if db is not None and detail_id:
+        store = find_nye_store(db, detail_id, enabled_only=True)
+        if store:
+            cover = store.cover or cover
+            title = store.name or title
+            price = nye_starting_price(store)
+            origin_price = float(store.origin_price or 0) or origin_price
+            sold_count = int(getattr(store, "sold_count", 0) or 0)
+            if not tag.strip():
+                tag = store.tag or ""
     return {
         "id": row.id,
         "tab": row.tab,
         "region": getattr(row, "region", "") or "",
         "detailId": row.detail_id,
-        "cover": row.cover,
-        "title": row.title,
-        "tag": row.tag,
+        "cover": cover,
+        "title": title,
+        "tag": tag,
         "tags": loads(row.tags, []),
-        "soldText": display_sold_text(getattr(row, "sold_count", 0) or 0, row.sold_text),
-        "soldCount": int(getattr(row, "sold_count", 0) or 0),
-        "price": row.price,
-        "originPrice": row.origin_price,
+        "soldText": display_sold_text(sold_count, row.sold_text),
+        "soldCount": sold_count,
+        "price": price,
+        "originPrice": origin_price,
     }
 
 
 def _nye_packages_for(row: NyeStore) -> list:
-    stored = loads(getattr(row, "packages", None) or "[]", [])
-    if stored:
-        return stored
-    return default_nye_packages(row.price or 2388, row.cover or "")
+    return nye_packages_for(row)
 
 
 def _nye_out(row: NyeStore, db: Optional[Session] = None) -> dict:
@@ -208,7 +224,7 @@ def _nye_out(row: NyeStore, db: Optional[Session] = None) -> dict:
         "storeId": linked,
         "name": row.name,
         "cover": row.cover,
-        "price": row.price,
+        "price": nye_starting_price(row),
         "originPrice": row.origin_price,
         "tag": row.tag,
         "address": row.address,
@@ -331,23 +347,7 @@ def _resolve_order_price(db: Session, payload: OrderCreateIn) -> tuple[float, fl
         return unit, round(unit * qty, 2), title, cover, spec
 
     if otype == "gather":
-        row = (
-            db.query(GatherProduct)
-            .filter(GatherProduct.id == payload.store_id, GatherProduct.enabled.is_(True))
-            .first()
-        )
-        if not row:
-            raise HTTPException(status_code=404, detail="商品不存在或已下架")
-        unit = float(row.price or 0)
-        if unit <= 0:
-            raise HTTPException(status_code=400, detail="商品价格异常")
-        return (
-            unit,
-            round(unit * qty, 2),
-            row.title,
-            row.cover or payload.cover or "",
-            payload.spec or row.tag or "去哪聚",
-        )
+        raise HTTPException(status_code=400, detail="去哪聚已改为专题套餐预订，请从门店详情下单")
 
     if otype == "recommend":
         try:
@@ -583,7 +583,7 @@ def gather(db: Session = Depends(get_db)):
             for t in tabs
         ],
         "regions": region_list,
-        "products": [_product_out(p) for p in products],
+        "products": [_product_out(p, db) for p in products],
     }
 
 
@@ -601,7 +601,7 @@ def nye_list(db: Session = Depends(get_db)):
                 "id": r.id,
                 "name": r.name,
                 "cover": r.cover,
-                "price": r.price,
+                "price": nye_starting_price(r),
                 "originPrice": r.origin_price,
             }
             for r in rows
@@ -636,18 +636,6 @@ def recommend_list(db: Session = Depends(get_db)):
             for r in rows
         ],
     }
-
-
-@router.get("/gather/product/{product_id}")
-def gather_product_detail(product_id: str, db: Session = Depends(get_db)):
-    row = (
-        db.query(GatherProduct)
-        .filter(GatherProduct.id == product_id, GatherProduct.enabled.is_(True))
-        .first()
-    )
-    if not row:
-        raise HTTPException(status_code=404, detail="商品不存在")
-    return _product_out(row)
 
 
 @router.get("/agreements")

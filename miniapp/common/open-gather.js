@@ -1,13 +1,11 @@
-/** 首页推荐位和去哪聚点进同一张页面：有门店详情进门店页，否则进商品下单页。 */
+/** 去哪聚入口一律进宴会专题详情（封面/店名/套餐价在专题配置）。 */
 export function openGatherTarget(item) {
 	if (!item) return false
-	if (item.detailId) {
-		uni.navigateTo({ url: '/pages/nye/detail?id=' + item.detailId })
+	const detailId = item.detailId || item.detail_id || ''
+	if (detailId) {
+		uni.navigateTo({ url: '/pages/nye/detail?id=' + detailId })
 		return true
 	}
-	if (item.id) {
-		uni.navigateTo({ url: '/pages/gather/detail?id=' + item.id })
-		return true
-	}
+	uni.showToast({ title: '门店暂未开放预约', icon: 'none' })
 	return false
 }

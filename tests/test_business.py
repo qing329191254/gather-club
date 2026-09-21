@@ -303,16 +303,32 @@ class BusinessTests(unittest.TestCase):
         created = self.client.post(
             "/api/v1/orders",
             headers=headers("openid-cancel"),
-            json={"type": "gather", "store_id": "m2", "price": 1, "amount": 1},
+            json={
+                "type": "nye",
+                "store_id": "gongkang",
+                "package_id": "1",
+                "quantity": 1,
+                "price": 1,
+                "amount": 1,
+            },
         )
         self.assertEqual(created.status_code, 200, created.text)
-        self.assertEqual(created.json()["amount"], 198)
+        self.assertEqual(created.json()["amount"], 2388)
         order_id = created.json()["id"]
         cancelled = self.client.post(f"/api/v1/orders/{order_id}/cancel", headers=headers("openid-cancel"))
         self.assertEqual(cancelled.status_code, 200, cancelled.text)
         self.assertEqual(cancelled.json()["status"], "cancelled")
         again = self.client.post(f"/api/v1/orders/{order_id}/cancel", headers=headers("openid-cancel"))
         self.assertEqual(again.status_code, 400)
+
+    def test_gather_standalone_order_rejected(self):
+        res = self.client.post(
+            "/api/v1/orders",
+            headers=headers("openid-gather-old"),
+            json={"type": "gather", "store_id": "m2", "price": 1, "amount": 1},
+        )
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("专题套餐", res.json()["detail"])
 
     def test_invalid_slot_and_missing_room_store(self):
         bad_slot = self.client.post(
@@ -591,6 +607,23 @@ class BusinessTests(unittest.TestCase):
     def test_missing_nye_store_is_not_found(self):
         res = self.client.get("/api/v1/nye/not-a-store")
         self.assertEqual(res.status_code, 404)
+
+    def test_gather_card_shares_nye_store_fields(self):
+        gather = self.client.get("/api/v1/gather")
+        self.assertEqual(gather.status_code, 200, gather.text)
+        products = gather.json().get("products") or []
+        card = next((p for p in products if p.get("id") == "d1"), None)
+        self.assertIsNotNone(card)
+        detail = self.client.get("/api/v1/nye/xinzhuang")
+        self.assertEqual(detail.status_code, 200, detail.text)
+        store = detail.json()
+        self.assertEqual(card["title"], store["name"])
+        self.assertEqual(card["cover"], store["cover"])
+        self.assertEqual(card["price"], store["price"])
+        packages = store.get("packages") or []
+        enabled = [float(p["price"]) for p in packages if not p.get("disabled") and float(p.get("price") or 0) > 0]
+        self.assertTrue(enabled)
+        self.assertEqual(store["price"], min(enabled))
 
 
 if __name__ == "__main__":

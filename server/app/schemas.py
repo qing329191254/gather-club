@@ -83,7 +83,7 @@ class GatherProductIn(BaseModel):
     region: str = ""
     detail_id: str = ""
     cover: str = ""
-    title: str
+    title: str = ""
     tag: str = ""
     tags: list[str] = Field(default_factory=list)
     sold_text: str = ""

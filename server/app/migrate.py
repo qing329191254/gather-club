@@ -173,4 +173,29 @@ def ensure_schema() -> None:
             cols = {c["name"] for c in inspector.get_columns("user_coupons")}
             if "verify_code" not in cols:
                 conn.execute(text("ALTER TABLE user_coupons ADD COLUMN verify_code VARCHAR(16) DEFAULT ''"))
+        # 去哪聚只做专题入口：下架单点分类/无关联门店的旧商品
+        if "site_configs" in tables and "gather_tabs" in tables and "gather_products" in tables:
+            marker = conn.execute(
+                text("SELECT id FROM site_configs WHERE `key` = 'gather_entry_only_v1' LIMIT 1")
+            ).fetchone()
+            if not marker:
+                conn.execute(
+                    text("UPDATE gather_tabs SET enabled = 0 WHERE `key` IN ('dish', 'set')")
+                )
+                conn.execute(
+                    text("UPDATE gather_products SET enabled = 0 WHERE tab IN ('dish', 'set')")
+                )
+                conn.execute(
+                    text(
+                        "UPDATE gather_products SET enabled = 0 "
+                        "WHERE detail_id IS NULL OR TRIM(detail_id) = ''"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "INSERT INTO site_configs (`key`, value, updated_at) "
+                        "VALUES ('gather_entry_only_v1', '1', :updated_at)"
+                    ),
+                    {"updated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")},
+                )
         # recommend_items / addresses created by create_all

@@ -137,9 +137,6 @@ export const api = {
 	recommend() {
 		return request('/api/v1/recommend')
 	},
-	gatherProduct(id) {
-		return request('/api/v1/gather/product/' + id)
-	},
 	stores() {
 		return request('/api/v1/stores')
 	},

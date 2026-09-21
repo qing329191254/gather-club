@@ -46,7 +46,7 @@
           <el-select v-model="form.store_id" filterable placeholder="和首页、去哪聚是同一家店" style="width: 100%">
             <el-option v-for="s in stores" :key="s.id" :label="s.name" :value="s.id" />
           </el-select>
-          <div class="hint block">首页「预约」和去哪聚「关联门店」都进入这张详情。包房库存也按这家门店计算，一家店只建一张。</div>
+          <div class="hint block">封面、店名、地址、套餐价都在这里配置；去哪聚只做列表入口挂靠这家店。</div>
         </el-form-item>
         <el-form-item label="名称" required>
           <el-input v-model="form.name" placeholder="门店或宴席名称" />
@@ -56,6 +56,7 @@
         </el-form-item>
         <el-form-item label="现价">
           <el-input-number v-model="form.price" :min="0" :precision="2" :step="0.01" controls-position="right" class="num" />
+          <div class="hint block">有套餐时小程序「起」价取可用套餐最低价；此价作默认套餐基价</div>
         </el-form-item>
         <el-form-item label="原价">
           <el-input-number v-model="form.origin_price" :min="0" :precision="2" :step="0.01" controls-position="right" class="num" />
