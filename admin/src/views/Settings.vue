@@ -4,98 +4,110 @@
       <el-button type="primary" :loading="savingWhich === 'top'" @click="onSave(true, 'top')">保存配置</el-button>
       <span class="hint">{{ statusText }}</span>
     </div>
-    <el-form label-width="120px" style="max-width: 780px">
-      <el-form-item label="品牌 Logo">
-        <ImageField v-model="form.logo" folder="site" placeholder="品牌 Logo" />
-      </el-form-item>
-      <el-form-item label="客服热线"><el-input v-model="form.hotline" /></el-form-item>
-      <el-form-item label="管家标题"><el-input v-model="form.stewardTitle" /></el-form-item>
-      <el-form-item label="管家提示"><el-input v-model="form.stewardTip" /></el-form-item>
-      <el-form-item label="管家二维码"><ImageField v-model="form.stewardQr" folder="site" /></el-form-item>
-      <el-form-item label="入群二维码"><ImageField v-model="form.groupQr" folder="site" /></el-form-item>
-      <el-form-item label="午市库存默认"><el-input-number v-model="form.roomCapacity.lunch" :min="0" /></el-form-item>
-      <el-form-item label="晚市库存默认"><el-input-number v-model="form.roomCapacity.dinner" :min="0" /></el-form-item>
-      <el-form-item label="专题开放起"><el-input v-model="form.nyeOpenStart" placeholder="宴会专题可预订开始日期" /></el-form-item>
-      <el-form-item label="专题开放止"><el-input v-model="form.nyeOpenEnd" placeholder="宴会专题可预订结束日期" /></el-form-item>
-      <el-form-item label="积分规则">
-        <el-input v-model="rulesText" type="textarea" :rows="6" placeholder="每行一条规则（积分商城）" />
-      </el-form-item>
+    <el-tabs v-model="activePane">
+      <el-tab-pane label="基础信息" name="basic">
+        <el-form label-width="120px" style="max-width: 780px">
+          <el-form-item label="品牌 Logo">
+            <ImageField v-model="form.logo" folder="site" placeholder="品牌 Logo" />
+          </el-form-item>
+          <el-form-item label="客服热线"><el-input v-model="form.hotline" /></el-form-item>
+          <el-form-item label="管家标题"><el-input v-model="form.stewardTitle" /></el-form-item>
+          <el-form-item label="管家提示"><el-input v-model="form.stewardTip" /></el-form-item>
+          <el-form-item label="管家二维码"><ImageField v-model="form.stewardQr" folder="site" /></el-form-item>
+          <el-form-item label="入群二维码"><ImageField v-model="form.groupQr" folder="site" /></el-form-item>
+          <el-form-item label="积分规则">
+            <el-input v-model="rulesText" type="textarea" :rows="6" placeholder="每行一条规则（积分商城）" />
+          </el-form-item>
+        </el-form>
+      </el-tab-pane>
 
-      <el-divider content-position="left">会员与消费积分</el-divider>
-      <el-form-item label="新用户积分">
-        <el-input-number v-model="loyalty.welcomePoints" :min="0" />
-      </el-form-item>
-      <el-form-item label="默认倍率">
-        <el-input-number v-model="loyalty.earnRateDefault" :min="0" :step="0.1" :precision="2" />
-        <span class="inline-tip">消费金额 × 倍率</span>
-      </el-form-item>
-      <el-form-item label="V3 倍率">
-        <el-input-number v-model="loyalty.earnRateV3" :min="0" :step="0.1" :precision="2" />
-      </el-form-item>
-      <el-form-item label="首单倍率">
-        <el-input-number v-model="loyalty.firstOrderRate" :min="0" :step="0.1" :precision="2" />
-      </el-form-item>
-      <el-form-item label="生日月倍数">
-        <el-input-number v-model="loyalty.birthdayMultiplier" :min="1" :step="0.5" :precision="1" />
-      </el-form-item>
-      <el-form-item label="V1 桌数">
-        <el-input-number v-model="loyalty.vipTables.V1" :min="1" />
-      </el-form-item>
-      <el-form-item label="V2 桌数">
-        <el-input-number v-model="loyalty.vipTables.V2" :min="1" />
-      </el-form-item>
-      <el-form-item label="V3 桌数">
-        <el-input-number v-model="loyalty.vipTables.V3" :min="1" />
-      </el-form-item>
-      <el-form-item label="包房单价">
-        <el-input-number v-model="loyalty.roomPrice" :min="0" :precision="2" :step="0.01" />
-        <span class="inline-tip">支付成功后才锁定包房，填 0 则不能预约</span>
-      </el-form-item>
+      <el-tab-pane label="包房与预订" name="rooms">
+        <el-form label-width="120px" style="max-width: 780px">
+          <el-form-item label="午市库存默认"><el-input-number v-model="form.roomCapacity.lunch" :min="0" /></el-form-item>
+          <el-form-item label="晚市库存默认"><el-input-number v-model="form.roomCapacity.dinner" :min="0" /></el-form-item>
+          <el-form-item label="包房单价">
+            <el-input-number v-model="loyalty.roomPrice" :min="0" :precision="2" :step="0.01" />
+            <span class="inline-tip">支付成功后才锁定包房，填 0 则不能预约</span>
+          </el-form-item>
+          <p class="section-tip pane-tip">活动可预订日期请在「活动管理」里按活动单独配置。</p>
+        </el-form>
+      </el-tab-pane>
 
-      <el-divider content-position="left">完善资料奖励</el-divider>
-      <el-form-item label="开启奖励">
-        <el-switch v-model="profileReward.enabled" />
-        <span class="inline-tip">资料未填完时，进入小程序会提示去完善</span>
-      </el-form-item>
-      <el-form-item label="奖励积分">
-        <el-input-number v-model="profileReward.points" :min="0" />
-        <span class="inline-tip">昵称、生日、手机号、兴趣都填完后发放一次</span>
-      </el-form-item>
+      <el-tab-pane label="积分会员" name="loyalty">
+        <el-form label-width="120px" style="max-width: 780px">
+          <el-form-item label="新用户积分">
+            <el-input-number v-model="loyalty.welcomePoints" :min="0" />
+          </el-form-item>
+          <el-form-item label="默认倍率">
+            <el-input-number v-model="loyalty.earnRateDefault" :min="0" :step="0.1" :precision="2" />
+            <span class="inline-tip">消费金额 × 倍率</span>
+          </el-form-item>
+          <el-form-item label="V3 倍率">
+            <el-input-number v-model="loyalty.earnRateV3" :min="0" :step="0.1" :precision="2" />
+          </el-form-item>
+          <el-form-item label="首单倍率">
+            <el-input-number v-model="loyalty.firstOrderRate" :min="0" :step="0.1" :precision="2" />
+          </el-form-item>
+          <el-form-item label="生日月倍数">
+            <el-input-number v-model="loyalty.birthdayMultiplier" :min="1" :step="0.5" :precision="1" />
+          </el-form-item>
+          <el-form-item label="V1 桌数">
+            <el-input-number v-model="loyalty.vipTables.V1" :min="1" />
+          </el-form-item>
+          <el-form-item label="V2 桌数">
+            <el-input-number v-model="loyalty.vipTables.V2" :min="1" />
+          </el-form-item>
+          <el-form-item label="V3 桌数">
+            <el-input-number v-model="loyalty.vipTables.V3" :min="1" />
+          </el-form-item>
 
-      <el-divider content-position="left">每日签到</el-divider>
-      <p class="section-tip">按当月累计签到天数发放，每档每月只发一次。</p>
-      <el-form-item label="每日签到积分">
-        <el-input-number v-model="checkin.dailyPoints" :min="0" />
-      </el-form-item>
-      <el-form-item label="补签积分">
-        <el-input-number v-model="checkin.makeupPoints" :min="0" />
-      </el-form-item>
-      <el-form-item label="整月满签奖励">
-        <el-input-number v-model="checkin.fullMonthBonus" :min="0" />
-        <span class="inline-tip">当月每天都签到时额外发放</span>
-      </el-form-item>
-      <el-form-item label="签到规则文案">
-        <el-input v-model="checkin.rules" type="textarea" :rows="3" placeholder="签到页「查看规则」中显示的内容" />
-      </el-form-item>
-      <el-form-item label="累计奖励档">
-        <div class="mile-list">
-          <div v-for="(m, i) in checkin.milestones" :key="i" class="mile-row">
-            <el-input-number v-model="m.days" :min="1" placeholder="天数" />
-            <span class="mile-x">天</span>
-            <el-input-number v-model="m.points" :min="0" placeholder="积分" />
-            <span class="mile-x">积分</span>
-            <el-input v-model="m.label" placeholder="展示文案，如 签到5天" style="width: 160px" />
-            <el-button link type="danger" @click="checkin.milestones.splice(i, 1)">删</el-button>
-          </div>
-          <el-button size="small" @click="addMilestone">+ 增加一档</el-button>
-        </div>
-      </el-form-item>
+          <el-divider content-position="left">完善资料奖励</el-divider>
+          <el-form-item label="开启奖励">
+            <el-switch v-model="profileReward.enabled" />
+            <span class="inline-tip">资料未填完时，进入小程序会提示去完善</span>
+          </el-form-item>
+          <el-form-item label="奖励积分">
+            <el-input-number v-model="profileReward.points" :min="0" />
+            <span class="inline-tip">昵称、生日、手机号、兴趣都填完后发放一次</span>
+          </el-form-item>
+        </el-form>
+      </el-tab-pane>
 
-      <el-form-item>
-        <el-button type="primary" :loading="savingWhich === 'bottom'" @click="onSave(true, 'bottom')">保存配置</el-button>
-        <el-button :loading="restoring" @click="restoreCheckin">恢复签到默认</el-button>
-      </el-form-item>
-    </el-form>
+      <el-tab-pane label="每日签到" name="checkin">
+        <el-form label-width="120px" style="max-width: 780px">
+          <p class="section-tip pane-tip">按当月累计签到天数发放，每档每月只发一次。</p>
+          <el-form-item label="每日签到积分">
+            <el-input-number v-model="checkin.dailyPoints" :min="0" />
+          </el-form-item>
+          <el-form-item label="补签积分">
+            <el-input-number v-model="checkin.makeupPoints" :min="0" />
+          </el-form-item>
+          <el-form-item label="整月满签奖励">
+            <el-input-number v-model="checkin.fullMonthBonus" :min="0" />
+            <span class="inline-tip">当月每天都签到时额外发放</span>
+          </el-form-item>
+          <el-form-item label="签到规则文案">
+            <el-input v-model="checkin.rules" type="textarea" :rows="3" placeholder="签到页「查看规则」中显示的内容" />
+          </el-form-item>
+          <el-form-item label="累计奖励档">
+            <div class="mile-list">
+              <div v-for="(m, i) in checkin.milestones" :key="i" class="mile-row">
+                <el-input-number v-model="m.days" :min="1" placeholder="天数" />
+                <span class="mile-x">天</span>
+                <el-input-number v-model="m.points" :min="0" placeholder="积分" />
+                <span class="mile-x">积分</span>
+                <el-input v-model="m.label" placeholder="展示文案，如 签到5天" style="width: 160px" />
+                <el-button link type="danger" @click="checkin.milestones.splice(i, 1)">删</el-button>
+              </div>
+              <el-button size="small" @click="addMilestone">+ 增加一档</el-button>
+            </div>
+          </el-form-item>
+          <el-form-item>
+            <el-button :loading="restoring" @click="restoreCheckin">恢复签到默认</el-button>
+          </el-form-item>
+        </el-form>
+      </el-tab-pane>
+    </el-tabs>
   </el-card>
 </template>
 
@@ -131,6 +143,7 @@ const checkinDefaults = () => ({
 })
 
 const rulesText = ref('')
+const activePane = ref('basic')
 const form = reactive(defaults())
 const checkin = reactive(checkinDefaults())
 const profileReward = reactive({
@@ -322,6 +335,10 @@ onMounted(load)
   color: #64748b;
   font-size: 13px;
   line-height: 1.5;
+}
+.pane-tip {
+  margin-left: 0;
+  margin-bottom: 16px;
 }
 .inline-tip {
   margin-left: 10px;

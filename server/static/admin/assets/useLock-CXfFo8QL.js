@@ -1,1 +1,0 @@
-import{h as s}from"./index-DJKHrbAK.js";function i(){const t=s({});function f(e="default"){return!!t[e]}async function o(e,c,u){const n=e||"default";if(t[n])return;t[n]=!0;const r=u&&u!==n?u:"";r&&(t[r]=!0);try{return await c()}finally{t[n]=!1,r&&(t[r]=!1)}}return{busy:f,run:o}}export{i as u};

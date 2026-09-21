@@ -291,6 +291,39 @@ GATHER_PRODUCTS = [
 ]
 
 
+def ensure_default_activities(db: Session) -> None:
+    """补齐默认活动（年夜饭/家宴/宴席），不覆盖已有自定义项。"""
+    raw = get_config(db, "activities")
+    if isinstance(raw, dict):
+        items = raw.get("list")
+    else:
+        items = raw
+    if not isinstance(items, list):
+        items = []
+    by_id = {str(x.get("id")): dict(x) for x in items if isinstance(x, dict) and x.get("id")}
+    changed = False
+    for d in DEFAULT_ACTIVITIES:
+        aid = d["id"]
+        if aid not in by_id:
+            by_id[aid] = dict(d)
+            changed = True
+        else:
+            row = by_id[aid]
+            # 补缺字段，不改已填名称/标识
+            for key in ("banners", "open_start", "open_end", "enabled", "sort", "tag", "name"):
+                if key not in row or row.get(key) in (None, ""):
+                    if key in d and d[key] not in (None, ""):
+                        row[key] = d[key]
+                        changed = True
+            if "enabled" not in row:
+                row["enabled"] = True
+                changed = True
+    if changed or not items:
+        merged = list(by_id.values())
+        merged.sort(key=lambda x: (int(x.get("sort") or 0), str(x.get("id") or "")))
+        set_config(db, "activities", merged)
+
+
 def sync_gather_demo_catalog(db: Session) -> None:
     """补齐分类，并把演示商品刷成互不重复的标题/封面/价格（一次性）。"""
     if get_config(db, "gather_demo_variety_v1"):
@@ -338,8 +371,7 @@ def sync_gather_demo_catalog(db: Session) -> None:
             db.add(GatherProduct(**fields))
 
     # 活动页仍保留年夜饭/家宴
-    if not get_config(db, "activities"):
-        set_config(db, "activities", DEFAULT_ACTIVITIES)
+    ensure_default_activities(db)
 
     set_config(db, "gather_demo_variety_v1", "1")
     db.commit()
@@ -644,6 +676,7 @@ def seed_all(db: Session) -> None:
         db.commit()
 
     sync_gather_demo_catalog(db)
+    ensure_default_activities(db)
 
     if not get_config(db, "activities"):
         set_config(db, "activities", DEFAULT_ACTIVITIES)

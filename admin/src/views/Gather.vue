@@ -24,7 +24,7 @@
             <el-table-column label="所属地区" width="100">
               <template #default="{ row }">{{ regionName(row.region) }}</template>
             </el-table-column>
-            <el-table-column prop="tag" label="角标" width="90" show-overflow-tooltip />
+            <el-table-column prop="tag" label="所属活动" width="100" show-overflow-tooltip />
             <el-table-column label="起价" width="90">
               <template #default="{ row }">{{ row.price > 0 ? row.price : '—' }}</template>
             </el-table-column>
@@ -179,10 +179,26 @@
             <el-option v-for="r in regionOptions" :key="r.id" :label="r.name" :value="r.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="角标文案">
-          <el-input v-model="productForm.tag" placeholder="如：年夜饭、家宴；活动页按此筛选" />
+        <el-form-item label="所属活动">
+          <el-select
+            v-model="productForm.tag"
+            filterable
+            allow-create
+            default-first-option
+            clearable
+            placeholder="选择活动，也可输入新标识"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="a in activityOptions"
+              :key="a.tag"
+              :label="a.name === a.tag ? a.name : `${a.name}（${a.tag}）`"
+              :value="a.tag"
+            />
+          </el-select>
+          <div class="hint block">对应活动管理里的「筛选标识」；活动页按此筛选商品</div>
         </el-form-item>
-        <el-form-item label="标签">
+        <el-form-item label="卖点标签">
           <el-input v-model="tagsText" placeholder="多个用逗号分隔，例如：近地铁,包厢" />
         </el-form-item>
         <el-form-item label="现价">
@@ -310,6 +326,7 @@ const tabs = ref([])
 const regions = ref([])
 const products = ref([])
 const stores = ref([])
+const activities = ref([])
 const tabVisible = ref(false)
 const regionVisible = ref(false)
 const regionEditing = ref(false)
@@ -357,6 +374,18 @@ const packages = ref([])
 let pkgSeq = 1
 
 const regionOptions = computed(() => regions.value.filter((r) => r.id !== 'all'))
+const activityOptions = computed(() => {
+  const rows = (activities.value || []).filter((a) => a && a.tag)
+  const seen = new Set()
+  const out = []
+  for (const a of rows) {
+    const tag = String(a.tag).trim()
+    if (!tag || seen.has(tag)) continue
+    seen.add(tag)
+    out.push({ name: a.name || tag, tag })
+  }
+  return out
+})
 
 function tabName(key) {
   return tabs.value.find((t) => t.key === key)?.name || key || '未分类'
@@ -460,14 +489,16 @@ async function loadProducts() {
 }
 
 async function load() {
-  const [tabList, regionList, storeList] = await Promise.all([
+  const [tabList, regionList, storeList, activityList] = await Promise.all([
     http.get('/gather/tabs'),
     http.get('/gather/regions'),
-    http.get('/stores')
+    http.get('/stores'),
+    http.get('/activities')
   ])
   tabs.value = tabList
   regions.value = regionList || []
   stores.value = storeList || []
+  activities.value = activityList || []
   await loadProducts()
 }
 

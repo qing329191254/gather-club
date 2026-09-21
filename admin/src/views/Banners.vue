@@ -9,7 +9,7 @@
           <el-image :src="row.image" style="width: 100px; height: 50px" fit="cover" />
         </template>
       </el-table-column>
-      <el-table-column label="点击后去" min-width="140">
+      <el-table-column label="点击后去" min-width="160">
         <template #default="{ row }">{{ linkLabel(row.link) }}</template>
       </el-table-column>
       <el-table-column prop="sort" label="排序" width="80" />
@@ -32,7 +32,7 @@
           <ImageField v-model="form.image" folder="banners" placeholder="上传或粘贴图片地址" />
         </el-form-item>
         <el-form-item label="点击后去">
-          <el-select v-model="form.link" placeholder="请选择要打开的页面" style="width: 100%" clearable>
+          <el-select v-model="form.link" placeholder="请选择要打开的页面" style="width: 100%" clearable filterable>
             <el-option
               v-for="item in linkOptions"
               :key="item.value || 'none'"
@@ -58,7 +58,7 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '../api/http'
 import { useLock } from '../composables/useLock'
@@ -66,11 +66,11 @@ import ImageField from '../components/ImageField.vue'
 
 const { busy, run } = useLock()
 
-/** 运营可选的跳转目标；value 仍是小程序路径，界面只展示中文 */
-const linkOptions = [
+const activities = ref([])
+
+const baseLinkOptions = [
   { label: '不跳转', value: '' },
   { label: '订酒店', value: '/pages/recommend/recommend' },
-  { label: '宴会专题', value: '/pages/nye/nye' },
   { label: '去哪聚', value: '/pages/gather/gather' },
   { label: '积分商城', value: '/pages/mall/mall' },
   { label: '包房预约', value: '/pages/booking/booking' },
@@ -80,52 +80,82 @@ const linkOptions = [
   { label: '视频号', value: '/pages/video/video' }
 ]
 
+const linkOptions = computed(() => {
+  const actLinks = (activities.value || [])
+    .filter((a) => a && a.enabled !== false && (a.tag || a.name))
+    .map((a) => {
+      const tag = String(a.tag || a.name).trim()
+      return {
+        label: `活动：${a.name || tag}`,
+        value: `/pages/nye/nye?tag=${encodeURIComponent(tag)}`
+      }
+    })
+  // 兼容旧「宴会专题」链接，编辑时仍能显示名称
+  const legacy = [{ label: '活动专题（默认年夜饭）', value: '/pages/nye/nye' }]
+  return [...baseLinkOptions.slice(0, 1), ...actLinks, ...legacy, ...baseLinkOptions.slice(1)]
+})
+
 const list = ref([])
 const visible = ref(false)
 const form = reactive({ id: null, image: '', link: '', sort: 0, enabled: true })
 
 function linkLabel(link) {
-  const hit = linkOptions.find((item) => item.value === (link || ''))
+  const hit = linkOptions.value.find((item) => item.value === (link || ''))
   if (hit) return hit.label
-  return link ? '自定义页面' : '不跳转'
+  if (!link) return '不跳转'
+  try {
+    if (String(link).startsWith('/pages/nye/nye')) {
+      const q = String(link).split('?')[1] || ''
+      const tag = new URLSearchParams(q).get('tag')
+      if (tag) return `活动：${decodeURIComponent(tag)}`
+      return '活动专题'
+    }
+  } catch (_) {
+    /* ignore */
+  }
+  return '自定义页面'
 }
 
 async function load() {
-  list.value = await http.get('/banners')
+  const [rows, acts] = await Promise.all([http.get('/banners'), http.get('/activities')])
+  list.value = rows || []
+  activities.value = acts || []
 }
 
 function openEdit(row) {
   Object.assign(form, { id: null, image: '', link: '', sort: 0, enabled: true }, row || {})
-  if (form.link == null) form.link = ''
+  // 旧「宴会专题」统一显示为默认活动页
+  if (form.link === '/pages/nye/nye') {
+    /* keep */
+  }
   visible.value = true
 }
 
 async function onSave() {
   return run('save', async () => {
-  if (!form.image) {
-    ElMessage.warning('请先上传轮播图片')
-    return
-  }
-  const payload = {
-    image: form.image,
-    link: form.link || '',
-    sort: form.sort,
-    enabled: form.enabled
-  }
-  if (form.id) await http.put(`/banners/${form.id}`, payload)
-  else await http.post('/banners', payload)
-  ElMessage.success('已保存')
-  visible.value = false
-  load()
+    if (!form.image) {
+      ElMessage.warning('请上传轮播图片')
+      return
+    }
+    const payload = {
+      image: form.image,
+      link: form.link || '',
+      sort: form.sort,
+      enabled: form.enabled
+    }
+    if (form.id) await http.put(`/banners/${form.id}`, payload)
+    else await http.post('/banners', payload)
+    ElMessage.success('已保存')
+    visible.value = false
+    load()
   })
 }
 
 async function onRemove(row) {
   return run('remove-' + row.id, async () => {
-  await ElMessageBox.confirm('确认删除这张轮播图？', '提示')
-  await http.delete(`/banners/${row.id}`)
-  ElMessage.success('已删除')
-  load()
+    await ElMessageBox.confirm('确认删除该轮播？', '提示')
+    await http.delete(`/banners/${row.id}`)
+    load()
   })
 }
 
@@ -137,8 +167,8 @@ onMounted(load)
   margin-bottom: 12px;
 }
 .hint {
-  margin-left: 12px;
-  color: #94a3b8;
-  font-size: 13px;
+  margin-left: 8px;
+  color: #999;
+  font-size: 12px;
 }
 </style>

@@ -19,8 +19,8 @@ export const api = {
 	gather() {
 		return request('/api/v1/gather')
 	},
-	nyeList() {
-		return request('/api/v1/nye')
+	nyeList(tag) {
+		return request('/api/v1/nye', { data: tag ? { tag } : {} })
 	},
 	nyeDetail(id) {
 		return request('/api/v1/nye/' + id)

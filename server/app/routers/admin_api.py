@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from ..cms_data import (
     AGREEMENTS,
     CHECKIN_CONFIG,
+    DEFAULT_ACTIVITIES,
     HOBBY_OPTIONS,
     LOYALTY_CONFIG,
     MEMBER_CONFIG,
@@ -1394,6 +1395,92 @@ def update_vip(
         "vip_manual": user.vip_manual,
         "table_count": table_count(db, user.id),
     }
+
+
+# ---- activities（活动专题）----
+def _activities_all(db: Session) -> list:
+    raw = get_config(db, "activities")
+    items = raw.get("list") if isinstance(raw, dict) else raw
+    if not isinstance(items, list) or not items:
+        items = [dict(x) for x in DEFAULT_ACTIVITIES]
+        set_config(db, "activities", items)
+    return [dict(x) for x in items if isinstance(x, dict)]
+
+
+def _normalize_activity(data: dict, *, require_id: bool = True) -> dict:
+    aid = str(data.get("id") or "").strip()
+    name = str(data.get("name") or "").strip()
+    tag = str(data.get("tag") or "").strip() or name
+    if require_id and not aid:
+        raise HTTPException(400, "请填写活动 ID")
+    if not name:
+        raise HTTPException(400, "请填写活动名称")
+    if not tag:
+        raise HTTPException(400, "请填写筛选标识（与商品所属活动一致）")
+    banners = data.get("banners") or []
+    if not isinstance(banners, list):
+        banners = []
+    return {
+        "id": aid,
+        "name": name,
+        "tag": tag,
+        "banners": [str(x).strip() for x in banners if str(x).strip()],
+        "open_start": str(data.get("open_start") or "").strip(),
+        "open_end": str(data.get("open_end") or "").strip(),
+        "enabled": bool(data.get("enabled", True)),
+        "sort": int(data.get("sort") or 0),
+    }
+
+
+@router.get("/activities")
+def list_activities(db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
+    rows = _activities_all(db)
+    rows.sort(key=lambda x: (int(x.get("sort") or 0), str(x.get("id") or "")))
+    return rows
+
+
+@router.post("/activities")
+def create_activity(payload: dict[str, Any], db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
+    item = _normalize_activity(payload, require_id=True)
+    rows = _activities_all(db)
+    if any(str(r.get("id")) == item["id"] for r in rows):
+        raise HTTPException(400, "活动 ID 已存在")
+    if any(str(r.get("tag")) == item["tag"] for r in rows):
+        raise HTTPException(400, "筛选标识已被其他活动使用")
+    rows.append(item)
+    set_config(db, "activities", rows)
+    return item
+
+
+@router.put("/activities/{activity_id}")
+def update_activity(
+    activity_id: str,
+    payload: dict[str, Any],
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    rows = _activities_all(db)
+    idx = next((i for i, r in enumerate(rows) if str(r.get("id")) == activity_id), -1)
+    if idx < 0:
+        raise HTTPException(404, "活动不存在")
+    data = dict(payload)
+    data["id"] = activity_id
+    item = _normalize_activity(data, require_id=True)
+    if any(i != idx and str(r.get("tag")) == item["tag"] for i, r in enumerate(rows)):
+        raise HTTPException(400, "筛选标识已被其他活动使用")
+    rows[idx] = item
+    set_config(db, "activities", rows)
+    return item
+
+
+@router.delete("/activities/{activity_id}")
+def delete_activity(activity_id: str, db: Session = Depends(get_db), _: AdminUser = Depends(get_current_admin)):
+    rows = _activities_all(db)
+    next_rows = [r for r in rows if str(r.get("id")) != activity_id]
+    if len(next_rows) == len(rows):
+        raise HTTPException(404, "活动不存在")
+    set_config(db, "activities", next_rows)
+    return OkResponse()
 
 
 # ---- site config ----

@@ -11,7 +11,7 @@
 					<view class="back-arrow" :class="{ dark: navSolid }" />
 					<text :class="{ dark: navSolid }">返回</text>
 				</view>
-				<text v-if="navSolid" class="nav-title">年夜饭</text>
+				<text v-if="navSolid" class="nav-title">{{ activityName }}</text>
 			</view>
 		</view>
 
@@ -41,7 +41,7 @@
 				<view class="body">
 					<view class="top">
 						<text class="name">{{ item.name }}</text>
-						<view class="tag">年夜饭</view>
+						<view class="tag">{{ activityName }}</view>
 					</view>
 					<view class="action">
 						<view class="price-area">
@@ -77,20 +77,27 @@
 				navSolid: false,
 				banners: [],
 				list: [],
+				activityName: '活动',
+				activityTag: '',
 				loaded: false
 			}
 		},
-		onLoad() {
+		onLoad(query) {
 			const sys = uni.getSystemInfoSync()
 			this.statusBarHeight = sys.statusBarHeight || 20
 			const width = sys.windowWidth || 375
 			this.heroHeight = Math.round(width * (500 / 750))
 			const rpx = width / 750
 			this.sheetTop = this.heroHeight - Math.round(36 * rpx)
+			const tag = (query && (query.tag || query.activity)) || ''
+			this.activityTag = tag
 			api
-				.nyeList()
+				.nyeList(tag)
 				.then((res) => {
 					if (Array.isArray(res.list)) this.list = res.list
+					const act = res.activity || {}
+					this.activityName = act.name || act.tag || tag || '活动'
+					if (act.tag) this.activityTag = act.tag
 					if (Array.isArray(res.banners) && res.banners.length) {
 						this.banners = res.banners
 					} else if (this.list.length) {

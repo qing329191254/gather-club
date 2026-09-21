@@ -270,12 +270,20 @@ def _nye_out(row: NyeStore, db: Optional[Session] = None) -> dict:
     }
 
 
-def _activity_pages(db: Session) -> list:
+def _activity_pages(db: Session, *, enabled_only: bool = True) -> list:
     raw = get_config(db, "activities") or {}
     items = raw.get("list") if isinstance(raw, dict) else raw
     if not isinstance(items, list) or not items:
-        return list(DEFAULT_ACTIVITIES)
-    return items
+        items = list(DEFAULT_ACTIVITIES)
+    out = []
+    for a in items:
+        if not isinstance(a, dict):
+            continue
+        if enabled_only and a.get("enabled") is False:
+            continue
+        out.append(a)
+    out.sort(key=lambda x: (int(x.get("sort") or 0), str(x.get("id") or "")))
+    return out
 
 
 def _pick_package(packages: list, payload) -> dict:

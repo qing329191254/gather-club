@@ -16,6 +16,7 @@ const routes = [
       { path: 'banners', name: 'banners', meta: { title: '首页轮播' }, component: () => import('../views/Banners.vue') },
       { path: 'stores', name: 'stores', meta: { title: '门店管理' }, component: () => import('../views/Stores.vue') },
       { path: 'gather', name: 'gather', meta: { title: '去哪聚' }, component: () => import('../views/Gather.vue') },
+      { path: 'activities', name: 'activities', meta: { title: '活动管理' }, component: () => import('../views/Activities.vue') },
       { path: 'nye', name: 'nye', meta: { title: '宴会专题（遗留）' }, component: () => import('../views/Nye.vue') },
       { path: 'mall', name: 'mall', meta: { title: '积分商城' }, component: () => import('../views/Mall.vue') },
       { path: 'recommend', name: 'recommend', meta: { title: '订酒店' }, component: () => import('../views/Recommend.vue') },

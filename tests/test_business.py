@@ -635,6 +635,38 @@ class BusinessTests(unittest.TestCase):
             self.assertEqual(detail.status_code, 200, detail.text)
             self.assertEqual(detail.json().get("tag"), "年夜饭")
 
+    def test_admin_activities_crud(self):
+        login = self.client.post(
+            "/api/admin/login",
+            json={"username": "admin", "password": "admin123"},
+        )
+        self.assertEqual(login.status_code, 200, login.text)
+        token = login.json()["access_token"]
+        auth = {"Authorization": f"Bearer {token}"}
+        listed = self.client.get("/api/admin/activities", headers=auth)
+        self.assertEqual(listed.status_code, 200, listed.text)
+        self.assertTrue(isinstance(listed.json(), list))
+        self.assertTrue(any(a.get("tag") == "年夜饭" for a in listed.json()))
+
+        created = self.client.post(
+            "/api/admin/activities",
+            headers=auth,
+            json={
+                "id": "act_test_x",
+                "name": "测试宴",
+                "tag": "测试宴",
+                "banners": [],
+                "enabled": True,
+                "sort": 99,
+            },
+        )
+        self.assertEqual(created.status_code, 200, created.text)
+        page = self.client.get("/api/v1/nye", params={"tag": "测试宴"})
+        self.assertEqual(page.status_code, 200, page.text)
+        self.assertEqual((page.json().get("activity") or {}).get("tag"), "测试宴")
+        deleted = self.client.delete("/api/admin/activities/act_test_x", headers=auth)
+        self.assertEqual(deleted.status_code, 200, deleted.text)
+
     def test_product_order_by_gather_id(self):
         res = self.client.post(
             "/api/v1/orders",
