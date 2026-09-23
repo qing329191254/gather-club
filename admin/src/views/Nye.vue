@@ -43,10 +43,10 @@
     <el-dialog v-model="visible" :title="editing ? '编辑专题门店' : '新增专题门店'" width="720px" top="6vh">
       <el-form label-width="100px">
         <el-form-item label="首页门店" required>
-          <el-select v-model="form.store_id" filterable placeholder="和首页、去哪聚是同一家店" style="width: 100%">
+          <el-select v-model="form.store_id" filterable placeholder="和首页、聚餐页是同一家店" style="width: 100%">
             <el-option v-for="s in stores" :key="s.id" :label="s.name" :value="s.id" />
           </el-select>
-          <div class="hint block">封面、店名、地址、套餐价都在这里配置；去哪聚只做列表入口挂靠这家店。</div>
+          <div class="hint block">封面、店名、地址、套餐价都在这里配置；聚餐页只做列表入口挂靠这家店。</div>
         </el-form-item>
         <el-form-item label="名称" required>
           <el-input v-model="form.name" placeholder="门店或宴席名称" />

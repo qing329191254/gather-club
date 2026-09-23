@@ -419,7 +419,7 @@ def _resolve_order_price(db: Session, payload: OrderCreateIn) -> tuple[float, fl
         return unit, round(unit * qty, 2), title, cover, spec
 
     if otype == "gather":
-        raise HTTPException(status_code=400, detail="去哪聚已改为专题套餐预订，请从门店详情下单")
+        raise HTTPException(status_code=400, detail="聚餐已改为专题套餐预订，请从门店详情下单")
 
     if otype == "recommend":
         try:
@@ -446,7 +446,7 @@ def _resolve_order_price(db: Session, payload: OrderCreateIn) -> tuple[float, fl
             unit = float(pkg.get("price") or 0)
             if unit <= 0:
                 raise HTTPException(status_code=400, detail="套餐价格异常")
-            title = product.title or "去哪聚"
+            title = product.title or "聚餐"
             cover = pkg.get("cover") or product.cover or ""
             spec = str(pkg.get("name") or "")
             if (payload.room_date or "").strip():

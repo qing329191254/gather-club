@@ -71,7 +71,7 @@ const activities = ref([])
 const baseLinkOptions = [
   { label: '不跳转', value: '' },
   { label: '订酒店', value: '/pages/recommend/recommend' },
-  { label: '去哪聚', value: '/pages/gather/gather' },
+  { label: '聚餐', value: '/pages/gather/gather' },
   { label: '积分商城', value: '/pages/mall/mall' },
   { label: '包房预约', value: '/pages/booking/booking' },
   { label: '我的订单', value: '/pages/orders/orders' },

@@ -102,7 +102,7 @@ const { page, pageSize, total, applyPage, resetPage, pageParams } = usePager()
 
 function typeLabel(type) {
   return {
-    gather: '去哪聚',
+    gather: '聚餐',
     nye: '宴会',
     room: '包房',
     recommend: '订酒店',

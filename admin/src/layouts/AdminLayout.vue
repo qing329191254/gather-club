@@ -47,7 +47,7 @@ const menus = [
   { path: '/dashboard', title: '概览', icon: 'Odometer' },
   { path: '/banners', title: '首页轮播', icon: 'Picture' },
   { path: '/stores', title: '门店管理', icon: 'Shop' },
-  { path: '/gather', title: '去哪聚', icon: 'Grid' },
+  { path: '/gather', title: '聚餐', icon: 'Grid' },
   { path: '/activities', title: '活动管理', icon: 'Flag' },
   { path: '/mall', title: '积分商城', icon: 'Goods' },
   { path: '/recommend', title: '订酒店', icon: 'OfficeBuilding' },

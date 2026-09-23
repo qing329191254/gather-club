@@ -165,7 +165,7 @@ def award_order_points(db: Session, order: Order, user: Optional[AppUser]) -> in
             "room": "包房预约",
             "nye": "年夜饭",
             "recommend": "订酒店",
-            "gather": "去哪聚",
+            "gather": "聚餐",
         }.get(order.type or "", "订单")
         add_points(db, user, f"消费获得-{type_label}", gained)
         extra["pointsAwarded"] = gained

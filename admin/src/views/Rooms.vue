@@ -15,7 +15,7 @@
       />
       <el-button @click="onSearch">查询</el-button>
       <el-button type="primary" @click="openEdit()">新增/覆盖库存</el-button>
-      <span class="hint">支付成功后才占用。首页和去哪聚下单，占用的是专题门店绑定的这家门店。</span>
+      <span class="hint">支付成功后才占用。首页和聚餐下单，占用的是专题门店绑定的这家门店。</span>
     </div>
     <el-table :data="list" stripe>
       <el-table-column label="门店" min-width="180">

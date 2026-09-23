@@ -63,7 +63,7 @@
 
         <el-tab-pane label="分类" name="tabs">
           <div class="pane-head">
-            <span class="pane-tip">对应小程序去哪聚顶部的分类 Tab</span>
+            <span class="pane-tip">对应小程序「聚餐」顶部的分类 Tab</span>
             <el-button type="primary" size="small" @click="openTab()">新增分类</el-button>
           </div>
           <el-table :data="tabs" size="small" stripe>
@@ -90,7 +90,7 @@
 
         <el-tab-pane label="地区" name="regions">
           <div class="pane-head">
-            <span class="pane-tip">对应小程序去哪聚的地区筛选</span>
+            <span class="pane-tip">对应小程序「聚餐」的地区筛选</span>
             <el-button type="primary" size="small" @click="openRegion()">新增地区</el-button>
           </div>
           <el-table :data="regions" size="small" stripe>
