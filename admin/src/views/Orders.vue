@@ -4,6 +4,7 @@
       <el-select v-model="status" clearable placeholder="状态" style="width: 140px" @change="onSearch">
         <el-option label="待支付" value="pending" />
         <el-option label="待核销" value="paid" />
+        <el-option label="待到店结算" value="reserved" />
         <el-option label="已完成" value="completed" />
         <el-option label="已取消" value="cancelled" />
         <el-option label="待退款" value="refund_pending" />
@@ -37,6 +38,7 @@
                   <el-dropdown-menu>
                     <el-dropdown-item command="pending">待支付</el-dropdown-item>
                     <el-dropdown-item command="paid">待核销</el-dropdown-item>
+                    <el-dropdown-item command="reserved">待到店结算</el-dropdown-item>
                     <el-dropdown-item command="completed">已完成</el-dropdown-item>
                     <el-dropdown-item command="cancelled">已取消</el-dropdown-item>
                     <el-dropdown-item command="refund_pending">待退款</el-dropdown-item>
