@@ -21,15 +21,11 @@
         </el-form>
       </el-tab-pane>
 
-      <el-tab-pane label="包房与预订" name="rooms">
+      <el-tab-pane label="档期库存" name="rooms">
         <el-form label-width="120px" style="max-width: 780px">
-          <el-form-item label="午市库存默认"><el-input-number v-model="form.roomCapacity.lunch" :min="0" /></el-form-item>
-          <el-form-item label="晚市库存默认"><el-input-number v-model="form.roomCapacity.dinner" :min="0" /></el-form-item>
-          <el-form-item label="包房单价">
-            <el-input-number v-model="loyalty.roomPrice" :min="0" :precision="2" :step="0.01" />
-            <span class="inline-tip">支付成功后才锁定包房，填 0 则不能预约</span>
-          </el-form-item>
-          <p class="section-tip pane-tip">活动可预订日期请在「活动管理」里按活动单独配置。</p>
+          <el-form-item label="午市默认库存"><el-input-number v-model="form.roomCapacity.lunch" :min="0" /></el-form-item>
+          <el-form-item label="晚市默认库存"><el-input-number v-model="form.roomCapacity.dinner" :min="0" /></el-form-item>
+          <p class="section-tip pane-tip">未单独维护的日期，按这里的默认库存算。活动开放日期在「活动管理 / 聚餐」里配置。</p>
         </el-form>
       </el-tab-pane>
 

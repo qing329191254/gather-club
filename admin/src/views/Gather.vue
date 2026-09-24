@@ -158,7 +158,7 @@
     <el-dialog v-model="productVisible" :title="productEditing ? '编辑商品' : '新增商品'" width="720px" top="5vh">
       <el-form label-width="100px">
         <el-form-item label="首页门店" required>
-          <el-select v-model="productForm.detail_id" filterable placeholder="绑定包房库存的门店" style="width: 100%">
+          <el-select v-model="productForm.detail_id" filterable placeholder="绑定档期库存的门店" style="width: 100%">
             <el-option v-for="s in stores" :key="s.id" :label="s.name" :value="s.id" />
           </el-select>
           <div class="hint block">同一门店可建多张主题商品，销量与套餐互不影响</div>

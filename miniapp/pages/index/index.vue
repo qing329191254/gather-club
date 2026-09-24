@@ -59,7 +59,7 @@
 		</view>
 
 		<view class="section">
-			<text class="section-title">门店预约</text>
+			<text class="section-title">门店聚餐</text>
 			<view v-for="store in stores" :key="store.id" class="store">
 				<view class="store-head" @tap="callStore(store)">
 					<view class="store-name-wrap">

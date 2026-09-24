@@ -54,7 +54,7 @@ const menus = [
   { path: '/content', title: '内容配置', icon: 'Document' },
   { path: '/orders', title: '订单管理', icon: 'List' },
   { path: '/verify', title: '到店核销', icon: 'CircleCheck' },
-  { path: '/rooms', title: '包房库存', icon: 'Calendar' },
+  { path: '/rooms', title: '档期库存', icon: 'Calendar' },
   { path: '/coupons', title: '优惠券', icon: 'Ticket' },
   { path: '/users', title: '用户', icon: 'User' },
   { path: '/video', title: '视频号', icon: 'VideoCamera' },
