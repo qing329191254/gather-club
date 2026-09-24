@@ -1542,7 +1542,12 @@ def _cms_value_empty(key: str, value: Any) -> bool:
         rules = value.get("rules") or []
         if isinstance(rules, list) and rules:
             blob = str(rules)
-            if "等级体系" in blob or any(tag in blob for tag in ("V0", "V1", "V2", "V3")):
+            if (
+                "等级体系" in blob
+                or "不设等级" in blob
+                or "统一会员身份" in blob
+                or any(tag in blob for tag in ("V0", "V1", "V2", "V3"))
+            ):
                 return True
         return not (value.get("benefits") or []) and value.get("price") is None
     if key == "agreements":

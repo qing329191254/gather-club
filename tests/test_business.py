@@ -821,6 +821,8 @@ class BusinessTests(unittest.TestCase):
         self.assertTrue(rules)
         blob = str(rules)
         self.assertNotIn("等级体系", blob)
+        self.assertNotIn("不设等级", blob)
+        self.assertNotIn("统一会员身份", blob)
         for tag in ("V0", "V1", "V2", "V3"):
             self.assertNotIn(tag, blob)
         for b in cfg.get("benefits") or []:

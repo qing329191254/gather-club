@@ -40,11 +40,11 @@ def get_member_config(db: Optional[Session] = None) -> dict:
             return default
 
     def _rules_outdated(rules) -> bool:
-        """旧等级章程、或仍点名 V0–V3 的过渡文案，需换成纯年卡表述。"""
+        """旧等级/过渡章程需换成纯年卡表述（文案中不再提等级）。"""
         if not isinstance(rules, list) or not rules:
             return True
         blob = str(rules)
-        if "等级体系" in blob:
+        if "等级体系" in blob or "不设等级" in blob or "统一会员身份" in blob:
             return True
         if any(tag in blob for tag in ("V0", "V1", "V2", "V3")):
             return True

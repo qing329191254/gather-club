@@ -849,6 +849,8 @@ def seed_all(db: Session) -> None:
                     blob = str(rules)
                     if (
                         "等级体系" in blob
+                        or "不设等级" in blob
+                        or "统一会员身份" in blob
                         or any(tag in blob for tag in ("V0", "V1", "V2", "V3"))
                         or "到店对账" in blob
                     ):
