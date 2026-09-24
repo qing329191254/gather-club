@@ -42,23 +42,15 @@
             <el-input-number v-model="loyalty.earnRateDefault" :min="0" :step="0.1" :precision="2" />
             <span class="inline-tip">消费金额 × 倍率</span>
           </el-form-item>
-          <el-form-item label="V3 倍率">
+          <el-form-item label="会员倍率">
             <el-input-number v-model="loyalty.earnRateV3" :min="0" :step="0.1" :precision="2" />
+            <span class="inline-tip">年卡会员消费积分倍率</span>
           </el-form-item>
           <el-form-item label="首单倍率">
             <el-input-number v-model="loyalty.firstOrderRate" :min="0" :step="0.1" :precision="2" />
           </el-form-item>
           <el-form-item label="生日月倍数">
             <el-input-number v-model="loyalty.birthdayMultiplier" :min="1" :step="0.5" :precision="1" />
-          </el-form-item>
-          <el-form-item label="V1 桌数">
-            <el-input-number v-model="loyalty.vipTables.V1" :min="1" />
-          </el-form-item>
-          <el-form-item label="V2 桌数">
-            <el-input-number v-model="loyalty.vipTables.V2" :min="1" />
-          </el-form-item>
-          <el-form-item label="V3 桌数">
-            <el-input-number v-model="loyalty.vipTables.V3" :min="1" />
           </el-form-item>
 
           <el-divider content-position="left">完善资料奖励</el-divider>

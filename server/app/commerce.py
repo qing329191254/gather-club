@@ -301,15 +301,17 @@ def order_earn_points(
     first_order: bool = False,
     birthday: str = "",
     db: Optional[Session] = None,
+    *,
+    member: bool = False,
 ) -> int:
     amt = max(0.0, float(amount or 0))
     if amt <= 0:
         return 0
     cfg = get_loyalty_config(db)
-    level = (vip_level or "V0").upper()
     if first_order:
         rate = float(cfg["firstOrderRate"])
-    elif level == "V3":
+    elif member or (vip_level or "").upper() == "V3":
+        # earnRateV3 现为年卡会员倍率（字段名兼容旧配置）
         rate = float(cfg["earnRateV3"])
     else:
         rate = float(cfg["earnRateDefault"])
@@ -339,6 +341,7 @@ def award_order_points(db: Session, order: Order, user: Optional[AppUser]) -> in
         paid_before == 0,
         getattr(user, "birthday", "") or "",
         db,
+        member=is_member(user, db),
     )
     if gained > 0:
         type_label = {

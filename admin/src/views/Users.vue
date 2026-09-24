@@ -10,7 +10,6 @@
         <el-table-column prop="phone" label="手机" min-width="140" />
         <el-table-column prop="points" label="积分" width="100" />
         <el-table-column prop="table_count" label="近1年桌数" width="120" />
-        <el-table-column prop="vip_level" label="旧等级" width="80" />
         <el-table-column label="会员" width="140">
           <template #default="{ row }">
             <span v-if="row.is_member">至 {{ row.member_expire_at || '-' }}</span>
@@ -174,7 +173,6 @@ const detail = reactive({
   birthday: '',
   hobby: '',
   points: 0,
-  vip_level: '',
   table_count: 0,
   openid: '',
   phone_edited: false,
