@@ -34,8 +34,8 @@
 				<view class="inc-card" :key="current.id">
 					<image class="inc-cover" :src="current.cover || detail.cover" mode="aspectFill" />
 					<view class="inc-cap">
-						<view class="inc-line">【{{ current.time }}】</view>
-						<view class="inc-line">{{ current.meal }}</view>
+						<view v-if="current.time" class="inc-line">【{{ current.time }}】</view>
+						<view v-if="current.meal" class="inc-line">{{ current.meal }}</view>
 					</view>
 				</view>
 			</view>
@@ -66,6 +66,7 @@
 					<view class="arrow" />
 				</view>
 			</view>
+			<text class="date-hint">选填；未选日期不占档，可稍后补选</text>
 		</view>
 
 		<view class="sec form">
@@ -169,12 +170,13 @@
 				couponVisible: false,
 				couponHintShown: false,
 				calendarVisible: false,
-				viewYear: 2027,
-				viewMonth: 2,
+				viewYear: new Date().getFullYear(),
+				viewMonth: new Date().getMonth() + 1,
 				draftDate: '',
 				monthMap: {},
 				weeks: ['日', '一', '二', '三', '四', '五', '六'],
-				loyalty: null
+				loyalty: null,
+				earliestDate: ''
 			}
 		},
 		computed: {
@@ -196,9 +198,8 @@
 				if (amt <= 0) return 0
 				const cfg = this.loyalty || {}
 				const user = getUser() || {}
-				const level = String(user.vipLevel || user.vip_level || 'V0').toUpperCase()
 				let rate = Number(cfg.earnRateDefault != null ? cfg.earnRateDefault : 0.5)
-				if (level === 'V3') rate = Number(cfg.earnRateV3 != null ? cfg.earnRateV3 : 1)
+				if (user.isMember) rate = Number(cfg.earnRateV3 != null ? cfg.earnRateV3 : 1)
 				const bday = String(user.birthday || '')
 				const now = new Date()
 				const bm = bday.length >= 7 ? parseInt(bday.slice(5, 7), 10) : 0
@@ -210,7 +211,7 @@
 			dateText() {
 				if (this.date) return this.date
 				if (this.dateDeferred) return '以后再选'
-				return '立即选择'
+				return '选填，可以后再选'
 			},
 			calendarCells() {
 				const year = this.viewYear
@@ -268,9 +269,32 @@
 		},
 		onLoad(query) {
 			const id = (query && query.id) || ''
+			const now = new Date()
+			this.viewYear = now.getFullYear()
+			this.viewMonth = now.getMonth() + 1
 			api.loyaltyConfig().then((cfg) => {
 				this.loyalty = cfg || null
 			}).catch(() => {})
+			api.memberConfig().then((cfg) => {
+				const lead = Math.max(0, Number((cfg && cfg.bookingLeadDays) || 0))
+				const d = new Date()
+				d.setHours(0, 0, 0, 0)
+				d.setDate(d.getDate() + lead)
+				this.earliestDate =
+					d.getFullYear() +
+					'-' +
+					String(d.getMonth() + 1).padStart(2, '0') +
+					'-' +
+					String(d.getDate()).padStart(2, '0')
+			}).catch(() => {
+				const d = new Date()
+				this.earliestDate =
+					d.getFullYear() +
+					'-' +
+					String(d.getMonth() + 1).padStart(2, '0') +
+					'-' +
+					String(d.getDate()).padStart(2, '0')
+			})
 			if (!id) {
 				uni.showToast({ title: '加载失败', icon: 'none' })
 				setTimeout(() => {
@@ -326,10 +350,15 @@
 		},
 		methods: {
 			isNyeOpenDate(key) {
+				if (!key) return false
 				const start = (this.detail && this.detail.openStart) || ''
 				const end = (this.detail && this.detail.openEnd) || ''
-				if (!key || !start || !end) return false
-				return key >= start && key <= end
+				const earliest = this.earliestDate || ''
+				if (earliest && key < earliest) return false
+				// 后台配了开放起止：限制在窗口内；未配置则按提前预约天数可选任意未来日
+				if (start && key < start) return false
+				if (end && key > end) return false
+				return true
 			},
 			async loadMonthMap() {
 				const storeId = (this.detail && (this.detail.storeId || this.detail.id)) || ''
@@ -376,10 +405,6 @@
 				}
 				if (!/^1\d{10}$/.test(phone)) {
 					uni.showToast({ title: '请填写正确的联系方式～', icon: 'none' })
-					return
-				}
-				if (!this.date && !this.dateDeferred) {
-					uni.showToast({ title: '请选择日期～', icon: 'none' })
 					return
 				}
 				if (this.people < 1) {
@@ -720,6 +745,15 @@
 	.date text {
 		font-size: 28rpx;
 		color: #c4a06a;
+	}
+
+	.date-hint {
+		display: block;
+		margin-top: 12rpx;
+		padding-left: 24rpx;
+		font-size: 22rpx;
+		color: #999;
+		line-height: 1.4;
 	}
 
 	.arrow {
