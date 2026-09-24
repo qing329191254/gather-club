@@ -21,7 +21,7 @@
             <div class="row-ops">
               <el-button link type="primary" @click="openDetail(row)">详情</el-button>
               <el-button link type="primary" :loading="busy('adjust-list-' + row.id)" @click="adjust(row, 'adjust-list-' + row.id)">调积分</el-button>
-              <el-button link type="warning" :loading="busy('vip-list-' + row.id)" @click="setVip(row, 'vip-list-' + row.id)">设到期</el-button>
+              <el-button link type="warning" :loading="busy('vip-list-' + row.id)" @click="openMemberDialog(row, 'vip-list-' + row.id)">设置会员</el-button>
             </div>
           </template>
         </el-table-column>
@@ -66,7 +66,7 @@
           </el-descriptions>
           <div class="detail-actions">
             <el-button type="primary" :loading="busy('adjust-profile-' + detail.id)" @click="adjust(detail, 'adjust-profile-' + detail.id)">调积分</el-button>
-            <el-button type="warning" :loading="busy('vip-profile-' + detail.id)" @click="setVip(detail, 'vip-profile-' + detail.id)">设到期日</el-button>
+            <el-button type="warning" :loading="busy('vip-profile-' + detail.id)" @click="openMemberDialog(detail, 'vip-profile-' + detail.id)">设置会员</el-button>
           </div>
         </template>
 
@@ -148,6 +148,25 @@
         </template>
       </div>
     </el-drawer>
+
+    <el-dialog v-model="memberDialogVisible" title="设置会员" width="420px" destroy-on-close>
+      <el-form label-width="88px">
+        <el-form-item label="到期日">
+          <el-date-picker
+            v-model="memberExpireAt"
+            type="date"
+            value-format="YYYY-MM-DD"
+            placeholder="选择到期日"
+            clearable
+            style="width: 100%"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="memberDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="busy(memberDialogLock)" @click="saveMemberExpire">保存</el-button>
+      </template>
+    </el-dialog>
   </el-card>
 </template>
 
@@ -174,6 +193,8 @@ const detail = reactive({
   hobby: '',
   points: 0,
   table_count: 0,
+  is_member: false,
+  member_expire_at: '',
   openid: '',
   phone_edited: false,
   cancelled: false,
@@ -191,6 +212,46 @@ const couponTemplates = ref([])
 const issueCouponId = ref(null)
 
 const addressesList = ref([])
+
+const memberDialogVisible = ref(false)
+const memberExpireAt = ref('')
+const memberTargetId = ref(null)
+const memberDialogLock = ref('vip-dialog')
+
+function defaultExpireOneYear() {
+  const d = new Date()
+  d.setFullYear(d.getFullYear() + 1)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+function openMemberDialog(row, visual) {
+  if (!row?.id) return
+  memberTargetId.value = row.id
+  memberDialogLock.value = visual || 'vip-dialog'
+  const cur = row.member_expire_at || detail.member_expire_at || ''
+  memberExpireAt.value = cur || defaultExpireOneYear()
+  memberDialogVisible.value = true
+}
+
+async function saveMemberExpire() {
+  const id = memberTargetId.value
+  if (!id) return
+  return run('vip-' + id, async () => {
+    await http.put(`/users/${id}/vip`, null, {
+      params: { member_expire_at: (memberExpireAt.value || '').trim() }
+    })
+    ElMessage.success(memberExpireAt.value ? '已设为会员' : '已取消会员')
+    memberDialogVisible.value = false
+    load()
+    if (drawer.value && detail.id === id) {
+      const res = await http.get(`/users/${id}`)
+      Object.assign(detail, res)
+    }
+  }, memberDialogLock.value)
+}
 
 const drawerTitle = computed(() => {
   if (!detail.id) return '用户详情'
@@ -293,29 +354,6 @@ async function adjust(row, visual) {
     const res = await http.get(`/users/${row.id}`)
     Object.assign(detail, res)
     if (detailTab.value === 'points') await loadPoints()
-  }
-  }, visual)
-}
-
-async function setVip(row, visual) {
-  if (!row?.id) return
-  return run('vip-' + row.id, async () => {
-  const { value } = await ElMessageBox.prompt(
-    '输入会员到期日 YYYY-MM-DD；留空并确认可取消会员。',
-    '设置会员到期',
-    {
-      inputValue: row.member_expire_at || detail.member_expire_at || '',
-      inputPlaceholder: '例如 2027-09-24'
-    }
-  )
-  await http.put(`/users/${row.id}/vip`, null, {
-    params: { member_expire_at: (value || '').trim() }
-  })
-  ElMessage.success('已保存')
-  load()
-  if (drawer.value && detail.id === row.id) {
-    const res = await http.get(`/users/${row.id}`)
-    Object.assign(detail, res)
   }
   }, visual)
 }
