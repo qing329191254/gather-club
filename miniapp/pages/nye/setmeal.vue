@@ -426,7 +426,7 @@
 				const ok = await this.askModal({
 					title: member ? '确认预约' : '确认支付',
 					content: member
-						? `会员免费预约，到店应收约 ¥${(amount * 0.9).toFixed(2)}（以门店对账为准）`
+						? `会员免费预约，到店约惠后 ¥${(amount * 0.9).toFixed(2)}（以门店结算为准）`
 						: `需支付 ¥${amount}`,
 					confirmText: member ? '确认预约' : '立即支付',
 					confirmColor: '#C6453C'

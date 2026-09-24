@@ -40,11 +40,17 @@ def get_member_config(db: Optional[Session] = None) -> dict:
             return default
 
     def _rules_outdated(rules) -> bool:
+        """旧等级章程、或仍点名 V0–V3 的过渡文案，需换成纯年卡表述。"""
         if not isinstance(rules, list) or not rules:
             return True
-        title0 = str((rules[0] or {}).get("title") or "")
-        blob = title0 + str((rules[0] or {}).get("blocks") or [])
-        return ("等级体系" in blob) or ("V0" in blob and "V3" in blob)
+        blob = str(rules)
+        if "等级体系" in blob:
+            return True
+        if any(tag in blob for tag in ("V0", "V1", "V2", "V3")):
+            return True
+        if "到店对账" in blob:
+            return True
+        return False
 
     benefits = raw.get("benefits")
     if not isinstance(benefits, list) or not benefits:
@@ -52,14 +58,28 @@ def get_member_config(db: Optional[Session] = None) -> dict:
     reminders = raw.get("reminders")
     if not isinstance(reminders, list) or not reminders:
         reminders = base.get("reminders") or []
-    rules = raw.get("rules") if isinstance(raw.get("rules"), list) else None
-    if _rules_outdated(rules):
-        rules = base.get("rules") or []
+    rules_src = raw.get("rules") if isinstance(raw.get("rules"), list) else None
+    rules_need_refresh = _rules_outdated(rules_src)
+    rules = (base.get("rules") or []) if rules_need_refresh else (rules_src or [])
 
-    # 缺少年卡字段或仍是旧等级章程时，写入默认测试文案，方便后台/小程序直接看见
-    if db is not None and (
-        raw.get("price") is None or _rules_outdated(raw.get("rules")) or not (raw.get("benefits") or [])
-    ):
+    def _strip_settle_desc(items):
+        out = []
+        changed = False
+        for b in items or []:
+            if not isinstance(b, dict):
+                continue
+            row = dict(b)
+            if str(row.get("desc") or "").strip() == "到店消费按会员折扣对账":
+                row["desc"] = ""
+                changed = True
+            out.append(row)
+        return out, changed
+
+    benefits, benefits_cleaned = _strip_settle_desc(benefits)
+
+    # 缺少年卡核心字段 → 整份回填默认；仅章程/权益说明过时 → 局部更新，保留后台改价
+    need_full_reset = raw.get("price") is None or not (raw.get("benefits") or [])
+    if db is not None and need_full_reset:
         merged = dict(base)
         if raw.get("monthCoupon"):
             merged["monthCoupon"] = raw["monthCoupon"]
@@ -70,6 +90,14 @@ def get_member_config(db: Optional[Session] = None) -> dict:
         benefits = raw.get("benefits") or benefits
         reminders = raw.get("reminders") or reminders
         rules = raw.get("rules") if isinstance(raw.get("rules"), list) else rules
+    elif db is not None and (rules_need_refresh or benefits_cleaned):
+        merged = dict(raw)
+        if rules_need_refresh:
+            merged["rules"] = rules
+        if benefits_cleaned:
+            merged["benefits"] = benefits
+        set_config(db, "member", merged)
+        raw = merged
 
     price = _num("price", float, 199)
     duration = max(1, _num("durationDays", int, 365))

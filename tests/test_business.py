@@ -819,7 +819,12 @@ class BusinessTests(unittest.TestCase):
         self.assertTrue(cfg.get("reminders"))
         rules = cfg.get("rules") or []
         self.assertTrue(rules)
-        self.assertNotIn("等级体系", str((rules[0] or {}).get("title") or ""))
+        blob = str(rules)
+        self.assertNotIn("等级体系", blob)
+        for tag in ("V0", "V1", "V2", "V3"):
+            self.assertNotIn(tag, blob)
+        for b in cfg.get("benefits") or []:
+            self.assertNotEqual(str((b or {}).get("desc") or "").strip(), "到店消费按会员折扣对账")
 
     def test_membership_order_price_from_config(self):
         cfg = self.client.get("/api/v1/member/config").json()

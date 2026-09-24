@@ -1541,8 +1541,8 @@ def _cms_value_empty(key: str, value: Any) -> bool:
             return True
         rules = value.get("rules") or []
         if isinstance(rules, list) and rules:
-            t0 = str((rules[0] or {}).get("title") or "")
-            if "等级体系" in t0:
+            blob = str(rules)
+            if "等级体系" in blob or any(tag in blob for tag in ("V0", "V1", "V2", "V3")):
                 return True
         return not (value.get("benefits") or []) and value.get("price") is None
     if key == "agreements":

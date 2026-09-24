@@ -846,19 +846,43 @@ def seed_all(db: Session) -> None:
             else:
                 rules = cur.get("rules") or []
                 if isinstance(rules, list) and rules:
-                    first_title = str((rules[0] or {}).get("title") or "")
-                    if "等级体系" in first_title or "V0" in first_title:
+                    blob = str(rules)
+                    if (
+                        "等级体系" in blob
+                        or any(tag in blob for tag in ("V0", "V1", "V2", "V3"))
+                        or "到店对账" in blob
+                    ):
                         need_refresh = True
                 if not (cur.get("benefits") or []):
                     need_refresh = True
                 if not (cur.get("reminders") or []):
                     need_refresh = True
+                for b in cur.get("benefits") or []:
+                    if isinstance(b, dict) and str(b.get("desc") or "").strip() == "到店消费按会员折扣对账":
+                        need_refresh = True
+                        break
             if need_refresh:
                 merged = dict(default)
                 if isinstance(cur, dict) and cur.get("monthCoupon"):
                     merged["monthCoupon"] = cur["monthCoupon"]
                 if isinstance(cur, dict) and cur.get("levels"):
                     merged["levels"] = cur["levels"]
+                # 已有年费/权益时只刷新章程与权益说明，避免覆盖后台改价
+                if isinstance(cur, dict) and cur.get("price") is not None and (cur.get("benefits") or []):
+                    merged = dict(cur)
+                    merged["rules"] = default.get("rules")
+                    benefits = []
+                    for b in cur.get("benefits") or []:
+                        if not isinstance(b, dict):
+                            continue
+                        row = dict(b)
+                        if str(row.get("desc") or "").strip() == "到店消费按会员折扣对账":
+                            row["desc"] = ""
+                        benefits.append(row)
+                    if benefits:
+                        merged["benefits"] = benefits
+                    if not (merged.get("reminders") or []):
+                        merged["reminders"] = default.get("reminders")
                 set_config(db, key, merged)
         elif key == "agreements":
             if not (isinstance(cur, dict) and cur):
