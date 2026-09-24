@@ -72,6 +72,16 @@
 			</view>
 		</view>
 
+		<!-- 暂无直播 / 预告 -->
+		<view v-if="listReady && !living && !lives.length" class="live-empty">
+			<view class="live-empty-icon">
+				<view class="live-empty-lens"></view>
+				<view class="live-empty-body"></view>
+			</view>
+			<text class="live-empty-title">暂无直播预告</text>
+			<text class="live-empty-desc">关注视频号，开播时第一时间收到提醒</text>
+		</view>
+
 		<app-tabbar :current="2" />
 	</view>
 </template>
@@ -90,7 +100,8 @@
 					finderUserName: ''
 				},
 				living: null,
-				lives: []
+				lives: [],
+				listReady: false
 			}
 		},
 		onShow() {
@@ -98,13 +109,27 @@
 			this.loadList()
 		},
 		methods: {
+			channelsErrorCode(err) {
+				if (!err) return 0
+				return Number(
+					err.errCode != null ? err.errCode : err.errno != null ? err.errno : err.err_code
+				) || 0
+			},
+			isChannelsEmptyError(err) {
+				if (!err) return false
+				const code = this.channelsErrorCode(err)
+				if (code === 1416104 || code === 1) return true
+				const raw = String(err.errMsg || err.message || '').toLowerCase()
+				return (
+					raw.indexOf('empty finder info') >= 0 ||
+					raw.indexOf('fail empty') >= 0 ||
+					raw.indexOf(':fail empty') >= 0
+				)
+			},
 			channelsErrorText(err, fallback) {
 				const fb = fallback || '视频号操作失败'
 				if (!err) return fb
-				const code = Number(
-					(err && (err.errCode != null ? err.errCode : err.errno != null ? err.errno : err.err_code)) ||
-						0
-				)
+				const code = this.channelsErrorCode(err)
 				const byCode = {
 					100008: '视频号需认证或与小程序主体不一致',
 					40097: '视频号参数异常',
@@ -142,13 +167,14 @@
 					if (res && res.profile) {
 						this.profile = Object.assign({}, this.profile, res.profile)
 					}
-					this.living = null
-					this.lives = []
 					const fromProfile = Number(res && res.profile && res.profile.defaultReservePoints)
 					const defaultPoints =
 						Number.isFinite(fromProfile) && fromProfile >= 0 ? fromProfile : 10
 					const finder = (this.profile && this.profile.finderUserName) || ''
 					if (!finder) {
+						this.living = null
+						this.lives = []
+						this.listReady = true
 						return
 					}
 					try {
@@ -158,24 +184,29 @@
 							(res && res.reservedNoticeIds) || []
 						)
 					} catch (e) {
-						this.living = null
-						this.lives = []
-						const msg = this.channelsErrorText(e, '视频号直播同步失败')
 						console.warn('[video] channels sync failed', finder, e)
-						if (String((e && (e.errMsg || e.message)) || '').indexOf('unsupported') >= 0) {
+						if (this.isChannelsEmptyError(e)) {
+							this.living = null
+							this.lives = []
+						} else if (String((e && (e.errMsg || e.message)) || '').indexOf('unsupported') >= 0) {
+							this.living = null
+							this.lives = []
 							console.warn('[video] getChannelsLive* 仅真机可用')
-						} else {
+						} else if (!this.lives.length && !this.living) {
 							uni.showToast({
-								title: msg,
+								title: this.channelsErrorText(e, '视频号直播同步失败'),
 								icon: 'none',
 								duration: 3000
 							})
 						}
+					} finally {
+						this.listReady = true
 					}
 				} catch (e) {
-					this.living = null
-					this.lives = []
-					uni.showToast({ title: '直播列表加载失败', icon: 'none' })
+					this.listReady = true
+					if (!this.lives.length && !this.living) {
+						uni.showToast({ title: '直播列表加载失败', icon: 'none' })
+					}
 				}
 			},
 			wxCall(name, opts) {
@@ -256,8 +287,15 @@
 				})
 
 				if (!liveInfo && !noticeInfo) {
-					const err = noticeErr || liveErr || new Error('channels unavailable')
-					throw err
+					const emptyLive = !liveErr || this.isChannelsEmptyError(liveErr)
+					const emptyNotice = !noticeErr || this.isChannelsEmptyError(noticeErr)
+					// 暂无直播/预告：当作空列表，不要当成致命错误弹 toast
+					if (emptyLive && emptyNotice) {
+						this.living = null
+						this.lives = []
+						return
+					}
+					throw liveErr || noticeErr || new Error('channels unavailable')
 				}
 
 				if (liveInfo && Number(liveInfo.status) === 2) {
@@ -354,34 +392,74 @@
 				try {
 					const finder = this.profile.finderUserName || ''
 					const noticeId = item.noticeId
+					let wxReserved = !!item.reserved
 					if (finder) {
 						try {
-							await this.openChannelPromise('reserveChannelsLive', { noticeId })
+							const wxRes = await this.openChannelPromise('reserveChannelsLive', { noticeId })
+							const state = Number(wxRes && wxRes.state)
+							// 文档：6=新预约成功，8=此前已预约收起弹窗；5/9=未预约或取消
+							if (state === 6 || state === 8) {
+								wxReserved = true
+							} else if (state === 7) {
+								wxReserved = false
+								item.reserved = false
+								uni.showToast({ title: '已取消预约', icon: 'none' })
+								return
+							} else if (state === 5 || state === 9) {
+								uni.showToast({ title: '未完成预约', icon: 'none' })
+								return
+							} else if (Number.isFinite(state) && state > 0 && state !== 6 && state !== 8) {
+								// 其他状态（直播中/已结束等）不当作预约失败
+								uni.showToast({
+									title: this.reserveStateText(state),
+									icon: 'none'
+								})
+								return
+							} else {
+								// 部分机型不回传 state，弹窗成功唤起后仍继续记服务端预约
+								wxReserved = true
+							}
 						} catch (e) {
-							uni.showToast({
-								title: this.channelsErrorText(e, '打开预约失败'),
-								icon: 'none'
-							})
-							return
+							const cancelled =
+								/cancel/i.test(String((e && (e.errMsg || e.message)) || '')) ||
+								Number(e && e.errCode) === 1
+							if (cancelled) {
+								uni.showToast({ title: '已取消', icon: 'none' })
+								return
+							}
+							// 微信侧失败时仍尝试服务端（已预约过的场景），避免误报「预约失败」
+							console.warn('[video] reserveChannelsLive fail', e)
 						}
 					}
-					const res = await api.videoReserve({
-						noticeId,
-						time: item.time || '',
-						line1: item.line1 || '',
-						line2: item.line2 || '',
-						points: item.points || 10,
-						avatar: item.avatar || ''
-					})
-					const data = (res && res.data) || {}
-					item.reserved = true
-					const gained = data.points || 0
-					const nextFinder = data.finderUserName || finder || ''
-					this.profile.finderUserName = nextFinder
-					if (gained) {
-						uni.showToast({ title: '预约成功 +' + gained + '积分', icon: 'none' })
-					} else {
-						uni.showToast({ title: '已预约', icon: 'none' })
+					try {
+						const res = await api.videoReserve({
+							noticeId,
+							time: item.time || '',
+							line1: item.line1 || '',
+							line2: item.line2 || '',
+							points: item.points || 10,
+							avatar: item.avatar || ''
+						})
+						const data = (res && res.data) || {}
+						item.reserved = true
+						const gained = Number(data.points) || 0
+						const nextFinder = data.finderUserName || finder || ''
+						this.profile.finderUserName = nextFinder
+						if (gained) {
+							uni.showToast({ title: '预约成功 +' + gained + '积分', icon: 'none' })
+						} else {
+							uni.showToast({ title: res && res.message ? res.message : '已预约', icon: 'none' })
+						}
+					} catch (e) {
+						if (wxReserved) {
+							item.reserved = true
+							uni.showToast({ title: '已预约视频号', icon: 'none' })
+						} else {
+							uni.showToast({
+								title: this.channelsErrorText(e, '预约失败'),
+								icon: 'none'
+							})
+						}
 					}
 				} catch (e) {
 					uni.showToast({
@@ -390,6 +468,16 @@
 					})
 				}
 				})
+			},
+			reserveStateText(state) {
+				const map = {
+					1: '直播进行中',
+					2: '已进入直播',
+					3: '预告已取消',
+					4: '直播已结束',
+					10: '预约已过期'
+				}
+				return map[state] || '暂无法预约'
 			},
 			openChannelPromise(name, extra) {
 				return new Promise((resolve, reject) => {
@@ -446,18 +534,18 @@
 <style>
 	page {
 		height: 100%;
-		background: #FDECEC;
+		background: #F1EEE8;
 	}
 
 	.page {
 		box-sizing: border-box;
 		min-height: 100%;
-		background: #FDECEC;
-		padding-bottom: calc(168rpx + env(safe-area-inset-bottom));
+		background: #F1EEE8;
+		padding-bottom: calc(148rpx + env(safe-area-inset-bottom));
 	}
 
 	.header {
-		background: linear-gradient(180deg, #F25B5B 0%, #EF4E4E 100%);
+		background: linear-gradient(165deg, #A83632 0%, #C6453C 55%, #D25A48 100%);
 		padding: 20rpx 40rpx 48rpx;
 		display: flex;
 		flex-direction: column;
@@ -484,12 +572,12 @@
 		left: 50%;
 		bottom: -6rpx;
 		transform: translateX(-50%);
-		background: linear-gradient(90deg, #8B6BFF 0%, #E85CFF 55%, #FF6BA8 100%);
+		background: #2B2B2B;
 		color: #fff;
 		font-size: 20rpx;
 		line-height: 32rpx;
 		padding: 0 14rpx;
-		border-radius: 999rpx;
+		border-radius: 8rpx;
 		white-space: nowrap;
 		z-index: 1;
 		font-weight: 500;
@@ -506,10 +594,11 @@
 
 	.channel-card {
 		margin: -20rpx 24rpx 0;
-		border-radius: 20rpx;
+		border-radius: 12rpx;
 		overflow: hidden;
 		background: #fff;
-		box-shadow: 0 8rpx 24rpx rgba(226, 54, 54, 0.08);
+		border: 1rpx solid #E8E2DA;
+		box-shadow: none;
 	}
 
 	.cover-wrap {
@@ -538,7 +627,7 @@
 		border-radius: 50%;
 		margin-right: 12rpx;
 		flex-shrink: 0;
-		background: #E23636;
+		background: #C6453C;
 	}
 
 	.channel-name {
@@ -549,12 +638,12 @@
 	}
 
 	.follow {
-		background: #E23636;
+		background: #C6453C;
 		color: #fff;
 		font-size: 24rpx;
 		line-height: 56rpx;
 		padding: 0 22rpx;
-		border-radius: 28rpx;
+		border-radius: 10rpx;
 	}
 
 	.intro {
@@ -565,13 +654,72 @@
 		color: #666;
 	}
 
-	/* —— 直播中：红色外框选中态，紫色只在标签上 —— */
+	.live-empty {
+		margin: 24rpx 24rpx 0;
+		padding: 72rpx 40rpx 80rpx;
+		background: #fff;
+		border-radius: 12rpx;
+		border: 1rpx solid #E8E2DA;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		box-sizing: border-box;
+	}
+
+	.live-empty-icon {
+		position: relative;
+		width: 96rpx;
+		height: 72rpx;
+		margin-bottom: 28rpx;
+		opacity: 0.55;
+	}
+
+	.live-empty-body {
+		position: absolute;
+		left: 8rpx;
+		top: 12rpx;
+		width: 72rpx;
+		height: 48rpx;
+		border-radius: 10rpx;
+		border: 4rpx solid #C4B5A8;
+		box-sizing: border-box;
+		background: #F7F3EE;
+	}
+
+	.live-empty-lens {
+		position: absolute;
+		right: 0;
+		top: 0;
+		width: 28rpx;
+		height: 28rpx;
+		border-radius: 50%;
+		border: 4rpx solid #C4B5A8;
+		box-sizing: border-box;
+		background: #fff;
+	}
+
+	.live-empty-title {
+		font-size: 30rpx;
+		font-weight: 600;
+		color: #333;
+		line-height: 1.4;
+	}
+
+	.live-empty-desc {
+		margin-top: 12rpx;
+		font-size: 24rpx;
+		color: #999;
+		line-height: 1.5;
+		text-align: center;
+	}
+
+	/* —— 直播中 —— */
 	.live-onair {
 		position: relative;
 		margin: 24rpx 24rpx 0;
-		padding: 14rpx 12rpx 12rpx;
-		border-radius: 24rpx;
-		background: linear-gradient(180deg, #FF7A45 0%, #FF9A58 55%, #FFB06A 100%);
+		padding: 4rpx;
+		border-radius: 12rpx;
+		background: #C6453C;
 		box-sizing: border-box;
 		overflow: hidden;
 	}
@@ -584,7 +732,7 @@
 		position: relative;
 		z-index: 1;
 		background: #fff;
-		border-radius: 16rpx;
+		border-radius: 10rpx;
 		overflow: hidden;
 	}
 
@@ -597,8 +745,8 @@
 		align-items: center;
 		height: 40rpx;
 		padding: 0 16rpx 0 12rpx;
-		border-radius: 0 0 18rpx 0;
-		background: linear-gradient(90deg, #9B5CFF 0%, #FF6BA8 70%, #FF8A5C 100%);
+		border-radius: 0 0 12rpx 0;
+		background: #2B2B2B;
 		z-index: 2;
 	}
 
@@ -662,9 +810,9 @@
 		position: relative;
 		margin: 20rpx 24rpx 0;
 		background: #fff;
-		border-radius: 20rpx;
+		border-radius: 12rpx;
 		overflow: hidden;
-		border: 1rpx solid #F6D5D8;
+		border: 1rpx solid #E8E2DA;
 	}
 
 	.points-flare {
@@ -695,20 +843,20 @@
 	.live-tag {
 		font-size: 22rpx;
 		color: #fff;
-		background: #8B6BFF;
+		background: #C6453C;
 		line-height: 40rpx;
 		padding: 0 14rpx;
-		border-radius: 10rpx 0 0 10rpx;
+		border-radius: 8rpx 0 0 8rpx;
 		flex-shrink: 0;
 	}
 
 	.live-time {
 		font-size: 22rpx;
-		color: #6A6A88;
+		color: #6B635C;
 		line-height: 40rpx;
 		padding: 0 16rpx;
-		background: #EFEBF8;
-		border-radius: 0 10rpx 10rpx 0;
+		background: #F3EEE8;
+		border-radius: 0 8rpx 8rpx 0;
 	}
 
 	.points {
@@ -764,10 +912,10 @@
 	.live-avatar {
 		width: 104rpx;
 		height: 104rpx;
-		border-radius: 50%;
+		border-radius: 12rpx;
 		margin-right: 20rpx;
 		flex-shrink: 0;
-		background: #E23636;
+		background: #C6453C;
 	}
 
 	.live-title {
@@ -787,12 +935,12 @@
 
 	.reserve {
 		margin-left: 12rpx;
-		background: linear-gradient(90deg, #FF8A28 0%, #FFB24A 100%);
+		background: #C6453C;
 		color: #fff;
 		font-size: 24rpx;
 		line-height: 60rpx;
 		padding: 0 20rpx;
-		border-radius: 12rpx;
+		border-radius: 10rpx;
 		flex-shrink: 0;
 	}
 
@@ -802,12 +950,12 @@
 
 	.watch {
 		margin-left: 12rpx;
-		background: #E23636;
+		background: #C6453C;
 		color: #fff;
 		font-size: 24rpx;
 		line-height: 60rpx;
 		padding: 0 18rpx 0 12rpx;
-		border-radius: 12rpx;
+		border-radius: 10rpx;
 		flex-shrink: 0;
 		display: flex;
 		flex-direction: row;

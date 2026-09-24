@@ -810,6 +810,86 @@ class BusinessTests(unittest.TestCase):
         deleted = self.client.delete(f"/api/admin/gather/products/{pid}", headers=auth)
         self.assertEqual(deleted.status_code, 200, deleted.text)
 
+    def test_member_config_has_annual_card_fields(self):
+        res = self.client.get("/api/v1/member/config")
+        self.assertEqual(res.status_code, 200, res.text)
+        cfg = res.json()
+        self.assertGreater(float(cfg.get("price") or 0), 0)
+        self.assertTrue(cfg.get("benefits"))
+        self.assertTrue(cfg.get("reminders"))
+        rules = cfg.get("rules") or []
+        self.assertTrue(rules)
+        self.assertNotIn("等级体系", str((rules[0] or {}).get("title") or ""))
+
+    def test_membership_order_price_from_config(self):
+        cfg = self.client.get("/api/v1/member/config").json()
+        price = float(cfg["price"])
+        res = self.client.post(
+            "/api/v1/orders",
+            headers=headers("openid-member-buy"),
+            json={"type": "membership", "quantity": 1, "price": 1, "amount": 1},
+        )
+        self.assertEqual(res.status_code, 200, res.text)
+        body = res.json()
+        self.assertEqual(body["type"], "membership")
+        self.assertEqual(float(body["amount"]), price)
+        self.assertEqual(body["status"], "pending")
+
+    def test_member_free_reserve_nye(self):
+        from app.utils import today_cn
+        from datetime import date as date_cls, timedelta
+
+        y, m, d = [int(x) for x in today_cn().split("-")]
+        expire = (date_cls(y, m, d) + timedelta(days=30)).isoformat()
+        with SessionLocal() as db:
+            user = db.query(AppUser).filter(AppUser.openid == "openid-member-free").first()
+            if not user:
+                user = AppUser(openid="openid-member-free", nickname="会员测")
+                db.add(user)
+            user.member_expire_at = expire
+            db.commit()
+
+        # 不选日期：意向单，不碰活动开放窗；仍应免付预约
+        res = self.client.post(
+            "/api/v1/orders",
+            headers=headers("openid-member-free"),
+            json={
+                "type": "nye",
+                "store_id": "gongkang",
+                "package_id": "1",
+                "quantity": 1,
+                "contact_name": "测",
+                "contact_phone": "13800138000",
+            },
+        )
+        self.assertEqual(res.status_code, 200, res.text)
+        body = res.json()
+        self.assertEqual(body["status"], "reserved")
+        self.assertEqual(float(body["amount"]), 0)
+        self.assertTrue(body.get("memberReserve"))
+        self.assertGreater(float(body.get("settleAmount") or 0), 0)
+        self.assertFalse(body.get("roomDate"))
+
+    def test_booking_lead_days_blocks_today_when_configured(self):
+        with SessionLocal() as db:
+            cur = dict(get_config(db, "member") or {})
+            cur["bookingLeadDays"] = 1
+            set_config(db, "member", cur)
+        today = today_cn()
+        res = self.client.post(
+            "/api/v1/orders",
+            headers=headers("openid-lead"),
+            json={
+                "type": "nye",
+                "store_id": "gongkang",
+                "package_id": "1",
+                "room_date": today,
+                "room_slot": "lunch",
+            },
+        )
+        self.assertEqual(res.status_code, 400, res.text)
+        self.assertIn("提前", res.json()["detail"])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

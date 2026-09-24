@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<app-loading />
 	<view class="page">
 		<view class="article">
@@ -102,7 +102,7 @@
 
 	.author {
 		font-size: 26rpx;
-		color: #e64750;
+		color: #C6453C;
 		font-weight: 600;
 	}
 
@@ -123,7 +123,7 @@
 		border-radius: 20rpx;
 		overflow: hidden;
 		position: relative;
-		background: linear-gradient(135deg, #ff6b6f 0%, #e64750 55%, #c93a42 100%);
+		background: #C6453C;
 		display: flex;
 		align-items: center;
 		justify-content: flex-end;
@@ -182,7 +182,7 @@
 		width: 40rpx;
 		height: 40rpx;
 		border-radius: 10rpx;
-		background: #e64750;
+		background: #C6453C;
 		color: #fff;
 		font-size: 24rpx;
 		font-weight: 700;
@@ -210,7 +210,7 @@
 		width: 28rpx;
 		flex-shrink: 0;
 		font-size: 30rpx;
-		color: #e64750;
+		color: #C6453C;
 		line-height: 1.7;
 	}
 

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<app-loading />
 	<view class="page">
 		<view
@@ -222,7 +222,7 @@
 		position: relative;
 		z-index: 2;
 		background: #f5f5f5;
-		border-radius: 28rpx 28rpx 0 0;
+		border-radius: 12rpx 12rpx 0 0;
 		padding: 24rpx 20rpx calc(24rpx + env(safe-area-inset-bottom));
 		box-sizing: border-box;
 	}
@@ -306,14 +306,14 @@
 	.yen {
 		font-size: 28rpx;
 		font-weight: 700;
-		color: #e03d47;
+		color: #C6453C;
 		line-height: 68rpx;
 	}
 
 	.num {
 		font-size: 36rpx;
 		font-weight: 700;
-		color: #e03d47;
+		color: #C6453C;
 		line-height: 68rpx;
 	}
 
@@ -327,7 +327,7 @@
 
 	.buy {
 		padding: 0 28rpx;
-		background: #fc4f39;
+		background: #C6453C;
 		border-radius: 8rpx;
 		display: flex;
 		align-items: center;

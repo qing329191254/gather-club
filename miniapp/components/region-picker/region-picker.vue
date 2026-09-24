@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<view
 		v-if="visible"
 		class="region-mask"
@@ -106,7 +106,7 @@
 
 	.region-sheet {
 		background: #fff;
-		border-radius: 24rpx 24rpx 0 0;
+		border-radius: 12rpx 12rpx 0 0;
 		padding-bottom: env(safe-area-inset-bottom);
 	}
 
@@ -126,7 +126,7 @@
 
 	.region-ok {
 		font-size: 30rpx;
-		color: #E03D47;
+		color: #C6453C;
 		line-height: 96rpx;
 	}
 

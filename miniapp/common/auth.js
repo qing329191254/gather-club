@@ -10,8 +10,10 @@ const defaultUser = {
 	avatar: '',
 	phone: '',
 	points: 0,
-	vip: 'V0会员',
+	vip: '未开通',
 	vipLevel: 'V0',
+	isMember: false,
+	memberExpireAt: '',
 	vipIcon: '',
 	vipLabel: '',
 	openid: ''
@@ -96,7 +98,9 @@ function mapServerUser(raw, openid) {
 		phoneEdited: !!u.phoneEdited,
 		points: u.points != null ? u.points : 0,
 		vipLevel: u.vipLevel || u.vip_level || 'V0',
-		vip: u.vip || ((u.vipLevel || u.vip_level || 'V0') + '会员'),
+		vip: u.vip || (u.isMember ? '会员' : '未开通'),
+		isMember: !!(u.isMember || u.is_member),
+		memberExpireAt: u.memberExpireAt || u.member_expire_at || '',
 		vipIcon: u.vipIcon || '',
 		vipLabel: u.vipLabel || '',
 		openid: openid || u.openid || ''

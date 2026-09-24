@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<app-loading />
 	<view class="page">
 		<view class="hero">
@@ -99,12 +99,12 @@
 	.page {
 		min-height: 100vh;
 		box-sizing: border-box;
-		background: #f5f5f5;
+		background: #F1EEE8;
 		padding-bottom: calc(32rpx + env(safe-area-inset-bottom));
 	}
 
 	.hero {
-		background: linear-gradient(180deg, #ff5a5f 0%, #ff7a8a 55%, #ff9aa0 100%);
+		background: linear-gradient(165deg, #A83632 0%, #C6453C 60%, #D25A48 100%);
 		padding: 24rpx 36rpx 100rpx;
 	}
 
@@ -140,7 +140,7 @@
 		position: relative;
 		z-index: 2;
 		background: #fff;
-		border-radius: 20rpx;
+		border-radius: 12rpx;
 		padding: 28rpx 32rpx 32rpx;
 		box-shadow: 0 8rpx 24rpx rgba(200, 60, 60, 0.1);
 	}
@@ -294,6 +294,6 @@
 	.cost {
 		font-size: 32rpx;
 		font-weight: 700;
-		color: #e64750;
+		color: #C6453C;
 	}
 </style>

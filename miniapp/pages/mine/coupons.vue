@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<app-loading />
 	<view class="page">
 		<view class="tabs">
@@ -141,7 +141,7 @@
 	}
 
 	.tab.active {
-		color: #e23636;
+		color: #C6453C;
 		font-weight: 600;
 	}
 
@@ -152,7 +152,7 @@
 		width: 48rpx;
 		height: 6rpx;
 		border-radius: 6rpx;
-		background: #e23636;
+		background: #C6453C;
 		transform: translateX(-50%);
 	}
 
@@ -181,11 +181,11 @@
 
 	.coupon {
 		display: flex;
-		background: #fff5f5;
-		border-radius: 16rpx;
+		background: #fff;
+		border-radius: 12rpx;
 		overflow: hidden;
 		margin-bottom: 20rpx;
-		border: 1rpx solid #ffe0e0;
+		border: 1rpx solid #E8E2DA;
 	}
 
 	.coupon-left {
@@ -195,7 +195,7 @@
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		background: linear-gradient(160deg, #ff6b6b, #e23636);
+		background: #C6453C;
 		flex-shrink: 0;
 	}
 
@@ -243,8 +243,8 @@
 		align-self: center;
 		margin-right: 20rpx;
 		padding: 10rpx 28rpx;
-		border-radius: 999rpx;
-		background: #e23636;
+		border-radius: 8rpx;
+		background: #C6453C;
 		color: #ffffff;
 		font-size: 24rpx;
 		flex-shrink: 0;

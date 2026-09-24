@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<app-loading />
 	<view class="page">
 		<view class="hero">
@@ -289,14 +289,14 @@
 <style>
 	.page {
 		min-height: 100vh;
-		background: #f5f5f5;
+		background: #F1EEE8;
 		padding-bottom: calc(160rpx + env(safe-area-inset-bottom));
 		box-sizing: border-box;
 	}
 
 	.hero {
 		padding: 8rpx 0 48rpx;
-		background: linear-gradient(180deg, #ffe8ec 0%, #fff5f6 42%, #f5f5f5 100%);
+		background: #F1EEE8;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
@@ -336,8 +336,8 @@
 		bottom: 0;
 		width: 64rpx;
 		height: 64rpx;
-		border-radius: 50%;
-		background: #3d4f7a;
+		border-radius: 12rpx;
+		background: #C6453C;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -354,8 +354,9 @@
 	.card {
 		margin: 0 24rpx;
 		background: #ffffff;
-		border-radius: 20rpx;
+		border-radius: 12rpx;
 		overflow: hidden;
+		border: 1rpx solid #E8E2DA;
 	}
 
 	.row {
@@ -443,13 +444,13 @@
 		right: 0;
 		bottom: 0;
 		padding: 20rpx 40rpx calc(20rpx + env(safe-area-inset-bottom));
-		background: linear-gradient(180deg, rgba(245, 245, 245, 0) 0%, #f5f5f5 30%);
+		background: linear-gradient(180deg, rgba(241, 238, 232, 0) 0%, #F1EEE8 30%);
 	}
 
 	.save-btn {
 		height: 88rpx;
-		border-radius: 999rpx;
-		background: #e23636;
+		border-radius: 10rpx;
+		background: #C6453C;
 		color: #ffffff;
 		font-size: 32rpx;
 		font-weight: 600;

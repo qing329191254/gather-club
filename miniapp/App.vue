@@ -28,8 +28,9 @@
 
 <style>
 	page {
-		background-color: #F6F3EF;
+		background-color: #F1EEE8;
 		font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Helvetica, "Microsoft YaHei", sans-serif;
+		color: #2C2A27;
 	}
 
 	/* 只作用在加了这个类的那一个按钮上 */

@@ -55,6 +55,29 @@ export const vipLevels = [
 
 const fallback = vipLevels[0]
 
+/** 用会员中心后台色（levelColor / barColor）推导徽章主题 */
+function themeFromLevel(item, base) {
+	const fromServer = (item && item.theme) || {}
+	const levelColor = (item && (item.levelColor || item.barColor)) || ''
+	const derived = {}
+	if (levelColor) {
+		derived.pill = levelColor
+		// 浅色底用深字，深色底用白字
+		const hex = String(levelColor).replace('#', '')
+		if (/^[0-9a-fA-F]{6}$/.test(hex)) {
+			const r = parseInt(hex.slice(0, 2), 16)
+			const g = parseInt(hex.slice(2, 4), 16)
+			const b = parseInt(hex.slice(4, 6), 16)
+			const luma = (r * 299 + g * 587 + b * 114) / 1000
+			derived.text = luma > 160 ? '#1a1a1a' : '#ffffff'
+		} else {
+			derived.text = '#ffffff'
+		}
+		derived.border = 'transparent'
+	}
+	return Object.assign({}, (base && base.theme) || {}, derived, fromServer)
+}
+
 /** 合并后台下发的等级配置（可选） */
 export function setVipLevelsFromServer(list) {
 	if (!Array.isArray(list) || !list.length) return vipLevels
@@ -62,12 +85,17 @@ export function setVipLevelsFromServer(list) {
 		if (!item || !item.id) return
 		const idx = vipLevels.findIndex((row) => row.id === item.id)
 		if (idx >= 0) {
-			vipLevels[idx] = Object.assign({}, vipLevels[idx], item, {
-				icon: item.icon || item.crownIcon || vipLevels[idx].icon || '',
-				theme: Object.assign({}, vipLevels[idx].theme, item.theme || {})
+			const prev = vipLevels[idx]
+			vipLevels[idx] = Object.assign({}, prev, item, {
+				icon: item.icon || item.crownIcon || prev.icon || '',
+				theme: themeFromLevel(item, prev)
 			})
 		} else {
-			vipLevels.push(item)
+			vipLevels.push(
+				Object.assign({}, item, {
+					theme: themeFromLevel(item, null)
+				})
+			)
 		}
 	})
 	return vipLevels
@@ -83,17 +111,29 @@ export function setVipLevelsFromServer(list) {
  */
 export function resolveVip(user) {
 	const u = user || {}
-	let id = u.vipLevel || u.vipId || ''
-	if (!id && u.vip) {
-		const m = String(u.vip).match(/V\d+/i)
-		if (m) id = m[0].toUpperCase()
+	if (u.isMember) {
+		const exp = u.memberExpireAt || ''
+		return {
+			id: 'MEMBER',
+			label: exp ? `会员` : '会员',
+			icon: u.vipIcon || '',
+			theme: {
+				pill: '#c45c26',
+				border: 'transparent',
+				text: '#ffffff'
+			},
+			expireAt: exp
+		}
 	}
-	if (!id) id = 'V0'
-	const conf = vipLevels.find((row) => row.id.toUpperCase() === String(id).toUpperCase()) || fallback
 	return {
-		id: conf.id,
-		label: u.vipLabel || u.vip || conf.label,
-		icon: u.vipIcon || conf.icon || conf.crownIcon || '',
-		theme: conf.theme
+		id: 'NONE',
+		label: '未开通',
+		icon: '',
+		theme: {
+			pill: 'rgba(255,255,255,0.22)',
+			border: 'rgba(255,255,255,0.55)',
+			text: '#ffffff'
+		},
+		expireAt: ''
 	}
 }

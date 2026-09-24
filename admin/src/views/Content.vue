@@ -128,8 +128,53 @@
         </div>
       </template>
 
-      <!-- 会员 -->
+      <!-- 会员：年卡配置 -->
       <template v-else-if="tab === 'member'">
+        <el-divider content-position="left">年卡商品</el-divider>
+        <el-form label-width="130px" class="form">
+          <el-form-item label="页面标题"><el-input v-model="member.title" placeholder="天天聚乐部 会员权益" /></el-form-item>
+          <el-form-item label="副标题"><el-input v-model="member.subtitle" placeholder="加入后享受专属权益" /></el-form-item>
+          <el-form-item label="价签文案"><el-input v-model="member.priceLabel" placeholder="会员199元/年" /></el-form-item>
+          <el-form-item label="年费（元）"><el-input-number v-model="member.price" :min="0" :precision="2" /></el-form-item>
+          <el-form-item label="有效天数"><el-input-number v-model="member.durationDays" :min="1" /></el-form-item>
+          <el-form-item label="到店折扣">
+            <el-input-number v-model="member.discountRate" :min="0.1" :max="1" :step="0.05" :precision="2" />
+            <span class="hint">仅记账对账，不改线上支付价。0.9=九折</span>
+          </el-form-item>
+          <el-form-item label="提前预约天数">
+            <el-input-number v-model="member.bookingLeadDays" :min="0" />
+            <span class="hint">0=可约当天，1=最早明天</span>
+          </el-form-item>
+          <el-form-item label="意向单保留天">
+            <el-input-number v-model="member.intentExpireDays" :min="1" />
+            <span class="hint">未选日期的会员预约，超过后自动取消</span>
+          </el-form-item>
+          <el-form-item label="头图（可选）"><ImageField v-model="member.heroImage" folder="member" /></el-form-item>
+        </el-form>
+
+        <el-divider content-position="left">权益列表</el-divider>
+        <div class="section-head">
+          <h3>权益</h3>
+          <el-button type="primary" size="small" @click="addMemberBenefit">新增权益</el-button>
+        </div>
+        <div v-for="(b, bi) in member.benefits" :key="b._key" class="card">
+          <div class="card-head">
+            <strong>权益 {{ bi + 1 }}</strong>
+            <el-button link type="danger" @click="member.benefits.splice(bi, 1)">删除</el-button>
+          </div>
+          <el-form label-width="80px">
+            <el-form-item label="标题"><el-input v-model="b.title" /></el-form-item>
+            <el-form-item label="说明"><el-input v-model="b.desc" /></el-form-item>
+          </el-form>
+        </div>
+
+        <el-divider content-position="left">温馨提示</el-divider>
+        <div v-for="(tip, ti) in member.reminders" :key="ti" class="para-edit">
+          <el-input v-model="member.reminders[ti]" type="textarea" :rows="2" />
+          <el-button link type="danger" @click="member.reminders.splice(ti, 1)">删除</el-button>
+        </div>
+        <el-button size="small" @click="member.reminders.push('')">+ 加一条提示</el-button>
+
         <el-divider content-position="left">月度券包展示</el-divider>
         <el-form label-width="100px" class="form">
           <el-form-item label="券标题"><el-input v-model="member.monthCoupon.title" /></el-form-item>
@@ -138,50 +183,6 @@
             <el-input v-model="member.monthCoupon.tag" type="textarea" :rows="2" placeholder="可换行，展示在券角标" />
           </el-form-item>
         </el-form>
-
-        <el-divider content-position="left">会员等级</el-divider>
-        <el-tabs v-model="levelTab" type="card">
-          <el-tab-pane v-for="lv in member.levels" :key="lv.id" :label="lv.id" :name="lv.id">
-            <el-form label-width="110px" class="form">
-              <el-form-item label="升级所需桌数">
-                <el-input-number v-model="lv.need" :min="0" />
-              </el-form-item>
-              <el-form-item label="进度说明">
-                <el-input v-model="lv.needText" placeholder="例如：有效期内完成1桌可升级" />
-              </el-form-item>
-              <el-form-item label="进度条文案">
-                <el-input v-model="lv.progressLabel" placeholder="例如：升级进度" />
-              </el-form-item>
-              <el-form-item label="已达标展示">
-                <el-switch v-model="lv.doneText" active-text="是" inactive-text="否" />
-              </el-form-item>
-              <el-form-item label="页面背景图">
-                <ImageField v-model="lv.pageBgImage" folder="member" />
-              </el-form-item>
-              <el-form-item label="卡片背景图">
-                <ImageField v-model="lv.cardBgImage" folder="member" />
-              </el-form-item>
-              <el-form-item label="等级图标">
-                <ImageField v-model="lv.crownIcon" folder="member" />
-              </el-form-item>
-            </el-form>
-            <div class="section-head">
-              <h3>权益列表</h3>
-              <el-button type="primary" size="small" @click="addBenefit(lv)">新增权益</el-button>
-            </div>
-            <div v-for="(b, bi) in lv.benefits" :key="b._key" class="card">
-              <div class="card-head">
-                <strong>权益 {{ bi + 1 }}</strong>
-                <el-button link type="danger" @click="lv.benefits.splice(bi, 1)">删除</el-button>
-              </div>
-              <el-form label-width="80px">
-                <el-form-item label="标题"><el-input v-model="b.title" /></el-form-item>
-                <el-form-item label="说明"><el-input v-model="b.desc" /></el-form-item>
-                <el-form-item label="图标"><ImageField v-model="b.icon" folder="member" /></el-form-item>
-              </el-form>
-            </div>
-          </el-tab-pane>
-        </el-tabs>
       </template>
 
       <!-- 会员章程（独立页，与会员配置共用 member 配置） -->
@@ -197,7 +198,7 @@
           </div>
           <el-form label-width="90px">
             <el-form-item label="章节标题">
-              <el-input v-model="rule.title" placeholder="例如：一、会员等级体系" />
+              <el-input v-model="rule.title" placeholder="例如：一、会员说明" />
             </el-form-item>
           </el-form>
           <div v-for="(blk, bki) in rule.blocks" :key="blk._key" class="sub-card">
@@ -291,6 +292,17 @@ const share = reactive({ intro: '', sections: [] })
 
 const levelTab = ref('V0')
 const member = reactive({
+  title: '',
+  subtitle: '',
+  priceLabel: '',
+  price: 199,
+  durationDays: 365,
+  discountRate: 0.9,
+  bookingLeadDays: 1,
+  intentExpireDays: 7,
+  heroImage: '',
+  benefits: [],
+  reminders: [],
   levels: [],
   monthCoupon: { title: '', tip: '', tag: '' },
   rules: []
@@ -361,6 +373,10 @@ function addBenefit(lv) {
   lv.benefits.push({ _key: keyOf(), title: '', desc: '', icon: '' })
 }
 
+function addMemberBenefit() {
+  member.benefits.push({ _key: keyOf(), title: '', desc: '' })
+}
+
 function addRuleSection() {
   member.rules.push({
     _key: keyOf(),
@@ -392,6 +408,21 @@ function configKeyForTab(key) {
 }
 
 function applyMemberValue(value) {
+  member.title = value.title || ''
+  member.subtitle = value.subtitle || ''
+  member.priceLabel = value.priceLabel || ''
+  member.price = Number(value.price ?? 199)
+  member.durationDays = Number(value.durationDays ?? 365)
+  member.discountRate = Number(value.discountRate ?? 0.9)
+  member.bookingLeadDays = Number(value.bookingLeadDays ?? 1)
+  member.intentExpireDays = Number(value.intentExpireDays ?? 7)
+  member.heroImage = value.heroImage || ''
+  member.benefits = (value.benefits || []).map((b) => ({
+    _key: keyOf(),
+    title: b.title || '',
+    desc: b.desc || ''
+  }))
+  member.reminders = Array.isArray(value.reminders) ? value.reminders.map((x) => String(x || '')) : []
   member.monthCoupon = {
     title: value.monthCoupon?.title || '',
     tip: value.monthCoupon?.tip || '',
@@ -498,6 +529,19 @@ function buildAgreementPayload() {
 
 function buildMemberPayload() {
   return {
+    title: member.title,
+    subtitle: member.subtitle,
+    priceLabel: member.priceLabel,
+    price: Number(member.price) || 0,
+    durationDays: Number(member.durationDays) || 365,
+    discountRate: Number(member.discountRate) || 0.9,
+    bookingLeadDays: Math.max(0, Number(member.bookingLeadDays) || 0),
+    intentExpireDays: Math.max(1, Number(member.intentExpireDays) || 7),
+    heroImage: member.heroImage || '',
+    benefits: (member.benefits || [])
+      .filter((b) => (b.title || '').trim())
+      .map(({ title, desc }) => ({ title: title.trim(), desc: (desc || '').trim() })),
+    reminders: (member.reminders || []).map((x) => String(x || '').trim()).filter(Boolean),
     monthCoupon: { ...member.monthCoupon },
     levels: member.levels.map((lv) => {
       const { benefits, ...rest } = lv
@@ -580,7 +624,12 @@ function isEmptyConfig(key, value) {
     return !(value.sections && value.sections.length)
   }
   if (key === 'member' || key === 'member_rules') {
-    return !(value.levels && value.levels.length)
+    // 新年卡：有年费/权益/章程即可；不再依赖旧 levels
+    if (Number(value.price) > 0) return false
+    if (value.benefits && value.benefits.length) return false
+    if (value.rules && value.rules.length) return false
+    if (value.levels && value.levels.length) return false
+    return true
   }
   if (key === 'agreements') {
     return !Object.keys(value).length

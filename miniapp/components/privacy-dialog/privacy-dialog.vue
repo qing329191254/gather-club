@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<view
 		v-if="visible"
 		class="mask"
@@ -79,7 +79,7 @@
 	.dialog {
 		width: 100%;
 		background: #ffffff;
-		border-radius: 24rpx;
+		border-radius: 12rpx;
 		padding: 40rpx 36rpx 36rpx;
 		display: flex;
 		flex-direction: column;
@@ -89,13 +89,13 @@
 	.shield {
 		width: 88rpx;
 		height: 88rpx;
-		border-radius: 50% 50% 46% 46%;
-		background: linear-gradient(160deg, #ff8a6b, #e23636);
+		border-radius: 12rpx;
+		background: #C6453C;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		margin-bottom: 20rpx;
-		box-shadow: 0 8rpx 18rpx rgba(226, 54, 54, 0.28);
+		box-shadow: none;
 	}
 
 	.shield-check {
@@ -129,7 +129,7 @@
 		display: block;
 		margin-top: 12rpx;
 		font-size: 26rpx;
-		color: #e23636;
+		color: #C6453C;
 		text-decoration: underline;
 	}
 
@@ -143,7 +143,7 @@
 	.btn {
 		flex: 1;
 		height: 80rpx;
-		border-radius: 999rpx;
+		border-radius: 10rpx;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -153,13 +153,13 @@
 	}
 
 	.btn.ghost {
-		border: 2rpx solid #f0a0a0;
-		color: #e23636;
+		border: 2rpx solid #D8D0C6;
+		color: #6B635C;
 		background: #ffffff;
 	}
 
 	.btn.solid {
-		background: linear-gradient(90deg, #ff6b7a, #e23636);
+		background: #C6453C;
 		color: #ffffff;
 	}
 </style>

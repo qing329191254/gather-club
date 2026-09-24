@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<page-meta :page-style="'overflow:' + (successVisible ? 'hidden' : 'visible')"></page-meta>
 	<app-loading />
 	<view class="page">
@@ -330,22 +330,23 @@
 		min-height: 100vh;
 		box-sizing: border-box;
 		padding: 24rpx 28rpx calc(48rpx + env(safe-area-inset-bottom));
-		background: linear-gradient(180deg, #ff565c 0%, #ff8a5c 28%, #ffc08a 55%, #ffe8d0 78%, #fff8f2 100%);
+		background: #F1EEE8;
 	}
 
 	.hero-card,
 	.cal-card {
 		position: relative;
 		background: #ffffff;
-		border-radius: 24rpx;
-		box-shadow: 0 8rpx 24rpx rgba(200, 60, 40, 0.12);
+		border-radius: 12rpx;
+		box-shadow: none;
+		border: 1rpx solid #E8E2DA;
 	}
 
 	.hero-card {
 		margin-top: 28rpx;
 		padding: 48rpx 36rpx 40rpx;
 		overflow: hidden;
-		background: linear-gradient(135deg, #fff8f6 0%, #ffe8e0 55%, #ffe0d4 100%);
+		background: #fff;
 	}
 
 	.ring {
@@ -409,10 +410,10 @@
 		height: 64rpx;
 		line-height: 64rpx;
 		text-align: center;
-		border-radius: 32rpx;
-		background: #fff0ee;
-		border: 2rpx solid #f0b0a8;
-		color: #8a3a36;
+		border-radius: 10rpx;
+		background: #F7F3EE;
+		border: 2rpx solid #E8E2DA;
+		color: #5C564F;
 		font-size: 30rpx;
 		font-weight: 600;
 	}
@@ -422,7 +423,7 @@
 		display: flex;
 		align-items: center;
 		font-size: 24rpx;
-		color: #8a3a36;
+		color: #8A847C;
 	}
 
 	.rules-arrow {
@@ -450,7 +451,7 @@
 		text-align: center;
 		font-size: 22rpx;
 		color: #fff;
-		background: linear-gradient(90deg, #ff9a4a, #ff7a3a);
+		background: #C6453C;
 		line-height: 44rpx;
 	}
 
@@ -464,7 +465,7 @@
 	.mile-plus {
 		font-size: 36rpx;
 		font-weight: 700;
-		color: #e84a3a;
+		color: #C6453C;
 	}
 
 	.mile-unit {
@@ -488,7 +489,7 @@
 	}
 
 	.got-num {
-		color: #e84a3a;
+		color: #C6453C;
 		font-weight: 700;
 	}
 
@@ -577,28 +578,28 @@
 	}
 
 	.day-mark.today {
-		background: #e84a3a;
+		background: #C6453C;
 	}
 
 	.day-mark.makeup {
 		background: transparent;
-		border: 3rpx dashed #ff8a3a;
+		border: 3rpx dashed #C4B5A8;
 		box-sizing: border-box;
 	}
 
 	.day-mark.makeup text {
-		color: #ff8a3a;
+		color: #8A847C;
 	}
 
 	.day-mark.done {
-		background: #ff8a3a;
+		background: #A83632;
 	}
 
 	.today-bar {
 		width: 28rpx;
 		height: 6rpx;
 		border-radius: 3rpx;
-		background: #e84a3a;
+		background: #C6453C;
 		margin-top: 4rpx;
 	}
 
@@ -628,8 +629,8 @@
 		height: 56rpx;
 		line-height: 52rpx;
 		text-align: center;
-		border-radius: 28rpx;
-		background: linear-gradient(180deg, #ff8a7a 0%, #f25b4a 100%);
+		border-radius: 10rpx;
+		background: #C6453C;
 		border: 3rpx solid #ffffff;
 		box-sizing: border-box;
 	}
@@ -643,9 +644,9 @@
 	.makeup-btn {
 		margin-top: 36rpx;
 		height: 88rpx;
-		border-radius: 16rpx;
-		background: linear-gradient(90deg, #ff9a4a, #ff7a3a);
-		box-shadow: 0 8rpx 20rpx rgba(255, 120, 50, 0.35);
+		border-radius: 10rpx;
+		background: #C6453C;
+		box-shadow: none;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -706,8 +707,8 @@
 		margin-top: 48rpx;
 		width: 100%;
 		height: 88rpx;
-		border-radius: 16rpx;
-		background: linear-gradient(90deg, #ff9a4a, #ff7a3a);
+		border-radius: 10rpx;
+		background: #C6453C;
 		display: flex;
 		align-items: center;
 		justify-content: center;

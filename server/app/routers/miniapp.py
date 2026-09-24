@@ -17,16 +17,21 @@ from ..cms_data import (
     RECOMMEND_BANNERS,
 )
 from ..commerce import (
+    activate_membership,
     add_points,
     award_checkin_milestones,
     award_order_points,
     bump_sold_on_paid,
     display_sold_text,
+    earliest_book_date,
     find_gather_product,
     find_nye_store,
     get_checkin_config,
     get_loyalty_config,
+    get_member_config,
     hold_room_slot,
+    is_member,
+    MEMBER_FREE_RESERVE_TYPES,
     nye_packages_for,
     nye_recent_buy,
     nye_starting_price,
@@ -34,14 +39,17 @@ from ..commerce import (
     product_recent_buy,
     product_starting_price,
     mark_refund_pending,
+    member_expire_date,
     order_earn_points,
     release_room_if_needed,
     release_stale_room_holds,
     reverse_order_points,
     reverse_sold_on_refund,
     room_date_is_past,
+    settle_amount_for,
     sync_user_vip,
     table_count,
+    validate_book_date,
 )
 from ..database import get_db
 from ..models import (
@@ -162,6 +170,8 @@ def _table_count(db: Session, user_id: int) -> int:
 
 
 def _user_out(user: AppUser, db: Optional[Session] = None) -> dict:
+    exp = member_expire_date(user)
+    active = bool(exp and exp >= today_cn())
     out = {
         "id": user.id,
         "nickname": user.nickname,
@@ -172,14 +182,19 @@ def _user_out(user: AppUser, db: Optional[Session] = None) -> dict:
         "phoneEdited": bool(getattr(user, "phone_edited", False)),
         "points": user.points,
         "vipLevel": user.vip_level,
-        "vip": f"{user.vip_level}会员",
+        "vip": "会员" if active else "未开通",
+        "isMember": active,
+        "memberExpireAt": exp,
     }
     if db is not None:
+        # 桌数仅作展示兼容，不再驱动会员身份
         sync_user_vip(db, user)
         db.commit()
         out["vipLevel"] = user.vip_level
-        out["vip"] = f"{user.vip_level}会员"
         out["tableCount"] = _table_count(db, user.id)
+        out["isMember"] = is_member(user, db)
+        out["memberExpireAt"] = member_expire_date(user)
+        out["vip"] = "会员" if out["isMember"] else "未开通"
     return out
 
 
@@ -313,6 +328,13 @@ def _pick_package(packages: list, payload) -> dict:
 
 
 def _order_out(row: Order) -> dict:
+    extra = loads(row.extra or "{}", {}) or {}
+    status_text = row.status_text
+    if row.type == "mall" and row.status == "paid":
+        status_text = "待发货"
+    elif row.status == "reserved":
+        status_text = STATUS_TEXT.get("reserved", "待到店结算")
+    show_code = row.status in ("paid", "reserved") and row.type != "mall"
     return {
         "id": row.id,
         "type": row.type,
@@ -325,31 +347,41 @@ def _order_out(row: Order) -> dict:
         "price": row.price,
         "amount": row.amount,
         "status": row.status,
-        "statusText": "待发货" if row.type == "mall" and row.status == "paid" else row.status_text,
+        "statusText": status_text,
         "contactName": row.contact_name,
         "contactPhone": row.contact_phone,
         "people": row.people,
         "remark": row.remark,
         "roomDate": row.room_date,
         "roomSlot": row.room_slot,
-        "verifyCode": ""
-        if row.type == "mall"
-        else ((row.verify_code or "") if row.status == "paid" else ""),
-        "extra": loads(row.extra or "{}", {}) or {},
+        "verifyCode": (row.verify_code or "") if show_code else "",
+        "settleAmount": float(extra.get("settleAmount") or 0),
+        "memberReserve": bool(extra.get("memberReserve")),
+        "extra": extra,
         "createdAt": row.created_at.isoformat() if row.created_at else None,
     }
 
 
 def _mark_order_paid(db: Session, order: Order, extra_patch: Optional[dict] = None) -> Order:
-    already_paid = order.status in ("paid", "completed")
-    order.status = "paid"
-    order.status_text = STATUS_TEXT.get("paid", "待核销")
+    already_paid = order.status in ("paid", "completed", "reserved")
+    if order.type == "membership":
+        order.status = "completed"
+        order.status_text = STATUS_TEXT.get("completed", "已完成")
+        user = db.query(AppUser).filter(AppUser.id == order.user_id).first() if order.user_id else None
+        if user and not already_paid:
+            activate_membership(db, user)
+            extra_patch = dict(extra_patch or {})
+            extra_patch["memberExpireAt"] = member_expire_date(user)
+    else:
+        order.status = "paid"
+        order.status_text = STATUS_TEXT.get("paid", "待核销")
     extra = loads(order.extra or "{}", {})
     if extra_patch:
         extra.update(extra_patch)
     order.extra = dumps(extra)
-    ensure_order_verify_code(db, order)
-    if not already_paid:
+    if order.type != "membership":
+        ensure_order_verify_code(db, order)
+    if not already_paid and order.type != "membership":
         user = db.query(AppUser).filter(AppUser.id == order.user_id).first() if order.user_id else None
         bump_sold_on_paid(db, order, user)
         award_order_points(db, order, user)
@@ -408,15 +440,22 @@ def _resolve_order_price(db: Session, payload: OrderCreateIn) -> tuple[float, fl
         qty = 1
 
     if otype == "room":
-        if not ((payload.store_id or "").strip() and (payload.room_date or "").strip() and (payload.room_slot or "").strip()):
-            raise HTTPException(status_code=400, detail="请选择门店、日期和时段")
+        if not (payload.store_id or "").strip():
+            raise HTTPException(status_code=400, detail="请选择门店")
+        # 日期可选：未选不占档；选了则须同时有时段
         unit = float(get_loyalty_config(db).get("roomPrice") or 0)
         title = payload.title or "包房预约"
         cover = payload.cover or ""
         spec = payload.spec or ""
-        if unit <= 0:
-            raise HTTPException(status_code=400, detail="包房预约需支付，请先在后台设置包房单价")
         return unit, round(unit * qty, 2), title, cover, spec
+
+    if otype == "membership":
+        cfg = get_member_config(db)
+        unit = float(cfg.get("price") or 0)
+        if unit <= 0:
+            raise HTTPException(status_code=400, detail="会员年费未配置")
+        title = cfg.get("title") or "会员开通"
+        return unit, unit, title, str(cfg.get("heroImage") or ""), cfg.get("priceLabel") or "年费会员"
 
     if otype == "gather":
         raise HTTPException(status_code=400, detail="聚餐已改为专题套餐预订，请从门店详情下单")
@@ -760,7 +799,7 @@ def privacy_share(db: Session = Depends(get_db)):
 
 @router.get("/member/config")
 def member_config(db: Session = Depends(get_db)):
-    return get_config(db, "member") or MEMBER_CONFIG
+    return get_member_config(db)
 
 
 @router.get("/loyalty/config")
@@ -868,6 +907,7 @@ def room_month(
 
     _release_stale_room_holds(db)
     today = today_cn()
+    earliest = earliest_book_date(db)
     days = calendar.monthrange(year, month)[1]
     result = {}
     for d in range(1, days + 1):
@@ -875,7 +915,7 @@ def room_month(
         lunch = _slot_info(db, store_id, date, "lunch")
         dinner = _slot_info(db, store_id, date, "dinner")
         remain = lunch["remain"] + dinner["remain"]
-        past = date < today
+        past = date < earliest
         result[date] = {
             "date": date,
             "past": past,
@@ -884,6 +924,7 @@ def room_month(
             "remain": remain,
             "full": (not past) and lunch["full"] and dinner["full"],
             "open": not past,
+            "earliest": earliest,
             "statusText": "" if past else ("已满" if lunch["full"] and dinner["full"] else f"剩{remain}"),
         }
     return result
@@ -908,6 +949,8 @@ def list_orders(
         if st == "closed":
             # 小程序「已关闭」：已取消、待退款、已退款
             q = q.filter(Order.status.in_(("cancelled", "refund_pending", "refunded")))
+        elif st == "paid":
+            q = q.filter(Order.status.in_(("paid", "reserved")))
         else:
             q = q.filter(Order.status == st)
     q = q.order_by(Order.created_at.desc())
@@ -915,7 +958,7 @@ def list_orders(
     rows = q.offset(offset).limit(page_size).all()
     dirty = False
     for r in rows:
-        if r.status == "paid" and not (r.verify_code or "").strip():
+        if r.status in ("paid", "reserved") and not (r.verify_code or "").strip():
             ensure_order_verify_code(db, r)
             dirty = True
     if dirty:
@@ -937,6 +980,7 @@ def create_order(
     if (payload.type or "").strip() == "room":
         qty = 1
     unit_price, amount, title, cover, spec = _resolve_order_price(db, payload)
+    otype = (payload.type or "").strip()
     room_date = (payload.room_date or "").strip()
     room_slot = (payload.room_slot or "").strip()
     if room_date or room_slot:
@@ -944,12 +988,15 @@ def create_order(
             raise HTTPException(status_code=400, detail="请选择用餐日期和时段")
         if room_slot not in ("lunch", "dinner"):
             raise HTTPException(status_code=400, detail="用餐时段无效")
-        if room_date < today_cn():
-            raise HTTPException(status_code=400, detail="用餐日期已过，请重新选择")
+        validate_book_date(room_date, db)
+
+    if otype == "room" and not is_member(user, db):
+        if float(amount or 0) <= 0:
+            raise HTTPException(status_code=400, detail="包房预约需支付，请先在后台设置包房单价")
 
     extra = {}
     order_store_id = payload.store_id
-    if (payload.type or "") == "nye":
+    if otype == "nye":
         product = find_gather_product(db, payload.store_id or "", enabled_only=True)
         if product:
             open_start = (getattr(product, "open_start", None) or "").strip()
@@ -960,7 +1007,7 @@ def create_order(
                 raise HTTPException(status_code=400, detail=f"该活动开放日期至 {open_end} 止")
             order_store_id = product.id
             linked = (getattr(product, "detail_id", None) or "").strip() or product.id
-            if payload.room_date and payload.room_slot:
+            if room_date and room_slot:
                 extra["roomStoreId"] = linked
         else:
             nye = find_nye_store(db, payload.store_id or "", enabled_only=True)
@@ -973,22 +1020,37 @@ def create_order(
                     raise HTTPException(status_code=400, detail=f"该活动开放日期至 {open_end} 止")
                 order_store_id = nye.id
                 linked = (getattr(nye, "store_id", None) or "").strip() or nye.id
-                if payload.room_date and payload.room_slot:
+                if room_date and room_slot:
                     extra["roomStoreId"] = linked
+    elif otype == "room" and order_store_id:
+        if room_date and room_slot:
+            extra["roomStoreId"] = order_store_id
+
     slot_key = extra.get("roomStoreId") or order_store_id
-    if payload.room_date and payload.room_slot and slot_key:
+    if room_date and room_slot and slot_key:
         _release_stale_room_holds(db)
-        info = _slot_info(db, slot_key, payload.room_date, payload.room_slot)
+        info = _slot_info(db, slot_key, room_date, room_slot)
         if info["full"] or info["remain"] < 1:
             raise HTTPException(status_code=400, detail="该时段包房已满，请换日期或时段")
-        # 先只校验，支付发起时才占库存，避免未付款就把同一家店的包房订走
         extra["roomHeld"] = False
+
+    catalog_amount = float(amount or 0)
+    status = "pending"
+    status_text = STATUS_TEXT["pending"]
+    member_free = is_member(user, db) and otype in MEMBER_FREE_RESERVE_TYPES
+    if member_free:
+        extra["memberReserve"] = True
+        extra["catalogAmount"] = catalog_amount
+        extra["settleAmount"] = settle_amount_for(catalog_amount, db)
+        amount = 0
+        status = "reserved"
+        status_text = STATUS_TEXT["reserved"]
 
     order = Order(
         id=order_id,
         user_id=user.id,
         openid=openid,
-        type=payload.type,
+        type=otype or payload.type,
         store_id=order_store_id,
         store_name=payload.store_name,
         title=title,
@@ -997,8 +1059,8 @@ def create_order(
         quantity=qty,
         price=unit_price,
         amount=amount,
-        status="pending",
-        status_text=STATUS_TEXT["pending"],
+        status=status,
+        status_text=status_text,
         contact_name=payload.contact_name,
         contact_phone=payload.contact_phone,
         people=payload.people,
@@ -1008,6 +1070,12 @@ def create_order(
         extra=dumps(extra),
     )
     db.add(order)
+    db.flush()
+    if member_free:
+        ensure_order_verify_code(db, order)
+        if room_date and room_slot:
+            _hold_room_slot(db, order)
+        bump_sold_on_paid(db, order, user)
     db.commit()
     db.refresh(order)
     return _order_out(order)
@@ -1046,7 +1114,12 @@ async def pay_order(
 
     amount = float(order.amount or order.price or 0)
     if amount <= 0:
-        raise HTTPException(status_code=400, detail="需支付后才能预约" if order.type == "room" else "订单金额异常，无法支付")
+        raise HTTPException(
+            status_code=400,
+            detail="会员预约无需支付，请重新下单" if loads(order.extra or "{}", {}).get("memberReserve") else (
+                "需支付后才能预约" if order.type == "room" else "订单金额异常，无法支付"
+            ),
+        )
 
     just_held = False
     try:
@@ -1141,8 +1214,12 @@ def cancel_order(
         raise HTTPException(status_code=404, detail="订单不存在")
     if order.openid and order.openid != oid:
         raise HTTPException(status_code=403, detail="无权取消该订单")
-    # 用户侧仅允许取消待支付；已支付请走后台
-    if order.status != "pending":
+    # 用户侧允许取消待支付，或会员免付且未核销的预约
+    if order.status == "pending":
+        pass
+    elif order.status == "reserved":
+        pass
+    else:
         raise HTTPException(status_code=400, detail="订单状态不可取消")
     _release_room_slot(db, order)
     extra = loads(order.extra or "{}", {}) or {}
@@ -1154,6 +1231,51 @@ def cancel_order(
     order.status = "cancelled"
     order.status_text = STATUS_TEXT["cancelled"]
     db.commit()
+    return _order_out(order)
+
+
+@router.post("/orders/{order_id}/schedule")
+def schedule_order(
+    order_id: str,
+    payload: dict = Body(default={}),
+    x_openid: str = Header(default="", alias="X-Openid"),
+    x_wx_openid: str = Header(default="", alias="X-WX-OPENID"),
+    openid: str = Query(default=""),
+    db: Session = Depends(get_db),
+):
+    """为未选日期的订单补选用餐日（意向单 → 正式预约）。"""
+    oid = _require_openid(x_openid, x_wx_openid, openid)
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    if order.openid and order.openid != oid:
+        raise HTTPException(status_code=403, detail="无权操作该订单")
+    if order.status not in ("pending", "paid", "reserved"):
+        raise HTTPException(status_code=400, detail="当前订单不可改期")
+    if (order.room_date or "").strip():
+        raise HTTPException(status_code=400, detail="已选择用餐日期")
+    room_date = str(payload.get("room_date") or payload.get("roomDate") or "").strip()
+    room_slot = str(payload.get("room_slot") or payload.get("roomSlot") or "").strip()
+    if not room_date or room_slot not in ("lunch", "dinner"):
+        raise HTTPException(status_code=400, detail="请选择用餐日期和时段")
+    validate_book_date(room_date, db)
+    _release_stale_room_holds(db)
+    extra = loads(order.extra or "{}", {}) or {}
+    slot_key = extra.get("roomStoreId") or order.store_id
+    if not slot_key:
+        raise HTTPException(status_code=400, detail="订单缺少门店信息")
+    info = _slot_info(db, slot_key, room_date, room_slot)
+    if info["full"] or info["remain"] < 1:
+        raise HTTPException(status_code=400, detail="该时段包房已满，请换日期或时段")
+    order.room_date = room_date
+    order.room_slot = room_slot
+    if order.status in ("paid", "reserved"):
+        _hold_room_slot(db, order)
+    else:
+        extra["roomHeld"] = False
+        order.extra = dumps(extra)
+    db.commit()
+    db.refresh(order)
     return _order_out(order)
 
 
@@ -1289,27 +1411,9 @@ def user_profile(
 
 
 def _profile_out(user: AppUser, db: Optional[Session] = None) -> dict:
-    out = {
-        "id": user.id,
-        "nickname": user.nickname,
-        "avatar": user.avatar,
-        "phone": user.phone,
-        "birthday": getattr(user, "birthday", "") or "",
-        "hobby": getattr(user, "hobby", "") or "",
-        "phoneEdited": bool(getattr(user, "phone_edited", False)),
-        "points": user.points,
-        "vipLevel": user.vip_level,
-        "vip": f"{user.vip_level}会员",
-        "cancelled": bool(getattr(user, "cancelled", False)),
-        "profileRewarded": bool(getattr(user, "profile_rewarded", False)),
-        "tableCount": 0,
-    }
-    if db is not None:
-        sync_user_vip(db, user)
-        db.commit()
-        out["vipLevel"] = user.vip_level
-        out["vip"] = f"{user.vip_level}会员"
-        out["tableCount"] = _table_count(db, user.id)
+    out = _user_out(user, db)
+    out["cancelled"] = bool(getattr(user, "cancelled", False))
+    out["profileRewarded"] = bool(getattr(user, "profile_rewarded", False))
     return out
 
 

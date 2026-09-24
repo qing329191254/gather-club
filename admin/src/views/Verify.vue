@@ -26,7 +26,12 @@
         <div class="meta">
           <div>{{ item.title }} <span v-if="item.spec">· {{ item.spec }}</span></div>
           <div v-if="item.store_name">门店：{{ item.store_name }}</div>
-          <div v-if="item.kind === 'order'">金额：¥{{ item.amount }}　人数：{{ item.people || '-' }}　用餐：{{ item.room_date || '-' }} {{ item.room_slot || '' }}</div>
+          <div v-if="item.kind === 'order'">
+            金额：¥{{ item.amount }}
+            <span v-if="item.member_reserve">　到店应收：¥{{ item.settle_amount }}</span>
+            <span v-if="item.member_reserve">　（会员免付）</span>
+            　人数：{{ item.people || '-' }}　用餐：{{ item.room_date || '待选日期' }} {{ item.room_slot || '' }}
+          </div>
           <div v-else>面额：¥{{ item.amount }}　有效期：{{ item.expire || '-' }}</div>
           <div>顾客：{{ item.contact_name || '-' }}　{{ item.contact_phone || '-' }}</div>
         </div>

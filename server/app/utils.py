@@ -103,6 +103,7 @@ STATUS_TEXT = {
     "completed": "已完成",
     "refunded": "已退款",
     "refund_pending": "待退款",
+    "reserved": "待到店结算",  # 会员免付预约
 }
 
 

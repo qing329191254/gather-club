@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<page-meta :page-style="'overflow:' + (calendarVisible ? 'hidden' : 'visible')"></page-meta>
 	<app-loading />
 	<view class="page">
@@ -23,10 +23,11 @@
 					<text>用餐日期</text>
 				</view>
 				<view class="date">
-					<text>{{ date || '请选择日期' }}</text>
+					<text>{{ date || '选填，可以后再选' }}</text>
 					<view class="arrow" />
 				</view>
 			</view>
+			<text class="date-hint">未选日期不占档；选日期后按提前预约规则占档备菜</text>
 		</view>
 
 		<view class="sec">
@@ -336,14 +337,12 @@
 				if (this.slot === 'dinner' && dinner.full && !lunch.full) this.slot = 'lunch'
 			},
 			async onSubmit() {
-				if (!this.date) {
-					uni.showToast({ title: '请选择日期', icon: 'none' })
-					return
-				}
-				const avail = this.slotInfo(this.slot)
-				if (avail.full) {
-					uni.showToast({ title: '该时段包房已满', icon: 'none' })
-					return
+				if (this.date) {
+					const avail = this.slotInfo(this.slot)
+					if (avail.full) {
+						uni.showToast({ title: '该时段包房已满', icon: 'none' })
+						return
+					}
 				}
 				if (!String(this.name || '').trim()) {
 					uni.showToast({ title: '请填写姓名', icon: 'none' })
@@ -354,19 +353,28 @@
 					uni.showToast({ title: '请填写正确手机号', icon: 'none' })
 					return
 				}
-				if (!(this.roomPrice > 0)) {
+				return this.tapGuard('submit', async () => {
+				if (!isLoggedIn()) await silentLogin()
+				let member = false
+				try {
+					const profile = await api.profile()
+					member = !!(profile && profile.isMember)
+				} catch (e) {}
+				if (!member && !(this.roomPrice > 0)) {
 					uni.showToast({ title: '包房暂未开放线上预约', icon: 'none' })
 					return
 				}
-				return this.tapGuard('submit', async () => {
-				if (!isLoggedIn()) await silentLogin()
 
 				const slotMeta = SLOTS.find((s) => s.key === this.slot) || SLOTS[1]
 				const ok = await this.askModal({
-					title: '确认支付',
-					content: `需支付 ¥${this.roomPrice}，支付成功后才会锁定包房`,
-					confirmText: '立即支付',
-					confirmColor: '#e54148'
+					title: member ? '确认预约' : '确认支付',
+					content: member
+						? (this.date
+							? '会员免费预约，到店再结算。确认后将锁定包房。'
+							: '会员免费预约。未选日期暂不占档，请稍后补选日期。')
+						: `需支付 ¥${this.roomPrice}，支付成功后才会锁定包房`,
+					confirmText: member ? '确认预约' : '立即支付',
+					confirmColor: '#C6453C'
 				})
 				if (!ok) return
 				try {
@@ -375,7 +383,9 @@
 						store_id: this.storeId,
 						store_name: this.store.name,
 						title: `${this.store.name.replace('天天俱乐部', '')}-包房预约`,
-						spec: `${this.date} ${slotMeta.name}（${slotMeta.time}）·${this.people}人`,
+						spec: this.date
+							? `${this.date} ${slotMeta.name}（${slotMeta.time}）·${this.people}人`
+							: `待选日期 ·${this.people}人`,
 						cover: this.store.cover,
 						quantity: 1,
 						price: this.roomPrice,
@@ -384,16 +394,16 @@
 						contact_phone: phone,
 						people: this.people,
 						remark: this.remark,
-						room_date: this.date,
-						room_slot: this.slot
+						room_date: this.date || '',
+						room_slot: this.date ? this.slot : ''
 					})
-					if (created && created.id) {
+					if (created && created.id && created.status === 'pending') {
 						const payRes = await api.payOrder(created.id)
 						await settlePay(payRes)
 					}
 					this.tick++
 					this.loadRemoteMonth()
-					uni.showToast({ title: '预约成功', icon: 'success' })
+					uni.showToast({ title: member ? '预约成功' : '支付成功', icon: 'success' })
 					setTimeout(() => {
 						uni.navigateTo({ url: '/pages/orders/orders' })
 					}, 600)
@@ -413,14 +423,15 @@
 		min-height: 100vh;
 		box-sizing: border-box;
 		padding: 24rpx 24rpx calc(140rpx + env(safe-area-inset-bottom));
-		background: #f5f5f5;
+		background: #F1EEE8;
 	}
 
 	.sec {
 		background: #fff;
-		border-radius: 16rpx;
+		border-radius: 12rpx;
 		padding: 28rpx 24rpx;
 		margin-bottom: 20rpx;
+		border: 1rpx solid #E8E2DA;
 	}
 
 	.sec-title {
@@ -436,7 +447,7 @@
 		width: 8rpx;
 		height: 28rpx;
 		border-radius: 4rpx;
-		background: #e54148;
+		background: #C6453C;
 		margin-right: 12rpx;
 	}
 
@@ -492,6 +503,14 @@
 		color: #666;
 	}
 
+	.date-hint {
+		display: block;
+		margin-top: 12rpx;
+		font-size: 22rpx;
+		color: #999;
+		line-height: 1.4;
+	}
+
 	.arrow {
 		width: 14rpx;
 		height: 14rpx;
@@ -517,8 +536,8 @@
 	}
 
 	.slot.on {
-		border-color: #e54148;
-		background: #fff5f5;
+		border-color: #C6453C;
+		background: #F7F3EE;
 	}
 
 	.slot.full {
@@ -539,12 +558,12 @@
 	.slot-remain {
 		margin-top: 8rpx;
 		font-size: 24rpx;
-		color: #e54148;
+		color: #C6453C;
 		font-weight: 600;
 	}
 
 	.slot-remain.danger {
-		color: #e54148;
+		color: #C6453C;
 	}
 
 	.hint {
@@ -647,7 +666,7 @@
 	.bar-val {
 		font-size: 30rpx;
 		font-weight: 700;
-		color: #e54148;
+		color: #C6453C;
 	}
 
 	.bar-val.danger {
@@ -659,8 +678,8 @@
 		height: 80rpx;
 		line-height: 80rpx;
 		text-align: center;
-		border-radius: 40rpx;
-		background: #e54148;
+		border-radius: 10rpx;
+		background: #C6453C;
 		color: #fff;
 		font-size: 30rpx;
 		font-weight: 700;
@@ -682,7 +701,7 @@
 	.cal-sheet {
 		width: 100%;
 		background: #fff;
-		border-radius: 24rpx 24rpx 0 0;
+		border-radius: 12rpx 12rpx 0 0;
 		padding: 32rpx 28rpx calc(28rpx + env(safe-area-inset-bottom));
 	}
 
@@ -768,7 +787,7 @@
 	}
 
 	.cal-box.on {
-		background: #e54148;
+		background: #C6453C;
 	}
 
 	.cal-box.on .cal-day,
@@ -792,7 +811,7 @@
 
 	.cal-remain {
 		font-size: 20rpx;
-		color: #e54148;
+		color: #C6453C;
 	}
 
 	.cal-remain.danger {
@@ -804,8 +823,8 @@
 		height: 80rpx;
 		line-height: 80rpx;
 		text-align: center;
-		border-radius: 40rpx;
-		background: #e54148;
+		border-radius: 10rpx;
+		background: #C6453C;
 		color: #fff;
 		font-size: 30rpx;
 		font-weight: 700;

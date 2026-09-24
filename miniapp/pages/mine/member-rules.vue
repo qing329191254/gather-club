@@ -1,8 +1,8 @@
-<template>
+﻿<template>
 	<app-loading />
 	<view class="page">
 		<view class="card">
-			<text class="doc-title">天天俱乐部会员章程</text>
+			<text class="doc-title">天天聚乐部会员章程</text>
 
 			<view v-for="(sec, i) in sections" :key="i" class="section">
 				<view class="sec-head">
@@ -127,7 +127,7 @@
 	}
 
 	.para.tip {
-		color: #e23636;
+		color: #C6453C;
 		font-size: 24rpx;
 		margin-top: 4rpx;
 		margin-bottom: 12rpx;

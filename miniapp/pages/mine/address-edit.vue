@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<app-loading />
 	<view class="page">
 		<view class="card">
@@ -63,7 +63,7 @@
 
 		<view class="card switch-card">
 			<text class="label">设为默认地址</text>
-			<switch :checked="form.isDefault" color="#e23636" @change="onDefaultChange" />
+			<switch :checked="form.isDefault" color="#C6453C" @change="onDefaultChange" />
 		</view>
 
 		<view class="footer">
@@ -345,7 +345,7 @@
 		height: 52rpx;
 		padding: 0 20rpx;
 		border-radius: 8rpx;
-		background: #e23636;
+		background: #C6453C;
 		color: #ffffff;
 		font-size: 26rpx;
 		display: flex;
@@ -375,8 +375,8 @@
 
 	.save {
 		height: 88rpx;
-		border-radius: 999rpx;
-		background: #e23636;
+		border-radius: 10rpx;
+		background: #C6453C;
 		color: #ffffff;
 		font-size: 32rpx;
 		font-weight: 600;

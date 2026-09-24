@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<view
 		v-if="visible"
 		class="coupon-mask"
@@ -84,14 +84,15 @@
 
 	.coupon-dialog {
 		width: 100%;
-		border-radius: 28rpx;
+		border-radius: 12rpx;
 		padding: 100rpx 36rpx 40rpx;
 		box-sizing: border-box;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		background: #fff;
-		box-shadow: 0 16rpx 48rpx rgba(0, 0, 0, 0.12);
+		box-shadow: none;
+		border: 1rpx solid #E8E2DA;
 	}
 
 	.coupon-msg {
@@ -122,23 +123,23 @@
 		height: 84rpx;
 		line-height: 84rpx;
 		text-align: center;
-		border-radius: 42rpx;
+		border-radius: 10rpx;
 		font-size: 30rpx;
 		font-weight: 600;
 		box-sizing: border-box;
 	}
 
 	.coupon-btn.ghost {
-		border: 2rpx solid #e54148;
-		color: #e54148;
+		border: 2rpx solid #D8D0C6;
+		color: #6B635C;
 		background: #fff;
 		line-height: 80rpx;
 	}
 
 	.coupon-btn.solid {
-		background: #e54148;
+		background: #C6453C;
 		color: #fff;
-		box-shadow: 0 8rpx 20rpx rgba(229, 65, 72, 0.28);
+		box-shadow: none;
 	}
 
 	.coupon-close {

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<app-loading />
 	<view class="page">
 		<view class="tabs">
@@ -39,13 +39,18 @@
 					</view>
 					<view class="info-bottom">
 						<view class="spacer" />
-						<text class="price">¥{{ order.amount != null ? order.amount : order.price }}</text>
+						<text v-if="order.memberReserve && order.settleAmount" class="price settle">到店 ¥{{ order.settleAmount }}</text>
+						<text v-else class="price">¥{{ order.amount != null ? order.amount : order.price }}</text>
 					</view>
 				</view>
 			</view>
 
-			<view v-if="order.status === 'paid' && order.type !== 'mall' && order.verifyCode" class="order-actions" @tap.stop>
+			<view v-if="(order.status === 'paid' || order.status === 'reserved') && order.type !== 'mall' && order.verifyCode" class="order-actions" @tap.stop>
 				<view class="btn solid" @tap="onShowCode(order)">去核销</view>
+			</view>
+
+			<view v-if="order.status === 'reserved'" class="order-actions" @tap.stop>
+				<view class="btn ghost" :class="{ 'tap-busy': isTapBusy('cancel-' + order.id) }" @tap="onCancel(order)">取消预约</view>
 			</view>
 
 			<view v-if="order.status === 'pending'" class="order-actions" @tap.stop>
@@ -134,6 +139,8 @@
 					quantity: row.quantity || 1,
 					price: row.price,
 					amount: row.amount,
+					settleAmount: row.settleAmount,
+					memberReserve: !!row.memberReserve,
 					roomDate: row.roomDate,
 					roomSlot: row.roomSlot,
 					verifyCode: row.verifyCode || ''
@@ -260,7 +267,7 @@
 				uni.showModal({
 					title: '取消订单',
 					content: '确定取消该订单吗？取消后不可恢复',
-					confirmColor: '#e54148',
+					confirmColor: '#C6453C',
 					success: async (res) => {
 						if (!res.confirm) {
 							this.releaseTap(key)
@@ -287,7 +294,7 @@
 					title: '确认支付',
 					content: `需支付 ¥${amount}`,
 					confirmText: '立即支付',
-					confirmColor: '#e54148',
+					confirmColor: '#C6453C',
 					success: async (res) => {
 						if (!res.confirm) {
 							this.releaseTap(key)
@@ -316,7 +323,7 @@
 		min-height: 100vh;
 		box-sizing: border-box;
 		padding: 0 24rpx calc(40rpx + env(safe-area-inset-bottom));
-		background: #f5f5f5;
+		background: #F1EEE8;
 	}
 
 	.tabs {
@@ -342,7 +349,7 @@
 	}
 
 	.tab.on {
-		color: #e54148;
+		color: #C6453C;
 		font-weight: 600;
 	}
 
@@ -355,7 +362,7 @@
 		height: 6rpx;
 		margin-left: -20rpx;
 		border-radius: 6rpx;
-		background: #e54148;
+		background: #C6453C;
 	}
 
 	.empty {
@@ -366,8 +373,9 @@
 	}
 
 	.order-card {
-		background: #ffffff;
-		border-radius: 16rpx;
+		border-radius: 10rpx;
+		background: #fff;
+		border: 1rpx solid #E8E2DA;
 		padding: 28rpx 24rpx 28rpx;
 		margin-top: 24rpx;
 		margin-bottom: 0;
@@ -392,7 +400,7 @@
 		width: 6rpx;
 		height: 28rpx;
 		border-radius: 6rpx;
-		background: #e54148;
+		background: #C6453C;
 		margin-right: 12rpx;
 		flex-shrink: 0;
 	}
@@ -408,7 +416,7 @@
 
 	.order-status {
 		font-size: 26rpx;
-		color: #e54148;
+		color: #C6453C;
 		flex-shrink: 0;
 	}
 
@@ -422,7 +430,8 @@
 		color: #999999;
 	}
 
-	.order-status.st-paid {
+	.order-status.st-paid,
+	.order-status.st-reserved {
 		color: #d97706;
 	}
 
@@ -491,6 +500,11 @@
 		font-weight: 600;
 	}
 
+	.price.settle {
+		font-size: 28rpx;
+		color: #c45c26;
+	}
+
 	.order-actions {
 		margin-top: 24rpx;
 		padding-top: 20rpx;
@@ -505,7 +519,7 @@
 		height: 64rpx;
 		line-height: 64rpx;
 		text-align: center;
-		border-radius: 64rpx;
+		border-radius: 10rpx;
 		font-size: 26rpx;
 		padding: 0 28rpx;
 		box-sizing: border-box;
@@ -519,7 +533,7 @@
 
 	.btn.solid {
 		color: #fff;
-		background: #e54148;
+		background: #C6453C;
 	}
 
 	.end-line {

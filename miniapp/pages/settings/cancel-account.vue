@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<app-loading />
 	<view class="page">
 		<view class="card">
@@ -47,7 +47,7 @@
 				const ok = await this.askModal({
 					title: '确认注销',
 					content: '注销后账号数据与权益将清除且不可恢复，确定继续？',
-					confirmColor: '#e54148'
+					confirmColor: '#C6453C'
 				})
 				if (!ok) return
 				try {
@@ -70,7 +70,7 @@
 <style>
 	.page {
 		min-height: 100vh;
-		background: #f5f5f5;
+		background: #F1EEE8;
 		padding: 24rpx 24rpx 48rpx;
 		box-sizing: border-box;
 	}
@@ -126,8 +126,8 @@
 		height: 88rpx;
 		line-height: 88rpx;
 		text-align: center;
-		border-radius: 44rpx;
-		background: #e54148;
+		border-radius: 10rpx;
+		background: #C6453C;
 		color: #fff;
 		font-size: 30rpx;
 		font-weight: 600;

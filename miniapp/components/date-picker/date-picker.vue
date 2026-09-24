@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<view
 		v-if="visible"
 		class="date-mask"
@@ -168,7 +168,7 @@
 
 	.date-sheet {
 		background: #ffffff;
-		border-radius: 24rpx 24rpx 0 0;
+		border-radius: 12rpx 12rpx 0 0;
 		padding-bottom: env(safe-area-inset-bottom);
 	}
 
@@ -188,7 +188,7 @@
 
 	.date-ok {
 		font-size: 30rpx;
-		color: #e03d47;
+		color: #C6453C;
 		line-height: 96rpx;
 		font-weight: 600;
 	}

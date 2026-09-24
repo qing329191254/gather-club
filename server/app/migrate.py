@@ -20,6 +20,7 @@ def ensure_schema() -> None:
                 "cancelled": "ALTER TABLE app_users ADD COLUMN cancelled BOOLEAN DEFAULT 0",
                 "session_key": "ALTER TABLE app_users ADD COLUMN session_key VARCHAR(128) DEFAULT ''",
                 "vip_manual": "ALTER TABLE app_users ADD COLUMN vip_manual BOOLEAN DEFAULT 0",
+                "member_expire_at": "ALTER TABLE app_users ADD COLUMN member_expire_at VARCHAR(32) DEFAULT ''",
                 "profile_rewarded": "ALTER TABLE app_users ADD COLUMN profile_rewarded BOOLEAN DEFAULT 0",
             }
             for name, sql in patches.items():

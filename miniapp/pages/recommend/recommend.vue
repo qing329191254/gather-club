@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<app-loading />
 	<view class="page">
 		<view
@@ -120,7 +120,7 @@
 						title: '确认支付',
 						content: `需支付 ¥${item.price}`,
 						confirmText: '立即支付',
-						confirmColor: '#e54148'
+						confirmColor: '#C6453C'
 					})
 					if (!ok) return
 					try {
@@ -245,7 +245,7 @@
 		z-index: 2;
 		min-height: calc(100vh - 200rpx);
 		background: #f5f5f5;
-		border-radius: 28rpx 28rpx 0 0;
+		border-radius: 12rpx 12rpx 0 0;
 		padding: 24rpx 20rpx 8rpx;
 		box-sizing: border-box;
 	}
@@ -312,28 +312,28 @@
 	.yen {
 		font-size: 28rpx;
 		font-weight: 700;
-		color: #e03d47;
+		color: #C6453C;
 		line-height: 68rpx;
 	}
 
 	.num {
 		font-size: 40rpx;
 		font-weight: 700;
-		color: #e03d47;
+		color: #C6453C;
 		line-height: 68rpx;
 	}
 
 	.suffix {
 		font-size: 24rpx;
 		font-weight: 400;
-		color: #e03d47;
+		color: #C6453C;
 		line-height: 68rpx;
 		margin-left: 4rpx;
 	}
 
 	.buy {
 		padding: 0 28rpx;
-		background: #fc4f39;
+		background: #C6453C;
 		border-radius: 8rpx;
 		display: flex;
 		align-items: center;

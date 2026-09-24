@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<view
 		v-if="visible"
 		class="mask"
@@ -123,7 +123,7 @@
 		max-height: 86vh;
 		overflow-y: auto;
 		background: #ffffff;
-		border-radius: 24rpx;
+		border-radius: 12rpx;
 		padding: 36rpx 32rpx 40rpx;
 		box-sizing: border-box;
 		display: flex;
@@ -160,7 +160,7 @@
 		height: 6rpx;
 		margin-top: 12rpx;
 		border-radius: 6rpx;
-		background: #f3b6b6;
+		background: #C4B5A8;
 	}
 
 	.code-box {
@@ -168,8 +168,8 @@
 		margin-bottom: 8rpx;
 		min-width: 420rpx;
 		padding: 36rpx 28rpx;
-		border-radius: 16rpx;
-		background: #fff6f5;
+		border-radius: 12rpx;
+		background: #F7F3EE;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -179,7 +179,7 @@
 		font-size: 56rpx;
 		font-weight: 700;
 		letter-spacing: 6rpx;
-		color: #e23636;
+		color: #C6453C;
 	}
 
 	.expire {
@@ -193,7 +193,7 @@
 		width: 100%;
 		margin-top: 28rpx;
 		padding: 20rpx 20rpx 8rpx;
-		border: 1rpx solid #f3c4c4;
+		border: 1rpx solid #E8E2DA;
 		border-radius: 12rpx;
 		box-sizing: border-box;
 	}
@@ -225,7 +225,7 @@
 		margin-top: 8rpx;
 		margin-right: 10rpx;
 		border-radius: 50% 50% 50% 0;
-		background: #e23636;
+		background: #C6453C;
 		transform: rotate(-45deg);
 		flex-shrink: 0;
 	}

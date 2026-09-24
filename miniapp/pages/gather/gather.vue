@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<page-meta :page-style="'overflow:' + (stewardVisible || regionVisible ? 'hidden' : 'visible')"></page-meta>
 	<app-loading />
 	<view class="page">
@@ -10,22 +10,19 @@
 					<view class="city-arrow" />
 				</view>
 			</view>
-			<view class="tabs">
+			<scroll-view class="tabs" scroll-x :show-scrollbar="false">
 				<view
 					v-for="tab in tabs"
 					:key="tab.key"
 					class="tab"
 					:class="{ on: tab.key === currentTab }"
+					:style="{ width: tabWidth + 'px' }"
 					@tap="switchTab(tab.key)"
 				>
 					<text>{{ tab.name }}</text>
-					<image
-						class="tab-curve"
-						src="/static/icons/tab-curve.png"
-						mode="aspectFit"
-					/>
+					<view class="tab-line" />
 				</view>
-			</view>
+			</scroll-view>
 		</view>
 		<view class="head-space" :style="{ height: headHeight + 'px' }" />
 
@@ -76,6 +73,7 @@
 			return {
 				statusBarHeight: 20,
 				headHeight: 120,
+				windowWidth: 375,
 				city: '全部',
 				cityId: 'all',
 				regions: [{ id: 'all', name: '全部' }],
@@ -88,6 +86,14 @@
 			}
 		},
 		computed: {
+			tabWidth() {
+				const w = this.windowWidth || 375
+				const n = (this.tabs && this.tabs.length) || 0
+				if (n <= 1) return w / 2
+				if (n === 2) return w / 2
+				if (n === 3) return w / 3
+				return w / 4
+			},
 			list() {
 				return this.products.filter((item) => {
 					if (item.tab !== this.currentTab) return false
@@ -112,7 +118,8 @@
 		onLoad() {
 			const sys = uni.getSystemInfoSync()
 			this.statusBarHeight = sys.statusBarHeight || 20
-			const rpx = (sys.windowWidth || 375) / 750
+			this.windowWidth = sys.windowWidth || 375
+			const rpx = this.windowWidth / 750
 			this.headHeight = this.statusBarHeight + Math.round(176 * rpx)
 			this.loadGather()
 		},
@@ -207,8 +214,8 @@
 <style>
 	.page {
 		min-height: 100vh;
-		background: #F5F5F5;
-		padding-bottom: calc(168rpx + env(safe-area-inset-bottom));
+		background: #F1EEE8;
+		padding-bottom: calc(148rpx + env(safe-area-inset-bottom));
 	}
 
 	.fixed-head {
@@ -241,8 +248,8 @@
 
 	.city-name {
 		font-size: 32rpx;
-		font-weight: 400;
-		color: #E03D47;
+		font-weight: 600;
+		color: #2C2A27;
 		line-height: 44rpx;
 	}
 
@@ -257,38 +264,45 @@
 	}
 
 	.tabs {
-		display: flex;
-		padding: 4rpx 8rpx 0;
+		width: 100%;
+		white-space: nowrap;
+		padding-top: 4rpx;
 	}
 
 	.tab {
-		flex: 1;
-		display: flex;
+		display: inline-flex;
 		flex-direction: column;
 		align-items: center;
-		padding-bottom: 12rpx;
+		vertical-align: bottom;
+		padding: 0 8rpx 12rpx;
+		box-sizing: border-box;
 	}
 
 	.tab text {
+		max-width: 100%;
 		font-size: 30rpx;
 		color: #333;
 		line-height: 44rpx;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.tab.on text {
-		color: #E03D47;
+		color: #C6453C;
 		font-weight: 600;
 	}
 
-	.tab-curve {
-		width: 56rpx;
-		height: 12rpx;
-		margin-top: 6rpx;
-		opacity: 0;
+	.tab-line {
+		width: 36rpx;
+		height: 4rpx;
+		margin-top: 8rpx;
+		border-radius: 2rpx;
+		background: transparent;
 	}
 
-	.tab.on .tab-curve {
-		opacity: 1;
+	.tab.on .tab-line {
+		background: #C6453C;
 	}
 
 	.waterfall {
@@ -310,6 +324,7 @@
 		background: #fff;
 		border-radius: 12rpx;
 		overflow: hidden;
+		border: 1rpx solid #E8E2DA;
 	}
 
 	.cover-wrap {
@@ -333,12 +348,12 @@
 		position: absolute;
 		right: 10rpx;
 		top: 10rpx;
-		background: rgba(0, 0, 0, 0.45);
+		background: rgba(44, 42, 39, 0.72);
 		color: #fff;
 		font-size: 20rpx;
 		line-height: 36rpx;
 		padding: 0 12rpx;
-		border-radius: 18rpx;
+		border-radius: 6rpx;
 	}
 
 	.title {
@@ -380,7 +395,7 @@
 	.price {
 		font-size: 34rpx;
 		font-weight: 700;
-		color: #E23636;
+		color: #C6453C;
 	}
 
 	.origin {

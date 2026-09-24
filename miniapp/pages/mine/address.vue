@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<app-loading />
 	<view class="page">
 		<view v-if="loaded && !list.length" class="empty">
@@ -135,7 +135,7 @@
 <style>
 	.page {
 		min-height: 100vh;
-		background: #f5f5f5;
+		background: #F1EEE8;
 		padding-bottom: calc(140rpx + env(safe-area-inset-bottom));
 		box-sizing: border-box;
 	}
@@ -259,8 +259,8 @@
 
 	.tag {
 		font-size: 20rpx;
-		color: #e23636;
-		border: 1rpx solid #e23636;
+		color: #C6453C;
+		border: 1rpx solid #C6453C;
 		border-radius: 6rpx;
 		padding: 2rpx 8rpx;
 	}
@@ -302,7 +302,7 @@
 	}
 
 	.btn.solid {
-		background: #e23636;
+		background: #C6453C;
 		color: #ffffff;
 	}
 </style>

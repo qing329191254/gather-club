@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<app-loading />
 	<view class="page">
 		<view v-if="loaded && !loading && !list.length" class="empty">
@@ -141,7 +141,7 @@
 
 	.cost {
 		font-size: 28rpx;
-		color: #e64750;
+		color: #C6453C;
 		font-weight: 600;
 		flex-shrink: 0;
 	}

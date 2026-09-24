@@ -10,13 +10,19 @@
         <el-table-column prop="phone" label="手机" min-width="140" />
         <el-table-column prop="points" label="积分" width="100" />
         <el-table-column prop="table_count" label="近1年桌数" width="120" />
-        <el-table-column prop="vip_level" label="会员" width="100" />
+        <el-table-column prop="vip_level" label="旧等级" width="80" />
+        <el-table-column label="会员" width="140">
+          <template #default="{ row }">
+            <span v-if="row.is_member">至 {{ row.member_expire_at || '-' }}</span>
+            <span v-else>未开通</span>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="260" fixed="right">
           <template #default="{ row }">
             <div class="row-ops">
               <el-button link type="primary" @click="openDetail(row)">详情</el-button>
               <el-button link type="primary" :loading="busy('adjust-list-' + row.id)" @click="adjust(row, 'adjust-list-' + row.id)">调积分</el-button>
-              <el-button link type="warning" :loading="busy('vip-list-' + row.id)" @click="setVip(row, 'vip-list-' + row.id)">改等级</el-button>
+              <el-button link type="warning" :loading="busy('vip-list-' + row.id)" @click="setVip(row, 'vip-list-' + row.id)">设到期</el-button>
             </div>
           </template>
         </el-table-column>
@@ -52,8 +58,8 @@
             <el-descriptions-item label="兴趣爱好">{{ detail.hobby || '-' }}</el-descriptions-item>
             <el-descriptions-item label="积分">{{ detail.points ?? 0 }}</el-descriptions-item>
             <el-descriptions-item label="会员">
-              {{ detail.vip_level || '-' }}
-              <span v-if="detail.vip_manual">（已固定）</span>
+              {{ detail.is_member ? '会员' : '未开通' }}
+              <span v-if="detail.member_expire_at">（至 {{ detail.member_expire_at }}）</span>
             </el-descriptions-item>
             <el-descriptions-item label="近1年桌数">{{ detail.table_count ?? 0 }}</el-descriptions-item>
             <el-descriptions-item label="已注销">{{ detail.cancelled ? '是' : '否' }}</el-descriptions-item>
@@ -61,7 +67,7 @@
           </el-descriptions>
           <div class="detail-actions">
             <el-button type="primary" :loading="busy('adjust-profile-' + detail.id)" @click="adjust(detail, 'adjust-profile-' + detail.id)">调积分</el-button>
-            <el-button type="warning" :loading="busy('vip-profile-' + detail.id)" @click="setVip(detail, 'vip-profile-' + detail.id)">改等级</el-button>
+            <el-button type="warning" :loading="busy('vip-profile-' + detail.id)" @click="setVip(detail, 'vip-profile-' + detail.id)">设到期日</el-button>
           </div>
         </template>
 
@@ -296,11 +302,18 @@ async function adjust(row, visual) {
 async function setVip(row, visual) {
   if (!row?.id) return
   return run('vip-' + row.id, async () => {
-  const { value } = await ElMessageBox.prompt('请输入 V0、V1、V2 或 V3。保存后不再随消费桌数自动变化。', '修改会员等级', {
-    inputValue: row.vip_level || detail.vip_level || 'V0'
+  const { value } = await ElMessageBox.prompt(
+    '输入会员到期日 YYYY-MM-DD；留空并确认可取消会员。',
+    '设置会员到期',
+    {
+      inputValue: row.member_expire_at || detail.member_expire_at || '',
+      inputPlaceholder: '例如 2027-09-24'
+    }
+  )
+  await http.put(`/users/${row.id}/vip`, null, {
+    params: { member_expire_at: (value || '').trim() }
   })
-  await http.put(`/users/${row.id}/vip`, null, { params: { vip_level: value, lock: true } })
-  ElMessage.success('已保存该等级')
+  ElMessage.success('已保存')
   load()
   if (drawer.value && detail.id === row.id) {
     const res = await http.get(`/users/${row.id}`)

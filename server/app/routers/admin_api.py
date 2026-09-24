@@ -796,8 +796,10 @@ def update_order_status(
 
 
 def _verify_order_item(db: Session, row: Order, user: Optional[AppUser] = None) -> dict:
-    if row.status == "paid" and not (row.verify_code or "").strip():
+    if row.status in ("paid", "reserved") and not (row.verify_code or "").strip():
         ensure_order_verify_code(db, row)
+    extra = loads(row.extra or "{}", {}) or {}
+    settle = float(extra.get("settleAmount") or 0)
     phone = row.contact_phone or ""
     nickname = ""
     if row.user_id:
@@ -814,6 +816,8 @@ def _verify_order_item(db: Session, row: Order, user: Optional[AppUser] = None) 
         "spec": row.spec or "",
         "store_name": row.store_name or "",
         "amount": row.amount or 0,
+        "settle_amount": settle,
+        "member_reserve": bool(extra.get("memberReserve")),
         "status": row.status,
         "status_text": row.status_text or "",
         "contact_name": row.contact_name or nickname,
@@ -821,7 +825,7 @@ def _verify_order_item(db: Session, row: Order, user: Optional[AppUser] = None) 
         "room_date": row.room_date or "",
         "room_slot": row.room_slot or "",
         "people": row.people or 0,
-        "can_verify": row.status == "paid",
+        "can_verify": row.status in ("paid", "reserved"),
     }
 
 
@@ -908,7 +912,7 @@ def search_verify(
         like = f"%{keyword}%"
         users = db.query(AppUser).filter(AppUser.phone.like(like)).all()
         user_ids = [u.id for u in users]
-        oq = db.query(Order).filter(Order.status == "paid", Order.type != "mall")
+        oq = db.query(Order).filter(Order.status.in_(("paid", "reserved")), Order.type != "mall")
         cq = db.query(UserCoupon).filter(UserCoupon.status == "unused")
         if user_ids:
             oq = oq.filter((Order.contact_phone.like(like)) | (Order.user_id.in_(user_ids)))
@@ -977,13 +981,15 @@ def confirm_verify(
             raise HTTPException(400, "积分兑换请按收货地址发货，不能到店核销")
         if row.status == "completed":
             return {"ok": False, "message": "该订单已核销", "item": _verify_order_item(db, row)}
-        if row.status != "paid":
+        if row.status not in ("paid", "reserved"):
             raise HTTPException(400, f"当前状态不可核销：{row.status_text or row.status}")
         row.status = "completed"
         row.status_text = STATUS_TEXT.get("completed", "已完成")
         user = db.query(AppUser).filter(AppUser.id == row.user_id).first() if row.user_id else None
         if user:
             sync_user_vip(db, user)
+        extra = loads(row.extra or "{}", {}) or {}
+        log_amount = float(extra.get("settleAmount") or row.amount or 0)
         _add_verify_log(
             db,
             kind="order",
@@ -993,7 +999,7 @@ def confirm_verify(
             store_name=row.store_name or "",
             contact_name=row.contact_name or "",
             contact_phone=row.contact_phone or "",
-            amount=float(row.amount or 0),
+            amount=log_amount,
             admin=admin,
         )
         db.commit()
@@ -1160,6 +1166,11 @@ def list_users(
                 "phone": r.phone or "",
                 "points": r.points or 0,
                 "vip_level": r.vip_level or "",
+                "member_expire_at": getattr(r, "member_expire_at", "") or "",
+                "is_member": bool(
+                    (getattr(r, "member_expire_at", "") or "")
+                    and (getattr(r, "member_expire_at", "") or "") >= today_cn()
+                ),
                 "table_count": table_count(db, r.id),
                 "created_at": r.created_at.isoformat() if r.created_at else None,
             }
@@ -1190,6 +1201,11 @@ def _user_detail(db: Session, user: AppUser) -> dict:
         "points": user.points or 0,
         "vip_level": user.vip_level or "V0",
         "vip_manual": bool(getattr(user, "vip_manual", False)),
+        "member_expire_at": getattr(user, "member_expire_at", "") or "",
+        "is_member": bool(
+            (getattr(user, "member_expire_at", "") or "")
+            and (getattr(user, "member_expire_at", "") or "") >= today_cn()
+        ),
         "table_count": table_count(db, user.id),
         "phone_edited": bool(getattr(user, "phone_edited", False)),
         "cancelled": bool(getattr(user, "cancelled", False)),
@@ -1380,19 +1396,27 @@ def adjust_points(
 @router.put("/users/{user_id}/vip")
 def update_vip(
     user_id: int,
-    vip_level: str = Query(...),
-    lock: bool = Query(True, description="锁定手动等级，避免被桌数自动覆盖"),
+    vip_level: str = Query(default=""),
+    lock: bool = Query(True, description="锁定手动等级（兼容旧字段）"),
+    member_expire_at: Optional[str] = Query(default=None, description="会员到期日 YYYY-MM-DD，传空串取消"),
     db: Session = Depends(get_db),
     _: AdminUser = Depends(get_current_admin),
 ):
+    from ..commerce import is_member, member_expire_date
+
     user = _user_or_404(db, user_id)
-    user.vip_level = vip_level.upper()
-    user.vip_manual = bool(lock)
+    if member_expire_at is not None:
+        user.member_expire_at = (member_expire_at or "").strip()
+    if vip_level:
+        user.vip_level = vip_level.upper()
+        user.vip_manual = bool(lock)
     db.commit()
     return {
         "id": user.id,
         "vip_level": user.vip_level,
         "vip_manual": user.vip_manual,
+        "member_expire_at": member_expire_date(user),
+        "is_member": is_member(user, db),
         "table_count": table_count(db, user.id),
     }
 
@@ -1512,7 +1536,15 @@ def _cms_value_empty(key: str, value: Any) -> bool:
     if key in ("privacy_collect", "privacy_share"):
         return not (value.get("sections") or [])
     if key == "member":
-        return not (value.get("levels") or [])
+        # 新年卡：无 price / benefits / 仍是旧等级章程 → 视为空，回填默认测试文案
+        if value.get("price") is None and not (value.get("benefits") or []):
+            return True
+        rules = value.get("rules") or []
+        if isinstance(rules, list) and rules:
+            t0 = str((rules[0] or {}).get("title") or "")
+            if "等级体系" in t0:
+                return True
+        return not (value.get("benefits") or []) and value.get("price") is None
     if key == "agreements":
         return not value
     if key == "hobby_options":
@@ -1526,6 +1558,10 @@ def _cms_value_empty(key: str, value: Any) -> bool:
 
 
 def _resolve_cms_value(db: Session, key: str) -> Any:
+    if key == "member":
+        from ..commerce import get_member_config
+
+        return get_member_config(db)
     value = get_config(db, key, {})
     default = CMS_DEFAULTS.get(key)
     if default is not None and _cms_value_empty(key, value):

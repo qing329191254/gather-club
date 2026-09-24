@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<app-loading />
 	<view class="page">
 		<view class="balance-card">
@@ -90,15 +90,15 @@
 <style>
 	.page {
 		min-height: 100vh;
-		background: #f5f5f5;
+		background: #F1EEE8;
 		padding: 24rpx 24rpx 48rpx;
 		box-sizing: border-box;
 	}
 
 	.balance-card {
-		border-radius: 20rpx;
+		border-radius: 12rpx;
 		padding: 36rpx 32rpx;
-		background: linear-gradient(105deg, #ff4d4f 0%, #ff6a3d 48%, #ff8a3a 100%);
+		background: linear-gradient(135deg, #A83632 0%, #C6453C 55%, #D25A48 100%);
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
@@ -179,7 +179,7 @@
 	.item-value {
 		font-size: 34rpx;
 		font-weight: 700;
-		color: #e23636;
+		color: #C6453C;
 		flex-shrink: 0;
 		margin-left: 16rpx;
 	}

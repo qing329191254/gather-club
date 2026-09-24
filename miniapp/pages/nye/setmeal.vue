@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<page-meta :page-style="'overflow:' + (stewardVisible || calendarVisible || couponVisible ? 'hidden' : 'visible')"></page-meta>
 	<app-loading />
 	<view v-if="detail" class="page">
@@ -417,11 +417,19 @@
 				}
 
 				const amount = this.total
+				let member = false
+				try {
+					if (!isLoggedIn()) await silentLogin()
+					const profile = await api.profile()
+					member = !!(profile && profile.isMember)
+				} catch (e) {}
 				const ok = await this.askModal({
-					title: '确认支付',
-					content: `需支付 ¥${amount}`,
-					confirmText: '立即支付',
-					confirmColor: '#e54148'
+					title: member ? '确认预约' : '确认支付',
+					content: member
+						? `会员免费预约，到店应收约 ¥${(amount * 0.9).toFixed(2)}（以门店对账为准）`
+						: `需支付 ¥${amount}`,
+					confirmText: member ? '确认预约' : '立即支付',
+					confirmColor: '#C6453C'
 				})
 				if (!ok) return
 				try {
@@ -444,11 +452,11 @@
 						room_date: this.date || '',
 						room_slot: this.date ? this.roomSlot : ''
 					})
-					if (created && created.id) {
+					if (created && created.id && created.status === 'pending') {
 						const payRes = await api.payOrder(created.id)
 						await settlePay(payRes)
 					}
-					uni.showToast({ title: '支付成功', icon: 'success' })
+					uni.showToast({ title: member ? '预约成功' : '支付成功', icon: 'success' })
 					setTimeout(() => {
 						uni.navigateTo({ url: '/pages/orders/orders' })
 					}, 600)
@@ -580,8 +588,8 @@
 	}
 
 	.spec.on {
-		background: #e54148;
-		border-color: #e54148;
+		background: #C6453C;
+		border-color: #C6453C;
 	}
 
 	.spec.off {
@@ -769,7 +777,7 @@
 	}
 
 	.points-num {
-		color: #e54148;
+		color: #C6453C;
 	}
 
 	.bar {
@@ -813,7 +821,7 @@
 		text-align: right;
 		font-size: 44rpx;
 		font-weight: 700;
-		color: #e54148;
+		color: #C6453C;
 		line-height: 1;
 	}
 
@@ -822,8 +830,8 @@
 		height: 84rpx;
 		line-height: 84rpx;
 		text-align: center;
-		border-radius: 42rpx;
-		background: #e54148;
+		border-radius: 10rpx;
+		background: #C6453C;
 		color: #fff;
 		font-size: 32rpx;
 		font-weight: 600;
@@ -845,7 +853,7 @@
 	.cal-sheet {
 		width: 100%;
 		background: #fff;
-		border-radius: 24rpx 24rpx 0 0;
+		border-radius: 12rpx 12rpx 0 0;
 		padding: 8rpx 28rpx calc(28rpx + env(safe-area-inset-bottom));
 		box-sizing: border-box;
 	}
@@ -935,7 +943,7 @@
 	}
 
 	.cal-box.on {
-		background: #e54148;
+		background: #C6453C;
 	}
 
 	.cal-day {
@@ -947,7 +955,7 @@
 	.cal-price {
 		margin-top: 4rpx;
 		font-size: 22rpx;
-		color: #e54148;
+		color: #C6453C;
 		line-height: 1.1;
 	}
 
@@ -969,8 +977,8 @@
 		height: 88rpx;
 		line-height: 88rpx;
 		text-align: center;
-		border-radius: 44rpx;
-		background: #e54148;
+		border-radius: 10rpx;
+		background: #C6453C;
 		color: #fff;
 		font-size: 32rpx;
 		font-weight: 600;

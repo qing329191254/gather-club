@@ -152,6 +152,9 @@ export const api = {
 	privacyShare() {
 		return request('/api/v1/privacy/share')
 	},
+	scheduleOrder(id, payload) {
+		return request('/api/v1/orders/' + id + '/schedule', { method: 'POST', data: payload || {} })
+	},
 	memberConfig() {
 		return request('/api/v1/member/config')
 	}

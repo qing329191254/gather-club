@@ -34,7 +34,7 @@
 		min-height: 100vh;
 		box-sizing: border-box;
 		padding: 80rpx 48rpx;
-		background: linear-gradient(180deg, #ff565c 0%, #ffb08a 45%, #fff5ee 100%);
+		background: #F1EEE8;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
@@ -66,8 +66,8 @@
 		width: 100%;
 		height: 88rpx;
 		line-height: 88rpx;
-		border-radius: 16rpx;
-		background: linear-gradient(90deg, #ff9a4a, #ff7a3a);
+		border-radius: 10rpx;
+		background: #C6453C;
 		color: #fff;
 		font-size: 32rpx;
 		font-weight: 600;

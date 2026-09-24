@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<view v-if="visible" class="mask" @tap="onClose" @touchmove.stop.prevent="noop">
 		<view class="panel" @tap.stop @touchmove.stop.prevent="noop">
 			<view v-if="mode === 'prompt'" class="art art-doc">
@@ -84,7 +84,7 @@
 	.panel {
 		width: 100%;
 		background: #fff;
-		border-radius: 28rpx;
+		border-radius: 12rpx;
 		padding: 48rpx 40rpx 36rpx;
 		display: flex;
 		flex-direction: column;
@@ -105,17 +105,17 @@
 		top: 24rpx;
 		width: 120rpx;
 		height: 140rpx;
-		background: #eef5ff;
-		border: 4rpx solid #7eb0f0;
-		border-radius: 12rpx;
+		background: #F7F3EE;
+		border: 4rpx solid #C4B5A8;
+		border-radius: 8rpx;
 		padding: 28rpx 16rpx;
 		box-sizing: border-box;
 	}
 
 	.line {
 		height: 8rpx;
-		background: #b9d4f5;
-		border-radius: 8rpx;
+		background: #D8D0C6;
+		border-radius: 4rpx;
 		margin-bottom: 14rpx;
 	}
 
@@ -204,7 +204,7 @@
 	.num {
 		font-size: 56rpx;
 		font-weight: 700;
-		color: #e64750;
+		color: #C6453C;
 		line-height: 1;
 		margin: 0 8rpx;
 	}
@@ -215,8 +215,8 @@
 		height: 88rpx;
 		line-height: 88rpx;
 		text-align: center;
-		border-radius: 44rpx;
-		background: #f25555;
+		border-radius: 10rpx;
+		background: #C6453C;
 		color: #fff;
 		font-size: 32rpx;
 		font-weight: 600;

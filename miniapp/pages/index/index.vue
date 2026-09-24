@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<page-meta :page-style="'overflow:' + (stewardVisible || privacyVisible || phoneLoginVisible || profilePromptVisible ? 'hidden' : 'visible')"></page-meta>
 	<app-loading />
 	<view class="page">
@@ -31,35 +31,35 @@
 			</view>
 		</view>
 
-		<view class="actions">
-			<view class="action-main">
-				<view
-					v-for="(item, index) in primaryActions"
-					:key="item.key"
-					class="action-big"
-					@tap="onAction(item)"
-				>
-					<image class="action-icon" :src="item.icon" mode="aspectFit" />
-					<text class="action-name">{{ item.name }}</text>
-					<text class="action-desc">{{ item.desc }}</text>
-					<view v-if="index === 0" class="action-line" />
+		<view class="entry">
+			<view
+				v-if="entryFeature"
+				class="entry-feature"
+				@tap="onAction(entryFeature)"
+			>
+				<image class="entry-feature-icon" :src="entryFeature.icon" mode="aspectFit" />
+				<view class="entry-feature-copy">
+					<text class="entry-feature-name">{{ entryFeature.name }}</text>
+					<text class="entry-feature-desc">{{ entryFeature.desc }}</text>
 				</view>
+				<view class="entry-feature-go">去咨询</view>
 			</view>
-			<view class="action-sub">
+			<view class="entry-grid">
 				<view
-					v-for="item in secondaryActions"
+					v-for="item in entryTiles"
 					:key="item.key"
-					class="action-small"
+					class="entry-tile"
 					@tap="onAction(item)"
 				>
-					<image class="sub-icon" :src="item.icon" mode="aspectFit" />
-					<text>{{ item.name }}</text>
+					<image class="entry-tile-icon" :src="item.icon" mode="aspectFit" />
+					<text class="entry-tile-name">{{ item.name }}</text>
+					<text v-if="item.desc" class="entry-tile-desc">{{ item.desc }}</text>
 				</view>
 			</view>
 		</view>
 
 		<view class="section">
-			<text class="section-title">门店预定</text>
+			<text class="section-title">门店预约</text>
 			<view v-for="store in stores" :key="store.id" class="store">
 				<view class="store-head" @tap="callStore(store)">
 					<view class="store-name-wrap">
@@ -154,6 +154,15 @@
 				primaryActions: [],
 				secondaryActions: [],
 				stores: []
+			}
+		},
+		computed: {
+			entryFeature() {
+				return (this.primaryActions && this.primaryActions[0]) || null
+			},
+			entryTiles() {
+				const rest = (this.primaryActions || []).slice(1)
+				return rest.concat(this.secondaryActions || [])
 			}
 		},
 		onLoad() {
@@ -293,12 +302,12 @@
 			},
 			loadHome() {
 				this.primaryActions = [
-					{ key: 'steward', name: '联系管家', desc: '活动详情', icon: '/static/icons/chat.png' },
-					{ key: 'mall', name: '积分商城', desc: '快乐一整天', icon: '/static/icons/shop.png' }
+					{ key: 'steward', name: '联系管家', desc: '企微一对一，帮你订场次', icon: '/static/icons/action-steward.png' },
+					{ key: 'mall', name: '积分商城', desc: '积分兑好礼', icon: '/static/icons/action-mall.png' }
 				]
 				this.secondaryActions = [
-					{ key: 'order', name: '我的订单', icon: '/static/icons/order.png' },
-					{ key: 'checkin', name: '每日签到', icon: '/static/icons/checkin.png' }
+					{ key: 'order', name: '我的订单', desc: '查看进度', icon: '/static/icons/action-order.png' },
+					{ key: 'checkin', name: '每日签到', desc: '领积分', icon: '/static/icons/action-checkin.png' }
 				]
 				api
 					.home()
@@ -385,8 +394,8 @@
 <style>
 	.page {
 		min-height: 100vh;
-		background: #F4F0E7;
-		padding-bottom: calc(168rpx + env(safe-area-inset-bottom));
+		background: #F1EEE8;
+		padding-bottom: calc(148rpx + env(safe-area-inset-bottom));
 	}
 
 	.navbar {
@@ -399,7 +408,7 @@
 	}
 
 	.navbar.solid {
-		background: #F4F0E7;
+		background: #F1EEE8;
 	}
 
 	.navbar-inner {
@@ -414,8 +423,8 @@
 	.hero {
 		width: 100%;
 		overflow: hidden;
-		border-radius: 0 0 24rpx 24rpx;
-		background: #E9D7C4;
+		border-radius: 0;
+		background: #DDD4C8;
 	}
 
 	.hero-img {
@@ -443,86 +452,114 @@
 		transition: transform 0.3s;
 	}
 
-	.actions {
-		margin: 20rpx 32rpx 0;
-		background: #fff;
-		border-radius: 24rpx;
-		overflow: hidden;
+	.entry {
+		margin: 24rpx 24rpx 0;
 	}
 
-	.action-main {
+	.entry-feature {
 		display: flex;
-		padding: 48rpx 0 40rpx;
+		align-items: center;
+		padding: 28rpx 24rpx;
+		background: #fff;
+		border-radius: 12rpx;
+		border: 1rpx solid #E8E2DA;
+		border-left: 8rpx solid #C6453C;
+		box-sizing: border-box;
 	}
 
-	.action-big {
+	.entry-feature-icon {
+		width: 88rpx;
+		height: 88rpx;
+		flex-shrink: 0;
+		background: #F7F3EE;
+		border-radius: 16rpx;
+		padding: 12rpx;
+		box-sizing: border-box;
+	}
+
+	.entry-feature-copy {
 		flex: 1;
+		min-width: 0;
+		margin: 0 20rpx;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.entry-feature-name {
+		font-size: 32rpx;
+		font-weight: 700;
+		color: #2C2A27;
+		line-height: 1.3;
+	}
+
+	.entry-feature-desc {
+		margin-top: 8rpx;
+		font-size: 24rpx;
+		color: #8A847C;
+		line-height: 1.35;
+	}
+
+	.entry-feature-go {
+		flex-shrink: 0;
+		padding: 0 22rpx;
+		height: 56rpx;
+		line-height: 56rpx;
+		font-size: 24rpx;
+		color: #fff;
+		background: #C6453C;
+		border-radius: 8rpx;
+		font-weight: 600;
+	}
+
+	.entry-grid {
+		margin-top: 16rpx;
+		display: flex;
+		gap: 12rpx;
+	}
+
+	.entry-tile {
+		flex: 1;
+		min-width: 0;
+		background: #fff;
+		border: 1rpx solid #E8E2DA;
+		border-radius: 12rpx;
+		padding: 24rpx 12rpx 22rpx;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		position: relative;
+		box-sizing: border-box;
 	}
 
-	.action-icon {
-		width: 132rpx;
-		height: 132rpx;
+	.entry-tile-icon {
+		width: 64rpx;
+		height: 64rpx;
 	}
 
-	.action-name {
-		margin-top: 20rpx;
-		font-size: 32rpx;
-		font-weight: 600;
-		color: #1a1a1a;
-		line-height: 1.2;
-	}
-
-	.action-desc {
-		margin-top: 8rpx;
+	.entry-tile-name {
+		margin-top: 14rpx;
 		font-size: 26rpx;
-		color: #999;
+		font-weight: 600;
+		color: #2C2A27;
 		line-height: 1.2;
+		text-align: center;
 	}
 
-	.action-line {
-		position: absolute;
-		right: 0;
-		top: 12rpx;
-		bottom: 4rpx;
-		width: 1rpx;
-		background: #E8E4DF;
-	}
-
-	.action-sub {
-		display: flex;
-		border-top: 1rpx solid #F0ECE8;
-		padding: 32rpx 0;
-	}
-
-	.action-small {
-		flex: 1;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 30rpx;
-		font-weight: 400;
-		color: #222;
+	.entry-tile-desc {
+		margin-top: 6rpx;
+		font-size: 20rpx;
+		color: #9A9288;
 		line-height: 1.2;
-	}
-
-	.sub-icon {
-		width: 44rpx;
-		height: 44rpx;
-		margin-right: 14rpx;
+		text-align: center;
 	}
 
 	.section {
-		padding: 40rpx 32rpx 0;
+		padding: 40rpx 24rpx 0;
 	}
 
 	.section-title {
-		font-size: 40rpx;
+		font-size: 34rpx;
 		font-weight: 700;
-		color: #1a1a1a;
+		color: #2C2A27;
 		line-height: 1.2;
 	}
 
@@ -544,17 +581,17 @@
 	}
 
 	.store-bar {
-		width: 4rpx;
-		height: 32rpx;
-		border-radius: 2rpx;
-		background: #A87858;
+		width: 6rpx;
+		height: 28rpx;
+		border-radius: 0;
+		background: #C6453C;
 		margin-right: 16rpx;
 		flex-shrink: 0;
 	}
 
 	.store-name {
-		font-size: 40rpx;
-		color: #A87858;
+		font-size: 36rpx;
+		color: #2C2A27;
 		font-weight: 600;
 		line-height: 1.2;
 	}
@@ -574,9 +611,10 @@
 
 	.store-card {
 		background: #fff;
-		border-radius: 20rpx;
+		border-radius: 12rpx;
 		overflow: hidden;
 		padding-bottom: 24rpx;
+		border: 1rpx solid #E8E2DA;
 	}
 
 	.store-cover-wrap {
@@ -594,12 +632,12 @@
 		position: absolute;
 		right: 20rpx;
 		top: 20rpx;
-		background: #E03D47;
+		background: #C6453C;
 		color: #fff;
-		font-size: 36rpx;
-		line-height: 76rpx;
-		padding: 0 46rpx;
-		border-radius: 38rpx;
+		font-size: 28rpx;
+		line-height: 64rpx;
+		padding: 0 32rpx;
+		border-radius: 8rpx;
 	}
 
 	.store-nav {
@@ -629,8 +667,8 @@
 
 	.store-route {
 		margin: 16rpx 8rpx 0;
-		background: #FFF1E2;
-		border-radius: 16rpx;
+		background: #F3EEE8;
+		border-radius: 8rpx;
 		padding: 16rpx 14rpx;
 	}
 

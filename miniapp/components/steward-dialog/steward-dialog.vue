@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<view
 		v-if="visible"
 		class="qr-mask"
@@ -156,7 +156,7 @@
 		width: 100%;
 		text-align: center;
 		font-size: 32rpx;
-		color: #e64750;
+		color: #C6453C;
 		line-height: 96rpx;
 	}
 

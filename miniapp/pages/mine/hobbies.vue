@@ -87,7 +87,7 @@
 					this.options = items.length
 						? items.map((i) => ({
 								name: i.name,
-								color: i.color || '#e85a4a'
+								color: i.color || '#C6453C'
 						  }))
 						: FALLBACK_OPTIONS.slice()
 				} catch (e) {
@@ -213,14 +213,14 @@
 
 	.done {
 		height: 88rpx;
-		border-radius: 999rpx;
-		background: #e85a4a;
+		border-radius: 10rpx;
+		background: #C6453C;
 		color: #ffffff;
 		font-size: 32rpx;
 		font-weight: 600;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		box-shadow: 0 10rpx 24rpx rgba(232, 90, 74, 0.28);
+		box-shadow: none;
 	}
 </style>

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<view
 		v-if="visible"
 		class="mask"
@@ -68,7 +68,7 @@
 	.dialog {
 		width: 100%;
 		background: #ffffff;
-		border-radius: 20rpx;
+		border-radius: 12rpx;
 		padding: 44rpx 36rpx 36rpx;
 		display: flex;
 		flex-direction: column;
@@ -108,12 +108,12 @@
 	}
 
 	.ghost {
-		background: #f3f3f3;
-		color: #666;
+		background: #F1EEE8;
+		color: #6B635C;
 	}
 
 	.phone-btn {
-		background: #e23636;
+		background: #C6453C;
 		color: #fff;
 		padding: 0;
 		margin: 0;

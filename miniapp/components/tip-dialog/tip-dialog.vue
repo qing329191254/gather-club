@@ -116,11 +116,12 @@
 
 	.tip-card {
 		width: 100%;
-		background: linear-gradient(180deg, #fff6f7 0%, #ffffff 38%);
-		border-radius: 36rpx;
+		background: #ffffff;
+		border-radius: 12rpx;
 		padding: 108rpx 44rpx 52rpx;
 		position: relative;
-		box-shadow: 0 24rpx 56rpx rgba(226, 54, 54, 0.16);
+		box-shadow: none;
+		border: 1rpx solid #E8E2DA;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
@@ -135,12 +136,13 @@
 		transform: translateX(-50%);
 		width: 136rpx;
 		height: 136rpx;
-		border-radius: 50%;
+		border-radius: 12rpx;
 		background: #ffffff;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		box-shadow: 0 12rpx 28rpx rgba(226, 54, 54, 0.14);
+		box-shadow: 0 8rpx 20rpx rgba(44, 42, 39, 0.08);
+		border: 1rpx solid #E8E2DA;
 	}
 
 	.bell {
@@ -176,7 +178,7 @@
 	.btn {
 		flex: 1;
 		height: 88rpx;
-		border-radius: 999rpx;
+		border-radius: 10rpx;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -187,12 +189,12 @@
 
 	.btn.ghost {
 		background: #ffffff;
-		border: 2rpx solid #e85a4a;
-		color: #e85a4a;
+		border: 2rpx solid #D8D0C6;
+		color: #6B635C;
 	}
 
 	.btn.solid {
-		background: #e85a4a;
+		background: #C6453C;
 		color: #ffffff;
 		border: none;
 		padding: 0;

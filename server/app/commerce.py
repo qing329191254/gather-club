@@ -16,7 +16,159 @@ from .utils import STATUS_TEXT, dumps, get_config, loads, today_cn
 ROOM_HOLD_MINUTES = 30
 
 TABLE_ORDER_TYPES = ("room", "nye", "recommend", "gather")
-TABLE_COUNTED_STATUSES = ("paid", "completed")
+TABLE_COUNTED_STATUSES = ("paid", "completed", "reserved")
+MEMBER_FREE_RESERVE_TYPES = ("room", "nye")
+
+
+def get_member_config(db: Optional[Session] = None) -> dict:
+    """年卡会员配置（无等级）。合并后台 site_configs.member。"""
+    from .cms_data import MEMBER_CONFIG
+    from .utils import set_config
+
+    raw = (get_config(db, "member") or {}) if db is not None else {}
+    if not isinstance(raw, dict):
+        raw = {}
+    base = dict(MEMBER_CONFIG)
+
+    def _num(key, cast, default):
+        v = raw.get(key)
+        if v is None:
+            v = base.get(key)
+        try:
+            return cast(v if v is not None else default)
+        except (TypeError, ValueError):
+            return default
+
+    def _rules_outdated(rules) -> bool:
+        if not isinstance(rules, list) or not rules:
+            return True
+        title0 = str((rules[0] or {}).get("title") or "")
+        blob = title0 + str((rules[0] or {}).get("blocks") or [])
+        return ("等级体系" in blob) or ("V0" in blob and "V3" in blob)
+
+    benefits = raw.get("benefits")
+    if not isinstance(benefits, list) or not benefits:
+        benefits = base.get("benefits") or []
+    reminders = raw.get("reminders")
+    if not isinstance(reminders, list) or not reminders:
+        reminders = base.get("reminders") or []
+    rules = raw.get("rules") if isinstance(raw.get("rules"), list) else None
+    if _rules_outdated(rules):
+        rules = base.get("rules") or []
+
+    # 缺少年卡字段或仍是旧等级章程时，写入默认测试文案，方便后台/小程序直接看见
+    if db is not None and (
+        raw.get("price") is None or _rules_outdated(raw.get("rules")) or not (raw.get("benefits") or [])
+    ):
+        merged = dict(base)
+        if raw.get("monthCoupon"):
+            merged["monthCoupon"] = raw["monthCoupon"]
+        if raw.get("levels"):
+            merged["levels"] = raw["levels"]
+        set_config(db, "member", merged)
+        raw = merged
+        benefits = raw.get("benefits") or benefits
+        reminders = raw.get("reminders") or reminders
+        rules = raw.get("rules") if isinstance(raw.get("rules"), list) else rules
+
+    price = _num("price", float, 199)
+    duration = max(1, _num("durationDays", int, 365))
+    rate = _num("discountRate", float, 0.9)
+    if rate <= 0 or rate > 1:
+        rate = 0.9
+    lead = max(0, _num("bookingLeadDays", int, 1))
+    intent = max(1, _num("intentExpireDays", int, 7))
+
+    price_label = str(raw.get("priceLabel") or base.get("priceLabel") or "").strip()
+    if not price_label:
+        price_label = f"会员{int(price) if price == int(price) else price}元/年"
+
+    subtitle = str(raw.get("subtitle") or base.get("subtitle") or "").strip()
+    if not subtitle:
+        subtitle = "加入天天聚乐部，享受4大专属权益"
+
+    return {
+        "price": price,
+        "durationDays": duration,
+        "discountRate": rate,
+        "bookingLeadDays": lead,
+        "intentExpireDays": intent,
+        "title": str(raw.get("title") or base.get("title") or "会员权益").strip() or "会员权益",
+        "priceLabel": price_label,
+        "subtitle": subtitle,
+        "heroImage": str(raw.get("heroImage") or base.get("heroImage") or "").strip(),
+        "benefits": [
+            {
+                "title": str(b.get("title") or "").strip(),
+                "desc": str(b.get("desc") or "").strip(),
+            }
+            for b in benefits
+            if isinstance(b, dict) and str(b.get("title") or "").strip()
+        ],
+        "reminders": [str(x).strip() for x in reminders if str(x).strip()],
+        "monthCoupon": raw.get("monthCoupon") or base.get("monthCoupon") or {},
+        "rules": rules if isinstance(rules, list) else (base.get("rules") or []),
+        "levels": raw.get("levels") if isinstance(raw.get("levels"), list) else (base.get("levels") or []),
+    }
+
+
+def earliest_book_date(db: Optional[Session] = None) -> str:
+    """最早可预约日期 YYYY-MM-DD（含）。"""
+    from datetime import date as date_cls
+
+    lead = int(get_member_config(db).get("bookingLeadDays") or 0)
+    y, m, d = [int(x) for x in today_cn().split("-")]
+    return (date_cls(y, m, d) + timedelta(days=lead)).isoformat()
+
+
+def validate_book_date(room_date: str, db: Optional[Session] = None) -> None:
+    day = (room_date or "").strip()
+    if not day:
+        return
+    today = today_cn()
+    if day < today:
+        raise HTTPException(status_code=400, detail="用餐日期已过，请重新选择")
+    earliest = earliest_book_date(db)
+    if day < earliest:
+        lead = int(get_member_config(db).get("bookingLeadDays") or 0)
+        raise HTTPException(status_code=400, detail=f"需提前{lead}天预约，最早可选 {earliest}")
+
+
+def member_expire_date(user: Optional[AppUser]) -> str:
+    if not user:
+        return ""
+    return str(getattr(user, "member_expire_at", "") or "").strip()
+
+
+def is_member(user: Optional[AppUser], db: Optional[Session] = None) -> bool:
+    exp = member_expire_date(user)
+    if not exp:
+        return False
+    return exp >= today_cn()
+
+
+def activate_membership(db: Session, user: AppUser, days: Optional[int] = None) -> str:
+    """支付开通/续费：从 max(今天, 当前到期) 起延长。返回新到期日。"""
+    from datetime import date as date_cls
+
+    cfg = get_member_config(db)
+    n = max(1, int(days if days is not None else cfg["durationDays"]))
+    today = today_cn()
+    start = today
+    cur = member_expire_date(user)
+    if cur and cur >= today:
+        start = cur
+    y, m, d = [int(x) for x in start.split("-")]
+    end = date_cls(y, m, d) + timedelta(days=n)
+    user.member_expire_at = end.isoformat()
+    return user.member_expire_at
+
+
+def settle_amount_for(catalog_amount: float, db: Optional[Session] = None) -> float:
+    rate = float(get_member_config(db).get("discountRate") or 0.9)
+    if rate <= 0 or rate > 1:
+        rate = 0.9
+    return round(max(0.0, float(catalog_amount or 0)) * rate, 2)
 
 
 def get_checkin_config(db: Session) -> dict:
@@ -166,6 +318,7 @@ def award_order_points(db: Session, order: Order, user: Optional[AppUser]) -> in
             "nye": "年夜饭",
             "recommend": "订酒店",
             "gather": "聚餐",
+            "membership": "会员开通",
         }.get(order.type or "", "订单")
         add_points(db, user, f"消费获得-{type_label}", gained)
         extra["pointsAwarded"] = gained
@@ -372,9 +525,17 @@ def mark_refund_pending(db: Session, order: Order, reason: str, extra_patch: Opt
 
 
 def release_stale_room_holds(db: Session) -> None:
-    """超过 30 分钟仍待支付，或用餐日期已过：取消订单并放开已锁包房。"""
+    """
+    清理占档：
+    - 待支付超过 30 分钟，或用餐日已过
+    - 会员免付预约：未选日期超过意向天数；已选日期且用餐日已过未核销
+    """
     cutoff = datetime.utcnow() - timedelta(minutes=ROOM_HOLD_MINUTES)
     today = today_cn()
+    cfg = get_member_config(db)
+    intent_days = max(1, int(cfg.get("intentExpireDays") or 7))
+    intent_cutoff = datetime.utcnow() - timedelta(days=intent_days)
+
     stale = (
         db.query(Order)
         .filter(
@@ -386,9 +547,28 @@ def release_stale_room_holds(db: Session) -> None:
         )
         .all()
     )
+    reserved = (
+        db.query(Order)
+        .filter(Order.status == "reserved")
+        .all()
+    )
+    for order in reserved:
+        extra = loads(order.extra or "{}", {}) or {}
+        if not extra.get("memberReserve"):
+            continue
+        day = (order.room_date or "").strip()
+        if day and day < today:
+            stale.append(order)
+        elif not day and order.created_at and order.created_at < intent_cutoff:
+            stale.append(order)
+
     if not stale:
         return
+    seen = set()
     for order in stale:
+        if order.id in seen:
+            continue
+        seen.add(order.id)
         release_room_if_needed(db, order)
         order.status = "cancelled"
         order.status_text = STATUS_TEXT["cancelled"]

@@ -837,8 +837,29 @@ def seed_all(db: Session) -> None:
             if not (isinstance(cur, dict) and (cur.get("sections") or [])):
                 set_config(db, key, default)
         elif key == "member":
-            if not (isinstance(cur, dict) and (cur.get("levels") or [])):
-                set_config(db, key, default)
+            # 旧库只有 levels、或章程仍是「会员等级体系」→ 用新年卡配置覆盖（保留 monthCoupon 若已有）
+            need_refresh = False
+            if not isinstance(cur, dict):
+                need_refresh = True
+            elif cur.get("price") is None and not (cur.get("benefits") or []):
+                need_refresh = True
+            else:
+                rules = cur.get("rules") or []
+                if isinstance(rules, list) and rules:
+                    first_title = str((rules[0] or {}).get("title") or "")
+                    if "等级体系" in first_title or "V0" in first_title:
+                        need_refresh = True
+                if not (cur.get("benefits") or []):
+                    need_refresh = True
+                if not (cur.get("reminders") or []):
+                    need_refresh = True
+            if need_refresh:
+                merged = dict(default)
+                if isinstance(cur, dict) and cur.get("monthCoupon"):
+                    merged["monthCoupon"] = cur["monthCoupon"]
+                if isinstance(cur, dict) and cur.get("levels"):
+                    merged["levels"] = cur["levels"]
+                set_config(db, key, merged)
         elif key == "agreements":
             if not (isinstance(cur, dict) and cur):
                 set_config(db, key, default)

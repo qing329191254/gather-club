@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<page-meta :page-style="'overflow:' + (stewardVisible ? 'hidden' : 'visible')"></page-meta>
 	<app-loading />
 	<view v-if="goods" class="page">
@@ -116,7 +116,7 @@
 				const ok = await this.askModal({
 					title: '确认兑换',
 					content: `将消耗 ${this.goods.cost} 积分兑换「${this.goods.title || this.goods.name}」\n${addrText}`,
-					confirmColor: '#e54148'
+					confirmColor: '#C6453C'
 				})
 				if (!ok) return
 				try {
@@ -273,8 +273,8 @@
 		height: 80rpx;
 		line-height: 80rpx;
 		text-align: center;
-		border-radius: 40rpx;
-		background: #e64750;
+		border-radius: 10rpx;
+		background: #C6453C;
 		color: #fff;
 		font-size: 32rpx;
 	}

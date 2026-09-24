@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 	<page-meta :page-style="'overflow:' + (stewardVisible ? 'hidden' : 'visible')"></page-meta>
 	<app-loading />
 	<view v-if="detail" class="page">
@@ -380,13 +380,13 @@
 	.yen {
 		font-size: 36rpx;
 		font-weight: 700;
-		color: #e23636;
+		color: #C6453C;
 	}
 
 	.price {
 		font-size: 56rpx;
 		font-weight: 700;
-		color: #e23636;
+		color: #C6453C;
 		line-height: 1;
 		margin-left: 4rpx;
 	}
@@ -395,7 +395,7 @@
 		margin-left: 10rpx;
 		font-size: 28rpx;
 		font-weight: 600;
-		color: #e23636;
+		color: #C6453C;
 	}
 
 	.name {
@@ -446,7 +446,7 @@
 		margin-top: 20rpx;
 		padding: 24rpx 24rpx;
 		border-radius: 16rpx;
-		background: #fff6ee;
+		background: #F7F3EE;
 		font-size: 26rpx;
 		color: #666;
 		line-height: 1.65;
@@ -503,7 +503,7 @@
 		padding: 0 28rpx;
 		height: 56rpx;
 		line-height: 56rpx;
-		border-radius: 28rpx;
+		border-radius: 12rpx;
 		background: #f6d7b8;
 		color: #8a5a2b;
 		font-size: 26rpx;
@@ -561,7 +561,7 @@
 		margin-left: auto;
 		height: 96rpx;
 		border-radius: 48rpx;
-		background: #e54148;
+		background: #C6453C;
 		display: flex;
 		align-items: center;
 	}
