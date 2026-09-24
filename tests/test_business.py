@@ -810,6 +810,27 @@ class BusinessTests(unittest.TestCase):
         deleted = self.client.delete(f"/api/admin/gather/products/{pid}", headers=auth)
         self.assertEqual(deleted.status_code, 200, deleted.text)
 
+    def test_nye_order_without_date_is_allowed(self):
+        """宴席可不选日期下单（意向单，不占档）。"""
+        res = self.client.post(
+            "/api/v1/orders",
+            headers=headers("openid-nye-nodate"),
+            json={
+                "type": "nye",
+                "store_id": "gongkang",
+                "package_id": "1",
+                "quantity": 1,
+                "contact_name": "测",
+                "contact_phone": "13800138001",
+            },
+        )
+        self.assertEqual(res.status_code, 200, res.text)
+        body = res.json()
+        self.assertEqual(body["status"], "pending")
+        self.assertGreater(float(body["amount"]), 0)
+        self.assertFalse(body.get("roomDate"))
+        self.assertFalse(body.get("memberReserve"))
+
     def test_member_config_has_annual_card_fields(self):
         res = self.client.get("/api/v1/member/config")
         self.assertEqual(res.status_code, 200, res.text)
