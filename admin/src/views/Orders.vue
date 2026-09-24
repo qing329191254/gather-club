@@ -21,13 +21,21 @@
         </el-table-column>
         <el-table-column prop="store_name" label="门店" min-width="140" />
         <el-table-column prop="title" label="标题" min-width="180" show-overflow-tooltip />
-        <el-table-column prop="amount" label="金额" width="90" />
+        <el-table-column label="金额" width="120">
+          <template #default="{ row }">
+            <template v-if="isMemberReserve(row)">
+              <div>线上 ¥0</div>
+              <div class="settle">到店 ¥{{ settleAmount(row) }}</div>
+            </template>
+            <template v-else>¥{{ row.amount }}</template>
+          </template>
+        </el-table-column>
         <el-table-column prop="contact_phone" label="手机" width="120" />
         <el-table-column prop="room_date" label="用餐日" width="110" />
         <el-table-column label="时段" width="90">
           <template #default="{ row }">{{ slotLabel(row.room_slot) }}</template>
         </el-table-column>
-        <el-table-column prop="status_text" label="状态" width="90" />
+        <el-table-column prop="status_text" label="状态" width="110" />
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
             <div class="row-ops">
@@ -71,7 +79,11 @@
         <el-descriptions-item label="门店">{{ current.store_name }}</el-descriptions-item>
         <el-descriptions-item label="标题">{{ current.title }}</el-descriptions-item>
         <el-descriptions-item label="规格">{{ current.spec }}</el-descriptions-item>
-        <el-descriptions-item label="金额">{{ current.amount }}</el-descriptions-item>
+        <el-descriptions-item v-if="isMemberReserve(current)" label="线上已付">¥0（会员预约）</el-descriptions-item>
+        <el-descriptions-item v-if="isMemberReserve(current)" label="到店应收">
+          <b>¥{{ settleAmount(current) }}</b>
+        </el-descriptions-item>
+        <el-descriptions-item v-else label="金额">¥{{ current.amount }}</el-descriptions-item>
         <el-descriptions-item label="联系人">{{ current.contact_name }} {{ current.contact_phone }}</el-descriptions-item>
         <el-descriptions-item label="人数">{{ current.people || '-' }}</el-descriptions-item>
         <el-descriptions-item label="用餐">{{ current.room_date || '-' }} {{ slotLabel(current.room_slot) }}</el-descriptions-item>
@@ -119,6 +131,18 @@ function slotLabel(slot) {
   return slot || ''
 }
 
+function isMemberReserve(row) {
+  const extra = (row && row.extra) || {}
+  return !!(extra.memberReserve || extra.member_reserve)
+}
+
+function settleAmount(row) {
+  const extra = (row && row.extra) || {}
+  const v = Number(extra.settleAmount ?? extra.settle_amount ?? 0)
+  if (v > 0) return v
+  return Number(row?.amount || 0)
+}
+
 function showDetail(row) {
   current.value = row
   drawer.value = true
@@ -163,3 +187,11 @@ onMounted(() => {
   load()
 })
 </script>
+
+<style scoped>
+.settle {
+  color: #c45c26;
+  font-size: 12px;
+  line-height: 1.3;
+}
+</style>
